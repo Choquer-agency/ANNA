@@ -21,7 +21,6 @@ export function SystemTab(): React.JSX.Element {
   const [envStatus, setEnvStatus] = useState({ hasOpenAI: false, hasAnthropic: false })
   const [defaultStyleId, setDefaultStyleId] = useState<string | null>(null)
   const [styleProfiles, setStyleProfiles] = useState<StyleProfile[]>([])
-  const [showInDock, setShowInDock] = useState(true)
   const [dictationSounds, setDictationSounds] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -32,13 +31,6 @@ export function SystemTab(): React.JSX.Element {
       window.annaAPI.getStyleProfiles(),
       window.annaAPI.getSetting('dictation_sounds')
     ])
-    // Dock visibility is a new IPC — handle gracefully if not yet available
-    try {
-      const dock = await window.annaAPI.getDockVisibility()
-      setShowInDock(dock)
-    } catch {
-      setShowInDock(true)
-    }
     setAutoPaste(ap !== 'false')
     setEnvStatus(env)
     setStyleProfiles(styles)
@@ -117,17 +109,6 @@ export function SystemTab(): React.JSX.Element {
         </SettingsCard>
       )}
 
-      <SettingsCard title="App Preferences">
-        <SettingsRow label="Show app in dock" description="Toggle Anna's visibility in the macOS dock">
-          <Toggle
-            value={showInDock}
-            onChange={async (v) => {
-              setShowInDock(v)
-              await window.annaAPI.setDockVisibility(v)
-            }}
-          />
-        </SettingsRow>
-      </SettingsCard>
     </div>
   )
 }
