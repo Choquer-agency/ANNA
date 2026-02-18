@@ -1,6 +1,8 @@
 import { globalShortcut } from 'electron'
+import { startFnKeyMonitor, stopFnKeyMonitor } from './fnKeyMonitor'
 
 let onToggle: (() => void) | null = null
+let usingFnKey = false
 
 export function registerHotkey(callback: () => void): boolean {
   onToggle = callback
@@ -27,6 +29,29 @@ export function registerHotkey(callback: () => void): boolean {
 }
 
 export function reregisterHotkey(accelerator: string): boolean {
+  // Stop fn key monitor if it was active
+  if (usingFnKey) {
+    stopFnKeyMonitor()
+    usingFnKey = false
+  }
+
+  // Handle fn key specially
+  if (accelerator === 'fn') {
+    globalShortcut.unregisterAll()
+    usingFnKey = true
+    const started = startFnKeyMonitor(() => {
+      onToggle?.()
+    })
+    if (started) {
+      console.log('[hotkey] Switched to fn key')
+    } else {
+      console.error('[hotkey] Failed to start fn key monitor, falling back to Alt+Space')
+      return registerHotkey(onToggle!)
+    }
+    return started
+  }
+
+  // Standard Electron accelerator
   globalShortcut.unregisterAll()
   const registered = globalShortcut.register(accelerator, () => {
     onToggle?.()
@@ -40,5 +65,9 @@ export function reregisterHotkey(accelerator: string): boolean {
 }
 
 export function unregisterHotkeys(): void {
+  if (usingFnKey) {
+    stopFnKeyMonitor()
+    usingFnKey = false
+  }
   globalShortcut.unregisterAll()
 }

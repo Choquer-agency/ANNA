@@ -10,8 +10,9 @@
     "preview": "electron-vite preview",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "rebuild": "npx @electron/rebuild -f -w better-sqlite3",
-    "build:mac": "electron-vite build && electron-builder --mac --config",
-    "build:mac:signed": "electron-vite build && electron-builder --mac --config",
+    "build:fn-helper": "bash scripts/build-fn-helper.sh",
+    "build:mac": "npm run build:fn-helper && electron-vite build && electron-builder --mac --config",
+    "build:mac:signed": "npm run build:fn-helper && electron-vite build && electron-builder --mac --config",
     "convex:dev": "npx convex dev",
     "convex:deploy": "npx convex deploy"
   },
@@ -71,6 +72,12 @@
       "private": true
     },
     "afterSign": "scripts/notarize.js",
+    "extraResources": [
+      {
+        "from": "resources/fn-key-helper",
+        "to": "fn-key-helper"
+      }
+    ],
     "asar": true,
     "asarUnpack": [
       "**/*.node"

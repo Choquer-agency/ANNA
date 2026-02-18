@@ -50,7 +50,24 @@ export function GeneralTab(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [capturingHotkey])
 
+  function setFnKey(): void {
+    setHotkey('fn')
+    setCapturingHotkey(false)
+    window.annaAPI.setSetting('hotkey', 'fn')
+  }
+
   if (!loaded) return <div />
+
+  function formatHotkey(hk: string): string {
+    if (hk === 'fn') return 'fn'
+    return hk
+      .replace('CommandOrControl', '⌘')
+      .replace('Alt', '⌥')
+      .replace('Shift', '⇧')
+      .replace('Ctrl', '⌃')
+      .replace('Space', '␣')
+      .replace(/\+/g, ' ')
+  }
 
   return (
     <div className="space-y-6">
@@ -58,13 +75,23 @@ export function GeneralTab(): React.JSX.Element {
         <SettingsRow label="Activation shortcut">
           <div className="flex items-center gap-3">
             <kbd className="px-3 py-1.5 bg-white/60 border border-border rounded-xl text-sm font-mono text-ink-secondary">
-              {capturingHotkey ? 'Press keys...' : hotkey}
+              {capturingHotkey ? 'Press keys...' : formatHotkey(hotkey)}
             </kbd>
             <button
               onClick={() => setCapturingHotkey(true)}
               className="px-3 py-1.5 text-sm text-ink-secondary hover:text-ink border border-border rounded-xl hover:bg-white/60 transition-colors duration-200"
             >
               {capturingHotkey ? 'Listening...' : 'Change'}
+            </button>
+            <button
+              onClick={setFnKey}
+              className={`px-3 py-1.5 text-sm border rounded-xl transition-colors duration-200 ${
+                hotkey === 'fn'
+                  ? 'bg-accent text-white border-accent'
+                  : 'text-ink-secondary hover:text-ink border-border hover:bg-white/60'
+              }`}
+            >
+              fn
             </button>
           </div>
         </SettingsRow>
