@@ -93,11 +93,18 @@ contextBridge.exposeInMainWorld('annaAPI', {
   onPipelineError: (callback: (data: unknown) => void): void => {
     ipcRenderer.on('pipeline:error', (_event, data) => callback(data))
   },
+  // Auto-update
+  onUpdateDownloaded: (callback: (version: string) => void): void => {
+    ipcRenderer.on('update:downloaded', (_event, version: string) => callback(version))
+  },
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+
   removeAllListeners: (): void => {
     ipcRenderer.removeAllListeners('pipeline:status')
     ipcRenderer.removeAllListeners('pipeline:complete')
     ipcRenderer.removeAllListeners('pipeline:error')
     ipcRenderer.removeAllListeners('app:get-current-page')
     ipcRenderer.removeAllListeners('dictation:append-to-note')
+    ipcRenderer.removeAllListeners('update:downloaded')
   }
 })

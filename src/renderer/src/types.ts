@@ -84,6 +84,10 @@ declare global {
       onDictationToNote: (cb: (text: string) => void) => void
       removeDictationToNoteListener: () => void
 
+      // Auto-update
+      onUpdateDownloaded: (cb: (version: string) => void) => void
+      installUpdate: () => Promise<void>
+
       onPipelineStatus: (cb: (data: PipelineStatus) => void) => void
       onPipelineComplete: (cb: (data: { sessionId: string }) => void) => void
       onPipelineError: (cb: (data: { error: string }) => void) => void

@@ -1,5 +1,6 @@
 import { config } from 'dotenv'
 import { app, BrowserWindow, ipcMain, dialog, systemPreferences } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { existsSync, unlinkSync, copyFileSync } from 'fs'
 import { userInfo, hostname } from 'os'
@@ -281,6 +282,32 @@ app.whenReady().then(() => {
 
   // Create tray icon
   createTray(mainWindow!, handleHotkeyToggle)
+
+  // Auto-updater (skip in dev)
+  if (!is.dev) {
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('[updater] Update downloaded:', info.version)
+      mainWindow?.webContents.send('update:downloaded', info.version)
+    })
+
+    autoUpdater.checkForUpdatesAndNotify().catch((err) =>
+      console.error('[updater] Check failed:', err)
+    )
+
+    // Check for updates every 4 hours
+    setInterval(() => {
+      autoUpdater.checkForUpdatesAndNotify().catch((err) =>
+        console.error('[updater] Check failed:', err)
+      )
+    }, 4 * 60 * 60 * 1000)
+  }
+
+  ipcMain.handle('update:install', () => {
+    autoUpdater.quitAndInstall()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

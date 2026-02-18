@@ -49,6 +49,18 @@ function App(): React.JSX.Element {
     return () => { window.annaAPI.removeGetCurrentPageListener() }
   }, [currentPage])
 
+  // Auto-update notification
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    window.annaAPI.onUpdateDownloaded((version) => {
+      setUpdateVersion(version)
+    })
+    return () => {
+      // Cleaned up via removeAllListeners
+    }
+  }, [])
+
   // Listen for dictation text to append to notes
   useEffect(() => {
     window.annaAPI.onDictationToNote((text: string) => {
@@ -143,6 +155,24 @@ function App(): React.JSX.Element {
           <div className="relative bg-surface-raised rounded-2xl shadow-float w-[851px] h-[598px] modal-enter overflow-hidden">
             <SettingsPage onClose={() => setSettingsOpen(false)} />
           </div>
+        </div>
+      )}
+
+      {updateVersion && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-float border bg-surface-raised border-border text-sm toast-enter">
+          <span className="text-ink">Update v{updateVersion} ready</span>
+          <button
+            onClick={() => window.annaAPI.installUpdate()}
+            className="px-3 py-1 rounded-lg bg-accent text-white text-xs font-medium hover:opacity-90 transition-opacity"
+          >
+            Restart
+          </button>
+          <button
+            onClick={() => setUpdateVersion(null)}
+            className="text-ink/40 hover:text-ink/70 transition-colors text-xs"
+          >
+            Later
+          </button>
         </div>
       )}
 
