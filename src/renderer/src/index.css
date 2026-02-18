@@ -1,0 +1,292 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Font */
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+  /* Surface palette */
+  --color-surface: #FFFCF7;
+  --color-surface-alt: #FBF5ED;
+  --color-surface-raised: #FFFFFF;
+
+  /* Primary orange */
+  --color-primary: #FF9E19;
+  --color-primary-hover: #E88D10;
+  --color-primary-soft: #FFEBD0;
+  --color-primary-ring: rgba(255, 158, 25, 0.3);
+
+  /* Ink hierarchy — standard neutral */
+  --color-ink: #1B1B1B;
+  --color-ink-secondary: #414141;
+  --color-ink-muted: #7A7A7A;
+  --color-ink-faint: #ADADAD;
+
+  /* Borders */
+  --color-border: #EDE7DC;
+  --color-border-strong: #DDD5C8;
+
+  /* Shadows (tinted warm) */
+  --shadow-soft: 0 1px 3px rgba(255, 158, 25, 0.08);
+  --shadow-medium: 0 4px 36px rgba(255, 158, 25, 0.05);
+  --shadow-float: 0 8px 30px rgba(255, 158, 25, 0.15);
+
+  /* Pastel accents */
+  --color-pastel-rose: #FFE4E8;
+  --color-pastel-rose-text: #D4536A;
+  --color-pastel-mint: #E0F5EC;
+  --color-pastel-mint-text: #2D8A5E;
+  --color-pastel-peach: #FFF0E5;
+  --color-pastel-peach-text: #C47A3A;
+  --color-pastel-sky: #E4F0FF;
+  --color-pastel-sky-text: #4A7FC4;
+  --color-pastel-lemon: #FFF9E0;
+  --color-pastel-lemon-text: #9E8A2F;
+
+  /* Semantic */
+  --color-success-bg: #E8F8EE;
+  --color-success-border: #B8E6C8;
+  --color-success-text: #2D7A4A;
+  --color-error-bg: #FEF0F0;
+  --color-error-border: #F5C4C4;
+  --color-error-text: #C44A4A;
+
+  /* Promo gradient (gold to lilac) */
+  --color-promo-start: #FFEBD0;
+  --color-promo-end: #FCEAFF;
+}
+
+/* Base font weight bump */
+body {
+  font-weight: 500;
+}
+
+/* Thicker lucide icons globally */
+.lucide {
+  stroke-width: 2.25;
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-surface: #1A1A2E;
+  --color-surface-alt: #16213E;
+  --color-surface-raised: #222244;
+  --color-primary: #FF9E19;
+  --color-primary-hover: #E88D10;
+  --color-primary-soft: #3D2E1A;
+  --color-primary-ring: rgba(255, 158, 25, 0.35);
+  --color-ink: #F0F0F0;
+  --color-ink-secondary: #C8C8C8;
+  --color-ink-muted: #8A8A9A;
+  --color-ink-faint: #5A5A6A;
+  --color-border: #2E2E4A;
+  --color-border-strong: #3E3E5A;
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-medium: 0 4px 36px rgba(0, 0, 0, 0.15);
+  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.3);
+  --color-pastel-rose: #3A2028;
+  --color-pastel-rose-text: #FF8A9A;
+  --color-pastel-mint: #1A2E24;
+  --color-pastel-mint-text: #6AD89A;
+  --color-pastel-peach: #2E2418;
+  --color-pastel-peach-text: #FFAA6A;
+  --color-pastel-sky: #1A2230;
+  --color-pastel-sky-text: #7AB4FF;
+  --color-pastel-lemon: #2A2818;
+  --color-pastel-lemon-text: #D4C86A;
+  --color-success-bg: #1A2E20;
+  --color-success-border: #2A4A34;
+  --color-success-text: #6AD89A;
+  --color-error-bg: #2E1A1A;
+  --color-error-border: #4A2A2A;
+  --color-error-text: #FF8A8A;
+  --color-promo-start: #2E2418;
+  --color-promo-end: #2A1A2E;
+}
+
+/* Mesh gradient background */
+.bg-mesh {
+  background-color: #FFFCF7;
+  background-image:
+    radial-gradient(ellipse 70% 70% at 5% 15%, rgba(255, 235, 208, 0.5) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 15% 50%, rgba(255, 235, 208, 0.4) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 10% 85%, rgba(255, 235, 208, 0.35) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(255, 255, 255, 0.7) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 70% 30%, rgba(255, 235, 208, 0.3) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 50% 55%, rgba(252, 234, 255, 0.35) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 45% at 85% 70%, rgba(252, 234, 255, 0.3) 0%, transparent 70%),
+    radial-gradient(ellipse 45% 50% at 25% 90%, rgba(255, 235, 208, 0.2) 0%, transparent 70%);
+}
+
+/* Glass utility */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Toast slide-up animation */
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 0.25s ease-out;
+}
+
+/* Modal scale-in animation */
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-enter {
+  animation: modal-enter 0.2s ease-out;
+}
+
+/* Expanding search */
+.search-wrapper {
+  position: relative;
+}
+
+.search-field {
+  width: 40px;
+  height: 40px;
+  color: transparent;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 0.875rem;
+  padding: 0 40px 0 0;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.3s ease-in-out;
+}
+
+.search-field:focus {
+  border-bottom-color: var(--color-border-strong);
+  width: 300px;
+  color: var(--color-ink);
+  cursor: text;
+  padding-left: 12px;
+}
+
+.search-field:focus ~ .search-icon {
+  background-color: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.search-field::placeholder {
+  color: transparent;
+  transition: color 0.1s;
+}
+
+.search-field:focus::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.search-icon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+  border: none;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+/* Text selection */
+::selection {
+  background-color: #FFEBD0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* Dark mesh background */
+.dark .bg-mesh {
+  background-color: #1A1A2E;
+  background-image:
+    radial-gradient(ellipse 70% 70% at 5% 15%, rgba(255, 158, 25, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 15% 50%, rgba(255, 158, 25, 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 10% 85%, rgba(255, 158, 25, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(30, 30, 50, 0.7) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 70% 30%, rgba(255, 158, 25, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 50% 55%, rgba(100, 60, 180, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 45% at 85% 70%, rgba(100, 60, 180, 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 45% 50% at 25% 90%, rgba(255, 158, 25, 0.04) 0%, transparent 70%);
+}
+
+/* Dark glass */
+.dark .glass {
+  background: rgba(30, 30, 50, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Dark selection */
+.dark ::selection {
+  background-color: rgba(255, 158, 25, 0.3);
+}
+
+/* Promo mesh — light */
+.promo-mesh {
+  background:
+    radial-gradient(ellipse 90% 150% at -10% -20%, rgba(255, 255, 255, 0.65) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 130% at 110% 120%, rgba(252, 234, 255, 0.55) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 140% at 95% -15%, rgba(252, 234, 255, 0.5) 0%, transparent 70%),
+    radial-gradient(ellipse 65% 100% at 40% 130%, rgba(255, 255, 255, 0.5) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 110% at -5% 90%, rgba(252, 234, 255, 0.4) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 80% at 55% 10%, rgba(255, 255, 255, 0.45) 0%, transparent 70%),
+    #FFEBD0;
+}
+
+/* Promo mesh — dark */
+.dark .promo-mesh {
+  background:
+    radial-gradient(ellipse 90% 150% at -10% -20%, rgba(60, 50, 30, 0.65) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 130% at 110% 120%, rgba(42, 26, 46, 0.55) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 140% at 95% -15%, rgba(42, 26, 46, 0.5) 0%, transparent 70%),
+    radial-gradient(ellipse 65% 100% at 40% 130%, rgba(60, 50, 30, 0.5) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 110% at -5% 90%, rgba(42, 26, 46, 0.4) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 80% at 55% 10%, rgba(60, 50, 30, 0.45) 0%, transparent 70%),
+    #2E2418;
+}
