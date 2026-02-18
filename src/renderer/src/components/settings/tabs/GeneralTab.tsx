@@ -1,15 +1,30 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Pencil } from 'lucide-react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 
+function parseHotkeyParts(hk: string): string[] {
+  if (hk === 'fn') return ['fn']
+  return hk.split('+').map((part) => {
+    const map: Record<string, string> = {
+      'CommandOrControl': '⌘',
+      'Alt': '⌥',
+      'Shift': '⇧ Shift',
+      'Ctrl': '⌃',
+      'Space': 'Space'
+    }
+    return map[part] || part
+  })
+}
+
 export function GeneralTab(): React.JSX.Element {
-  const [hotkey, setHotkey] = useState('Alt+Space')
+  const [hotkey, setHotkey] = useState('fn')
   const [capturingHotkey, setCapturingHotkey] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
   const loadSettings = useCallback(async () => {
     const hk = await window.annaAPI.getSetting('hotkey')
-    setHotkey(hk || 'Alt+Space')
+    setHotkey(hk || 'fn')
     setLoaded(true)
   }, [])
 
@@ -46,8 +61,18 @@ export function GeneralTab(): React.JSX.Element {
       window.annaAPI.setSetting('hotkey', accelerator)
     }
 
+    function onEscape(e: KeyboardEvent): void {
+      if (e.key === 'Escape') {
+        setCapturingHotkey(false)
+      }
+    }
+
     window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onEscape, true)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onEscape, true)
+    }
   }, [capturingHotkey])
 
   function setFnKey(): void {
@@ -58,40 +83,49 @@ export function GeneralTab(): React.JSX.Element {
 
   if (!loaded) return <div />
 
-  function formatHotkey(hk: string): string {
-    if (hk === 'fn') return 'fn'
-    return hk
-      .replace('CommandOrControl', '⌘')
-      .replace('Alt', '⌥')
-      .replace('Shift', '⇧')
-      .replace('Ctrl', '⌃')
-      .replace('Space', '␣')
-      .replace(/\+/g, ' ')
-  }
+  const parts = parseHotkeyParts(hotkey)
 
   return (
     <div className="space-y-6">
       <SettingsCard title="Activation">
         <SettingsRow label="Activation shortcut">
-          <div className="flex items-center gap-3">
-            <kbd className="px-3 py-1.5 bg-white/60 border border-border rounded-xl text-sm font-mono text-ink-secondary">
-              {capturingHotkey ? 'Press keys...' : formatHotkey(hotkey)}
-            </kbd>
-            <button
-              onClick={() => setCapturingHotkey(true)}
-              className="px-3 py-1.5 text-sm text-ink-secondary hover:text-ink border border-border rounded-xl hover:bg-white/60 transition-colors duration-200"
-            >
-              {capturingHotkey ? 'Listening...' : 'Change'}
-            </button>
+          <div className="flex flex-col gap-3">
+            {/* Hotkey display field */}
+            <div className="flex items-center gap-1 px-3 py-2 bg-white/60 border border-border rounded-xl min-w-[200px]">
+              {capturingHotkey ? (
+                <span className="text-sm text-ink-muted animate-pulse">Press keys...</span>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    {parts.map((part, i) => (
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 bg-surface-alt border border-border rounded-lg text-sm font-medium text-ink"
+                      >
+                        {part}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setCapturingHotkey(true)}
+                    className="ml-2 p-1 text-ink-muted hover:text-ink transition-colors rounded-md hover:bg-surface-alt"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* fn shortcut button */}
             <button
               onClick={setFnKey}
-              className={`px-3 py-1.5 text-sm border rounded-xl transition-colors duration-200 ${
+              className={`self-start px-3 py-1.5 text-sm border rounded-xl transition-colors duration-200 ${
                 hotkey === 'fn'
                   ? 'bg-accent text-white border-accent'
                   : 'text-ink-secondary hover:text-ink border-border hover:bg-white/60'
               }`}
             >
-              fn
+              Use fn key
             </button>
           </div>
         </SettingsRow>

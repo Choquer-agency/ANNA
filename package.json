@@ -44,6 +44,7 @@
         }
       ],
       "icon": "build/icon.icns",
+      "identity": "Bryce Choquer (VAC2837QGB)",
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "hardenedRuntime": true,

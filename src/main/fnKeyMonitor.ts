@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process'
+import { spawn, ChildProcess, execSync } from 'child_process'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { is } from '@electron-toolkit/utils'
@@ -24,6 +24,13 @@ export function startFnKeyMonitor(onPress: () => void): boolean {
 
   onPressCallback = onPress
 
+  // Ensure execute permissions (may be stripped during packaging)
+  try {
+    execSync(`chmod +x "${helperPath}"`)
+  } catch {
+    console.error('[fn-key] Failed to set execute permissions')
+  }
+
   helperProcess = spawn(helperPath, [], {
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -45,12 +52,17 @@ export function startFnKeyMonitor(onPress: () => void): boolean {
     console.error('[fn-key] Helper error:', data.trim())
   })
 
+  helperProcess.on('error', (err) => {
+    console.error('[fn-key] Failed to spawn helper:', err.message)
+    helperProcess = null
+  })
+
   helperProcess.on('exit', (code) => {
     console.log('[fn-key] Helper exited with code:', code)
     helperProcess = null
   })
 
-  console.log('[fn-key] Monitor started')
+  console.log('[fn-key] Monitor started, path:', helperPath)
   return true
 }
 

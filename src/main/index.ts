@@ -30,10 +30,10 @@ let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 960,
-    height: 700,
-    minWidth: 720,
-    minHeight: 500,
+    width: 1122,
+    height: 699,
+    minWidth: 1122,
+    minHeight: 699,
     title: 'ANNA',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
@@ -80,12 +80,6 @@ app.whenReady().then(() => {
   const launchSetting = getSetting('launch_at_login')
   if (launchSetting === 'true') {
     app.setLoginItemSettings({ openAtLogin: true })
-  }
-
-  // Apply dock visibility setting
-  const dockSetting = getSetting('show_in_dock')
-  if (dockSetting === 'false') {
-    app.dock?.hide()
   }
 
   // IPC handlers
@@ -200,21 +194,6 @@ app.whenReady().then(() => {
   ipcMain.handle('convex:get-status', () => getConvexStatus())
   ipcMain.handle('convex:enable-sync', () => enableSync())
   ipcMain.handle('convex:disable-sync', () => disableSync())
-
-  // Dock visibility
-  ipcMain.handle('system:set-dock-visibility', async (_event, visible: boolean) => {
-    setSetting('show_in_dock', String(visible))
-    if (visible) {
-      app.dock?.show()
-    } else {
-      app.dock?.hide()
-    }
-  })
-
-  ipcMain.handle('system:get-dock-visibility', () => {
-    const setting = getSetting('show_in_dock')
-    return setting !== 'false' // defaults to true
-  })
 
   ipcMain.handle('system:get-username', () => {
     try {

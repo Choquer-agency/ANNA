@@ -7,25 +7,24 @@ let usingFnKey = false
 export function registerHotkey(callback: () => void): boolean {
   onToggle = callback
 
-  // Option+Space — same as Wispr Flow, doesn't conflict with typing
-  let registered = globalShortcut.register('Alt+Space', () => {
+  // Default: fn key via native helper
+  usingFnKey = true
+  const started = startFnKeyMonitor(() => {
     onToggle?.()
   })
 
-  if (!registered) {
-    console.warn('[hotkey] Alt+Space registration failed, trying fallback: CommandOrControl+Shift+Space')
-    registered = globalShortcut.register('CommandOrControl+Shift+Space', () => {
+  if (started) {
+    console.log('[hotkey] Hotkey registered successfully (fn key)')
+  } else {
+    console.error('[hotkey] fn key monitor failed, falling back to Alt+Space')
+    usingFnKey = false
+    const registered = globalShortcut.register('Alt+Space', () => {
       onToggle?.()
     })
+    return registered
   }
 
-  if (registered) {
-    console.log('[hotkey] Hotkey registered successfully (Option+Space)')
-  } else {
-    console.error('[hotkey] Failed to register any hotkey')
-  }
-
-  return registered
+  return started
 }
 
 export function reregisterHotkey(accelerator: string): boolean {
@@ -45,8 +44,7 @@ export function reregisterHotkey(accelerator: string): boolean {
     if (started) {
       console.log('[hotkey] Switched to fn key')
     } else {
-      console.error('[hotkey] Failed to start fn key monitor, falling back to Alt+Space')
-      return registerHotkey(onToggle!)
+      console.error('[hotkey] Failed to start fn key monitor')
     }
     return started
   }

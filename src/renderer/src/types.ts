@@ -38,10 +38,6 @@ declare global {
       updateSnippet: (id: string, trigger: string, expansion: string) => Promise<void>
       deleteSnippet: (id: string) => Promise<void>
 
-      // System
-      setDockVisibility: (visible: boolean) => Promise<void>
-      getDockVisibility: () => Promise<boolean>
-
       // Settings
       getSetting: (key: string) => Promise<string | undefined>
       setSetting: (key: string, value: string) => Promise<void>

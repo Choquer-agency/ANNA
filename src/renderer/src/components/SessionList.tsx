@@ -41,7 +41,7 @@ export function SessionList({
   onDownload,
   onDelete,
   onFlag,
-  hotkey = 'Alt+Space'
+  hotkey = 'fn'
 }: SessionListProps): React.JSX.Element {
   if (sessions.length === 0) {
     return (

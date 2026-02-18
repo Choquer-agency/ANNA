@@ -3,10 +3,10 @@ import { Mic, RotateCcw } from 'lucide-react'
 import type { PipelineStatus } from '../../types'
 
 interface TestDictationStepProps {
-  onNext: () => void
+  onComplete: () => void
 }
 
-export function TestDictationStep({ onNext }: TestDictationStepProps): React.JSX.Element {
+export function TestDictationStep({ onComplete }: TestDictationStepProps): React.JSX.Element {
   const [status, setStatus] = useState<string>('idle')
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -24,9 +24,8 @@ export function TestDictationStep({ onNext }: TestDictationStepProps): React.JSX
       setError(data.error)
     })
 
-    return () => {
-      window.annaAPI.removeAllListeners()
-    }
+    // Don't call removeAllListeners here — useAnna has already
+    // registered pipeline listeners and they'd be wiped out
   }, [])
 
   // Fetch the latest session result when pipeline completes
@@ -53,7 +52,7 @@ export function TestDictationStep({ onNext }: TestDictationStepProps): React.JSX
     <div className="bg-surface-raised rounded-[20px] shadow-medium p-10 w-full max-w-md">
       <h2 className="text-xl font-bold mb-1">Test Dictation</h2>
       <p className="text-ink-muted text-sm mb-6">
-        Press your hotkey (Ctrl+Shift+Space by default) and say something to test the pipeline.
+        Press your hotkey (<kbd className="px-1.5 py-0.5 bg-white/60 border border-border rounded-md text-xs font-mono">fn</kbd>) and say something to test the pipeline.
       </p>
 
       {/* Status area */}
@@ -102,10 +101,13 @@ export function TestDictationStep({ onNext }: TestDictationStepProps): React.JSX
           </button>
         )}
         <button
-          onClick={onNext}
+          onClick={async () => {
+            await window.annaAPI.setSetting('onboarding_completed', 'true')
+            onComplete()
+          }}
           className="flex-1 bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
         >
-          Continue
+          Start Using Anna
         </button>
       </div>
     </div>

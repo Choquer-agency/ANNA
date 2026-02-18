@@ -33,7 +33,7 @@ export function HomePage({
   onNavigateToStyle
 }: HomePageProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
-  const [hotkey, setHotkey] = useState('Alt+Space')
+  const [hotkey, setHotkey] = useState('fn')
 
   useEffect(() => {
     window.annaAPI.getSetting('hotkey').then((val) => {
@@ -61,7 +61,7 @@ export function HomePage({
       {/* Welcome + Stats */}
       <div className="flex items-start justify-between mb-8">
         <h1 className="text-3xl font-bold text-ink">
-          Welcome back, {username || '...'}
+          {sessions.length > 0 ? 'Welcome back' : 'Welcome'}, {username || '...'}
         </h1>
         <StatsBar stats={stats} />
       </div>

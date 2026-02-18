@@ -56,10 +56,6 @@ contextBridge.exposeInMainWorld('annaAPI', {
   enableConvexSync: (): Promise<void> => ipcRenderer.invoke('convex:enable-sync'),
   disableConvexSync: (): Promise<void> => ipcRenderer.invoke('convex:disable-sync'),
 
-  // System
-  setDockVisibility: (visible: boolean): Promise<void> => ipcRenderer.invoke('system:set-dock-visibility', visible),
-  getDockVisibility: (): Promise<boolean> => ipcRenderer.invoke('system:get-dock-visibility'),
-
   // Settings
   getSetting: (key: string): Promise<string | undefined> => ipcRenderer.invoke('settings:get', key),
   setSetting: (key: string, value: string): Promise<void> => ipcRenderer.invoke('settings:set', key, value),
