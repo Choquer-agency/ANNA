@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingRoot: path.join(__dirname, '..'),
   webpack: (config, { isServer: _ }) => {
+    // Resolve @convex/* path alias to ../convex/*
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@convex': path.join(__dirname, '..', 'convex'),
+    }
     // Ensure ../convex/_generated files can resolve 'convex/server' etc.
     // from the website's node_modules
     config.resolve.modules = [
