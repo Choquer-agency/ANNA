@@ -1,17 +1,22 @@
 'use client'
 
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { ease } from '@/lib/animations'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
 
-const stickerLogos = [
-  { src: '/images/logos/Gmail.svg', alt: 'Gmail', rotate: -3, z: 5 },
-  { src: '/images/logos/Notion.svg', alt: 'Notion', rotate: 4, z: 4 },
-  { src: '/images/logos/Discord.svg', alt: 'Discord', rotate: -2, z: 3 },
-  { src: '/images/logos/GitHub.svg', alt: 'GitHub', rotate: 3, z: 2 },
-  { src: '/images/logos/Airtable.svg', alt: 'Airtable', rotate: -4, z: 1 },
+const typewriterWords = [
+  'Gmail',
+  'Slack',
+  'Notion',
+  'emails',
+  'notes',
+  'Cursor',
+  'code',
+  'Discord',
+  'docs',
+  'Linear',
 ]
 
 const allAvatars = [
@@ -53,21 +58,40 @@ function getDailyAvatars() {
   return shuffled.slice(0, 5)
 }
 
-function StickerStack() {
+function Typewriter() {
+  const [wordIndex, setWordIndex] = useState(0)
+  const [displayed, setDisplayed] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  useEffect(() => {
+    const currentWord = typewriterWords[wordIndex]
+
+    if (!isDeleting) {
+      if (displayed.length < currentWord.length) {
+        const timer = setTimeout(() => {
+          setDisplayed(currentWord.slice(0, displayed.length + 1))
+        }, 80)
+        return () => clearTimeout(timer)
+      }
+      const timer = setTimeout(() => setIsDeleting(true), 1800)
+      return () => clearTimeout(timer)
+    }
+
+    if (displayed.length > 0) {
+      const timer = setTimeout(() => {
+        setDisplayed(displayed.slice(0, -1))
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+
+    setIsDeleting(false)
+    setWordIndex((prev) => (prev + 1) % typewriterWords.length)
+  }, [displayed, isDeleting, wordIndex])
+
   return (
-    <span className="inline-flex items-center ml-1.5 -space-x-3 align-middle">
-      {stickerLogos.map((logo, i) => (
-        <motion.span
-          key={logo.alt}
-          initial={{ opacity: 0, y: 20, rotate: 0 }}
-          animate={{ opacity: 1, y: 0, rotate: logo.rotate }}
-          transition={{ duration: 0.5, ease, delay: 0.3 + i * 0.08 }}
-          className="inline-block px-3 py-2 rounded-2xl bg-[#FFF8E7] border-2 border-[#FFE49A] shadow-[0_2px_8px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.04)] hover:scale-110 transition-transform duration-200 cursor-default"
-          style={{ zIndex: logo.z }}
-        >
-          <img src={logo.src} alt={logo.alt} className="h-7 w-7 object-contain" />
-        </motion.span>
-      ))}
+    <span className="text-primary">
+      {displayed}
+      <span className="inline-block w-[3px] h-[0.85em] bg-primary/70 ml-0.5 align-middle animate-[blink_1s_step-end_infinite]" />
     </span>
   )
 }
@@ -99,7 +123,7 @@ export function HeroSection() {
             </span>
           </motion.div>
 
-          {/* Headline — medium weight, center */}
+          {/* Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 80 }}
             animate={{ opacity: 1, y: 0 }}
@@ -109,7 +133,7 @@ export function HeroSection() {
             Your voice, perfectly
             <br className="hidden md:block" />
             typed into{' '}
-            <StickerStack />
+            <Typewriter />
           </motion.h1>
 
           {/* Subheadline */}
@@ -139,7 +163,7 @@ export function HeroSection() {
             </a>
           </motion.div>
 
-          {/* Social proof — avatar photos + join count */}
+          {/* Social proof */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}

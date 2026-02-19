@@ -137,7 +137,7 @@ function MarqueeRow({
 
 export function LogoMarqueeSection() {
   return (
-    <section className="py-[clamp(4rem,8vw,8rem)]">
+    <section className="py-[clamp(2rem,4vw,4rem)]">
       <FadeIn className="text-center mb-[clamp(2.5rem,5vw,4rem)]">
         <h2 className="heading-lg text-ink">
           Works everywhere
