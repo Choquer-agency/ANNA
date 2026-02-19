@@ -1,5 +1,11 @@
 import type { NextConfig } from 'next'
 import path from 'path'
+import fs from 'fs'
+
+// Resolve convex directory: use ../convex (monorepo) if available, else ./convex (Vercel)
+const monorepoConvex = path.join(__dirname, '..', 'convex')
+const localConvex = path.join(__dirname, 'convex')
+const convexDir = fs.existsSync(monorepoConvex) ? monorepoConvex : localConvex
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -15,12 +21,12 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingRoot: path.join(__dirname, '..'),
   webpack: (config, { isServer: _ }) => {
-    // Resolve @convex/* path alias to ../convex/*
+    // Resolve @convex/* path alias
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@convex': path.join(__dirname, '..', 'convex'),
+      '@convex': convexDir,
     }
-    // Ensure ../convex/_generated files can resolve 'convex/server' etc.
+    // Ensure convex/_generated files can resolve 'convex/server' etc.
     // from the website's node_modules
     config.resolve.modules = [
       path.join(__dirname, 'node_modules'),
