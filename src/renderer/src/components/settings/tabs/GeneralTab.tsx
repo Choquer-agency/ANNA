@@ -75,12 +75,6 @@ export function GeneralTab(): React.JSX.Element {
     }
   }, [capturingHotkey])
 
-  function setFnKey(): void {
-    setHotkey('fn')
-    setCapturingHotkey(false)
-    window.annaAPI.setSetting('hotkey', 'fn')
-  }
-
   if (!loaded) return <div />
 
   const parts = parseHotkeyParts(hotkey)
@@ -89,44 +83,29 @@ export function GeneralTab(): React.JSX.Element {
     <div className="space-y-6">
       <SettingsCard title="Activation">
         <SettingsRow label="Activation shortcut">
-          <div className="flex flex-col gap-3">
-            {/* Hotkey display field */}
-            <div className="flex items-center gap-1 px-3 py-2 bg-white/60 border border-border rounded-xl min-w-[200px]">
-              {capturingHotkey ? (
-                <span className="text-sm text-ink-muted animate-pulse">Press keys...</span>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1.5 flex-1">
-                    {parts.map((part, i) => (
-                      <span
-                        key={i}
-                        className="px-2.5 py-1 bg-surface-alt border border-border rounded-lg text-sm font-medium text-ink"
-                      >
-                        {part}
-                      </span>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setCapturingHotkey(true)}
-                    className="ml-2 p-1 text-ink-muted hover:text-ink transition-colors rounded-md hover:bg-surface-alt"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* fn shortcut button */}
-            <button
-              onClick={setFnKey}
-              className={`self-start px-3 py-1.5 text-sm border rounded-xl transition-colors duration-200 ${
-                hotkey === 'fn'
-                  ? 'bg-accent text-white border-accent'
-                  : 'text-ink-secondary hover:text-ink border-border hover:bg-white/60'
-              }`}
-            >
-              Use fn key
-            </button>
+          <div className="flex items-center gap-1 px-3 py-2 bg-white/60 border border-border rounded-xl min-w-[200px]">
+            {capturingHotkey ? (
+              <span className="text-sm text-ink-muted animate-pulse">Press keys...</span>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5 flex-1">
+                  {parts.map((part, i) => (
+                    <span
+                      key={i}
+                      className="px-2.5 py-1 bg-surface-alt border border-border rounded-lg text-sm font-medium text-ink"
+                    >
+                      {part}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCapturingHotkey(true)}
+                  className="ml-2 p-1 text-ink-muted hover:text-ink transition-colors rounded-md hover:bg-surface-alt"
+                >
+                  <Pencil size={14} />
+                </button>
+              </>
+            )}
           </div>
         </SettingsRow>
       </SettingsCard>

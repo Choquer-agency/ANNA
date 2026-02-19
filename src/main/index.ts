@@ -139,7 +139,7 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Check API keys
   if (!process.env.OPENAI_API_KEY) {
     console.warn('[main] WARNING: OPENAI_API_KEY not set in .env')
@@ -152,12 +152,9 @@ app.whenReady().then(() => {
   createAudioWindow()
   createRecordingIndicatorWindow() // Pre-create hidden — shows instantly when recording
   createWindow()
-  // Register hotkey — use stored setting or default
+  // Register hotkey — use stored setting or default to fn
   const storedHotkey = getSetting('hotkey')
-  registerHotkey(handleHotkeyToggle)
-  if (storedHotkey) {
-    reregisterHotkey(storedHotkey)
-  }
+  await registerHotkey(handleHotkeyToggle, storedHotkey || 'fn')
 
   // Apply launch at login setting
   const launchSetting = getSetting('launch_at_login')
@@ -259,10 +256,10 @@ app.whenReady().then(() => {
 
   // Settings
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
-  ipcMain.handle('settings:set', (_e, key: string, value: string) => {
+  ipcMain.handle('settings:set', async (_e, key: string, value: string) => {
     setSetting(key, value)
     if (key === 'hotkey') {
-      reregisterHotkey(value)
+      await reregisterHotkey(value)
     }
     if (key === 'launch_at_login') {
       app.setLoginItemSettings({ openAtLogin: value === 'true' })
@@ -367,6 +364,18 @@ app.whenReady().then(() => {
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
 
+    autoUpdater.on('checking-for-update', () => {
+      mainWindow?.webContents.send('update:checking')
+    })
+
+    autoUpdater.on('update-available', (info) => {
+      mainWindow?.webContents.send('update:available', info.version)
+    })
+
+    autoUpdater.on('update-not-available', () => {
+      mainWindow?.webContents.send('update:not-available')
+    })
+
     autoUpdater.on('update-downloaded', (info) => {
       console.log('[updater] Update downloaded:', info.version)
       mainWindow?.webContents.send('update:downloaded', info.version)
@@ -383,6 +392,17 @@ app.whenReady().then(() => {
       )
     }, 4 * 60 * 60 * 1000)
   }
+
+  // App version
+  ipcMain.handle('app:get-version', () => app.getVersion())
+
+  // Manual update check
+  ipcMain.handle('update:check', async () => {
+    if (is.dev) return
+    autoUpdater.checkForUpdatesAndNotify().catch((err) =>
+      console.error('[updater] Manual check failed:', err)
+    )
+  })
 
   ipcMain.handle('update:install', () => {
     autoUpdater.quitAndInstall()

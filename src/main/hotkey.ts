@@ -1,56 +1,76 @@
 import { globalShortcut } from 'electron'
 import { startFnKeyMonitor, stopFnKeyMonitor } from './fnKeyMonitor'
+import { setSetting } from './db'
 
 let onToggle: (() => void) | null = null
 let usingFnKey = false
 
-export function registerHotkey(callback: () => void): boolean {
+export async function registerHotkey(callback: () => void, accelerator: string = 'fn'): Promise<boolean> {
   onToggle = callback
 
-  // Default: fn key via native helper
-  usingFnKey = true
-  const started = startFnKeyMonitor(() => {
-    onToggle?.()
-  })
+  if (accelerator === 'fn') {
+    usingFnKey = true
+    const started = await startFnKeyMonitor(() => {
+      onToggle?.()
+    })
 
-  if (started) {
-    console.log('[hotkey] Hotkey registered successfully (fn key)')
-  } else {
+    if (started) {
+      console.log('[hotkey] Hotkey registered successfully (fn key)')
+      return true
+    }
+
+    // FN failed — fall back to Alt+Space
     console.error('[hotkey] fn key monitor failed, falling back to Alt+Space')
     usingFnKey = false
+    setSetting('hotkey', 'Alt+Space')
     const registered = globalShortcut.register('Alt+Space', () => {
       onToggle?.()
     })
     return registered
   }
 
-  return started
+  // Standard Electron accelerator
+  const registered = globalShortcut.register(accelerator, () => {
+    onToggle?.()
+  })
+  if (registered) {
+    console.log(`[hotkey] Hotkey registered: ${accelerator}`)
+  } else {
+    console.error(`[hotkey] Failed to register hotkey: ${accelerator}`)
+  }
+  return registered
 }
 
-export function reregisterHotkey(accelerator: string): boolean {
+export async function reregisterHotkey(accelerator: string): Promise<boolean> {
   // Stop fn key monitor if it was active
   if (usingFnKey) {
     stopFnKeyMonitor()
     usingFnKey = false
   }
+  globalShortcut.unregisterAll()
 
   // Handle fn key specially
   if (accelerator === 'fn') {
-    globalShortcut.unregisterAll()
     usingFnKey = true
-    const started = startFnKeyMonitor(() => {
+    const started = await startFnKeyMonitor(() => {
       onToggle?.()
     })
     if (started) {
       console.log('[hotkey] Switched to fn key')
-    } else {
-      console.error('[hotkey] Failed to start fn key monitor')
+      return true
     }
-    return started
+
+    // FN failed — fall back to Alt+Space
+    console.error('[hotkey] fn key monitor failed, falling back to Alt+Space')
+    usingFnKey = false
+    setSetting('hotkey', 'Alt+Space')
+    const registered = globalShortcut.register('Alt+Space', () => {
+      onToggle?.()
+    })
+    return registered
   }
 
   // Standard Electron accelerator
-  globalShortcut.unregisterAll()
   const registered = globalShortcut.register(accelerator, () => {
     onToggle?.()
   })
