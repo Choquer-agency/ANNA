@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('annaAPI', {
   retrySession: (id: string, customPrompt?: string): Promise<void> => ipcRenderer.invoke('session:retry', id, customPrompt),
   deleteSession: (id: string): Promise<void> => ipcRenderer.invoke('session:delete', id),
   toggleFlag: (id: string): Promise<boolean> => ipcRenderer.invoke('session:toggle-flag', id),
+  submitFeedback: (sessionId: string, feedbackText: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('feedback:submit', sessionId, feedbackText),
   deleteAllSessions: (): Promise<void> => ipcRenderer.invoke('sessions:delete-all'),
   downloadAudio: (id: string): Promise<{ success: boolean; error?: string; canceled?: boolean }> => ipcRenderer.invoke('session:download-audio', id),
   getRawTranscript: (id: string): Promise<string | null> =>
@@ -100,11 +102,30 @@ contextBridge.exposeInMainWorld('annaAPI', {
   onPipelineError: (callback: (data: unknown) => void): void => {
     ipcRenderer.on('pipeline:error', (_event, data) => callback(data))
   },
+  // App version
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
+
   // Auto-update
   onUpdateDownloaded: (callback: (version: string) => void): void => {
     ipcRenderer.on('update:downloaded', (_event, version: string) => callback(version))
   },
+  onUpdateChecking: (callback: () => void): void => {
+    ipcRenderer.on('update:checking', () => callback())
+  },
+  onUpdateAvailable: (callback: (version: string) => void): void => {
+    ipcRenderer.on('update:available', (_event, version: string) => callback(version))
+  },
+  onUpdateNotAvailable: (callback: () => void): void => {
+    ipcRenderer.on('update:not-available', () => callback())
+  },
+  checkForUpdates: (): Promise<void> => ipcRenderer.invoke('update:check'),
   installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+
+  removePipelineListeners: (): void => {
+    ipcRenderer.removeAllListeners('pipeline:status')
+    ipcRenderer.removeAllListeners('pipeline:complete')
+    ipcRenderer.removeAllListeners('pipeline:error')
+  },
 
   removeAllListeners: (): void => {
     ipcRenderer.removeAllListeners('pipeline:status')
@@ -113,6 +134,9 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.removeAllListeners('app:get-current-page')
     ipcRenderer.removeAllListeners('dictation:append-to-note')
     ipcRenderer.removeAllListeners('update:downloaded')
+    ipcRenderer.removeAllListeners('update:checking')
+    ipcRenderer.removeAllListeners('update:available')
+    ipcRenderer.removeAllListeners('update:not-available')
     ipcRenderer.removeAllListeners('auth:changed')
   }
 })

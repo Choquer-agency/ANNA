@@ -20,6 +20,7 @@ declare global {
       retrySession: (id: string, customPrompt?: string) => Promise<void>
       deleteSession: (id: string) => Promise<void>
       toggleFlag: (id: string) => Promise<boolean>
+      submitFeedback: (sessionId: string, feedbackText: string) => Promise<{ success: boolean }>
       deleteAllSessions: () => Promise<void>
       downloadAudio: (id: string) => Promise<boolean>
       getRawTranscript: (id: string) => Promise<string | null>
@@ -86,13 +87,21 @@ declare global {
       onDictationToNote: (cb: (text: string) => void) => void
       removeDictationToNoteListener: () => void
 
+      // App version
+      getAppVersion: () => Promise<string>
+
       // Auto-update
       onUpdateDownloaded: (cb: (version: string) => void) => void
+      onUpdateChecking: (cb: () => void) => void
+      onUpdateAvailable: (cb: (version: string) => void) => void
+      onUpdateNotAvailable: (cb: () => void) => void
+      checkForUpdates: () => Promise<void>
       installUpdate: () => Promise<void>
 
       onPipelineStatus: (cb: (data: PipelineStatus) => void) => void
       onPipelineComplete: (cb: (data: { sessionId: string }) => void) => void
       onPipelineError: (cb: (data: { error: string }) => void) => void
+      removePipelineListeners: () => void
       removeAllListeners: () => void
     }
   }

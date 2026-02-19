@@ -10,6 +10,7 @@ export function useAnna() {
   const [pipelineStatus, setPipelineStatus] = useState('idle')
   const [retryingSessionId, setRetryingSessionId] = useState<string | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
   const toastTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const addToast = useCallback((message: string, type: 'success' | 'error') => {
@@ -31,14 +32,30 @@ export function useAnna() {
     }
   }, [])
 
-  const loadSessions = useCallback(async () => {
-    const data = await window.annaAPI.getSessions()
-    setSessions(data)
+  const loadSessions = useCallback(async (retry = true) => {
+    try {
+      const data = await window.annaAPI.getSessions()
+      setSessions(data)
+      setLoadError(null)
+    } catch (err) {
+      console.error('Failed to load sessions:', err)
+      setLoadError(err instanceof Error ? err.message : 'Failed to load sessions')
+      if (retry) {
+        setTimeout(() => loadSessions(false), 1000)
+      }
+    }
   }, [])
 
-  const loadStats = useCallback(async () => {
-    const data = await window.annaAPI.getStats()
-    setStats(data)
+  const loadStats = useCallback(async (retry = true) => {
+    try {
+      const data = await window.annaAPI.getStats()
+      setStats(data)
+    } catch (err) {
+      console.error('Failed to load stats:', err)
+      if (retry) {
+        setTimeout(() => loadStats(false), 1000)
+      }
+    }
   }, [])
 
   // Initial load
@@ -53,17 +70,23 @@ export function useAnna() {
 
     window.annaAPI.onPipelineComplete(() => {
       setPipelineStatus('idle')
-      loadSessions()
-      loadStats()
+      loadSessions().catch(() => {})
+      loadStats().catch(() => {})
     })
 
     window.annaAPI.onPipelineError(() => {
       setPipelineStatus('idle')
-      loadSessions()
+      loadSessions().catch(() => {})
     })
 
+    // Periodic refresh as safety net
+    const refreshInterval = setInterval(() => {
+      loadSessions().catch(() => {})
+    }, 30000)
+
     return () => {
-      window.annaAPI.removeAllListeners()
+      clearInterval(refreshInterval)
+      window.annaAPI.removePipelineListeners()
     }
   }, [loadSessions, loadStats])
 
@@ -118,14 +141,6 @@ export function useAnna() {
     [addToast]
   )
 
-  const flagSession = useCallback(
-    async (id: string) => {
-      await window.annaAPI.toggleFlag(id)
-      await loadSessions()
-    },
-    [loadSessions]
-  )
-
   const deleteAllSessions = useCallback(
     async () => {
       try {
@@ -147,12 +162,12 @@ export function useAnna() {
     pipelineStatus,
     retryingSessionId,
     toasts,
+    loadError,
     dismissToast,
     retrySession,
     deleteSession,
     downloadAudio,
     copyTranscript,
-    flagSession,
     deleteAllSessions
   }
 }
