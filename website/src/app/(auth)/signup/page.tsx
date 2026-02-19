@@ -6,26 +6,21 @@ import { AnnaLogo } from '@/components/ui/AnnaLogo'
 export default function SignUpPage() {
   return (
     <div className="min-h-screen bg-white flex">
-      {/* Left — vibrant gradient panel */}
+      {/* Left — animated gradient panel */}
       <div className="hidden lg:block w-[50%] p-5 pr-0">
-        <div className="relative h-full rounded-[24px] overflow-hidden">
-          {/* Vibrant gradient background */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(ellipse at 10% 0%, #FF9E19 0%, transparent 40%), radial-gradient(ellipse at 80% 10%, #EBC1FF 0%, transparent 45%), radial-gradient(ellipse at 50% 60%, #FFDBA6 0%, transparent 50%), radial-gradient(ellipse at 90% 90%, #EBC1FF 0%, transparent 40%), #FFF8F0',
-            }}
-          />
+        <div className="relative h-full rounded-[24px] overflow-hidden bg-[#FFF8F0]">
+          {/* Animated blobs */}
+          <div className="absolute w-[500px] h-[500px] top-[-10%] left-[-5%] rounded-full bg-[#FF9E19]/50 blur-[100px]" style={{ animation: 'blob-drift-1 12s ease-in-out infinite' }} />
+          <div className="absolute w-[400px] h-[400px] top-[5%] right-[-5%] rounded-full bg-[#EBC1FF]/60 blur-[90px]" style={{ animation: 'blob-drift-2 14s ease-in-out infinite' }} />
+          <div className="absolute w-[450px] h-[450px] bottom-[20%] left-[20%] rounded-full bg-[#FFDBA6]/50 blur-[100px]" style={{ animation: 'blob-drift-3 16s ease-in-out infinite' }} />
+          <div className="absolute w-[350px] h-[350px] bottom-[-5%] right-[10%] rounded-full bg-[#EBC1FF]/45 blur-[80px]" style={{ animation: 'blob-drift-4 13s ease-in-out infinite' }} />
 
           {/* Content */}
           <div className="relative flex flex-col justify-between h-full p-10">
-            {/* Logo top-left */}
             <a href="/">
               <AnnaLogo className="h-5 text-ink" />
             </a>
 
-            {/* Heading bottom-left */}
             <div className="max-w-[520px] pb-4">
               <p className="text-base font-medium text-ink-muted/70 mb-4">Get started for free</p>
               <h2
