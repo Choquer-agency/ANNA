@@ -13,12 +13,10 @@ import { SettingsPage } from './components/settings/SettingsPage'
 import { HelpPage } from './components/HelpPage'
 import { ToastContainer } from './components/Toast'
 import { FeedbackModal } from './components/FeedbackModal'
-import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
 import { SignInGate } from './components/SignInGate'
 
 function App(): React.JSX.Element {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
-  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
   const [currentPage, setCurrentPage] = useState<Page>('home')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [feedbackSessionId, setFeedbackSessionId] = useState<string | null>(null)
@@ -29,9 +27,6 @@ function App(): React.JSX.Element {
   useEffect(() => {
     window.annaAPI.getAuthStatus().then((status) => {
       setAuthenticated(status.isAuthenticated)
-    })
-    window.annaAPI.getSetting('onboarding_completed').then((val) => {
-      setOnboardingDone(val === 'true')
     })
   }, [])
 
@@ -126,7 +121,7 @@ function App(): React.JSX.Element {
   }
 
   // Loading state
-  if (authenticated === null || onboardingDone === null) {
+  if (authenticated === null) {
     return <div className="flex h-screen bg-mesh" />
   }
 
@@ -135,10 +130,7 @@ function App(): React.JSX.Element {
     return <SignInGate onSignedIn={() => setAuthenticated(true)} />
   }
 
-  // Onboarding gate
-  if (!onboardingDone) {
-    return <OnboardingWizard onComplete={() => setOnboardingDone(true)} />
-  }
+  // Onboarding is now handled on the website — skip the in-app wizard
 
   return (
     <div className="flex h-screen bg-mesh text-ink">

@@ -56,6 +56,7 @@ export default defineSchema({
     appVersion: v.optional(v.string()),
     deviceName: v.optional(v.string()),
     platform: v.optional(v.string()),
+    selectedPlan: v.optional(v.string()),
   })
     .index('by_user', ['userId'])
     .index('by_email', ['email']),

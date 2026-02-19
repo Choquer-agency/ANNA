@@ -12,6 +12,7 @@ export const register = mutation({
     appVersion: v.optional(v.string()),
     deviceName: v.optional(v.string()),
     platform: v.optional(v.string()),
+    selectedPlan: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const authUserId = await getAuthUserId(ctx)
@@ -33,6 +34,18 @@ export const register = mutation({
     } else {
       await ctx.db.insert('registrations', data)
     }
+  },
+})
+
+export const getRegistration = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (!userId) return null
+    return await ctx.db
+      .query('registrations')
+      .withIndex('by_user', (q) => q.eq('userId', String(userId)))
+      .first()
   },
 })
 

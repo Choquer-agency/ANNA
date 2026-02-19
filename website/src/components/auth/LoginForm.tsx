@@ -27,13 +27,18 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const getRedirectTo = () => {
+    if (isElectron) return '/electron-callback'
+    return '/onboarding'
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const redirectTo = isElectron ? '/electron-callback' : '/dashboard'
+      const redirectTo = getRedirectTo()
       const result = await signIn('password', {
         email,
         password,
@@ -55,7 +60,7 @@ export function LoginForm() {
   const handleOAuth = async (provider: 'google' | 'apple') => {
     setError(null)
     try {
-      const redirectTo = isElectron ? '/electron-callback' : '/dashboard'
+      const redirectTo = getRedirectTo()
       const result = await signIn(provider, { redirectTo })
       if (result.redirect) {
         window.location.href = result.redirect.toString()
