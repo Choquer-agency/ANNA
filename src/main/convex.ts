@@ -5,6 +5,7 @@ import { readFileSync } from 'fs'
 import { getRecordingState } from './audio'
 import { hostname } from 'os'
 import type { Session } from '../shared/types'
+import { getStoredToken, isAuthenticated as isAuthValid, applyAuthToClient } from './auth'
 
 const CATCH_UP_DELAY_MS = 500
 const INITIAL_SYNC_DEFER_MS = 10_000
@@ -24,7 +25,36 @@ export function initConvex(): void {
   }
 
   client = new ConvexHttpClient(convexUrl)
+
+  // Apply auth token if available
+  if (isAuthValid()) {
+    applyAuthToClient(client)
+  }
+
   console.log('[convex] Client initialized')
+}
+
+export function getClient(): ConvexHttpClient | null {
+  return client
+}
+
+export function ensureClient(): ConvexHttpClient {
+  if (!client && process.env.CONVEX_URL) {
+    client = new ConvexHttpClient(process.env.CONVEX_URL)
+    if (isAuthValid()) {
+      applyAuthToClient(client)
+    }
+  }
+  if (!client) {
+    throw new Error('No Convex client available')
+  }
+  return client
+}
+
+export function refreshClientAuth(): void {
+  if (client) {
+    applyAuthToClient(client)
+  }
 }
 
 export function isSyncEnabled(): boolean {
@@ -45,7 +75,9 @@ export async function syncSession(session: Session): Promise<void> {
   if (!isSyncEnabled() || !client) return
 
   try {
-    const userId = getUserId()
+    // If authenticated, server reads userId from auth context
+    // Otherwise fall back to legacy userId arg
+    const userId = isAuthValid() ? undefined : getUserId()
 
     await client.mutation(api.sessions.upsert, {
       localId: session.id,
@@ -105,7 +137,7 @@ export async function uploadFlaggedAudio(
   if (!client) return
 
   try {
-    const userId = getUserId()
+    const userId = isAuthValid() ? undefined : getUserId()
 
     // Step 1: Get upload URL from Convex
     const uploadUrl: string = await client.mutation(api.sessions.generateUploadUrl, {})
@@ -138,6 +170,9 @@ export function enableSync(): void {
 
   if (!client && process.env.CONVEX_URL) {
     client = new ConvexHttpClient(process.env.CONVEX_URL)
+    if (isAuthValid()) {
+      applyAuthToClient(client)
+    }
     console.log('[convex] Client initialized after enabling sync')
   }
 
@@ -163,6 +198,9 @@ export async function registerUserInConvex(data: {
   // Ensure client is initialized
   if (!client && process.env.CONVEX_URL) {
     client = new ConvexHttpClient(process.env.CONVEX_URL)
+    if (isAuthValid()) {
+      applyAuthToClient(client)
+    }
   }
   if (!client) {
     console.error('[convex] Cannot register — no Convex client')
@@ -171,7 +209,7 @@ export async function registerUserInConvex(data: {
 
   const { app } = require('electron')
   await client.mutation(api.registrations.register, {
-    userId: data.userId,
+    userId: isAuthValid() ? undefined : data.userId,
     name: data.name,
     email: data.email,
     consentedAt: data.consentedAt,

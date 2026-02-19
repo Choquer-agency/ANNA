@@ -1,8 +1,11 @@
+import { usePlasmaHover } from '../hooks/usePlasmaHover'
+
 interface PromoCardProps {
   onStartNow?: () => void
 }
 
 export function PromoCard({ onStartNow }: PromoCardProps): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   return (
     <div className="rounded-xl p-6 hover:scale-[1.005] transition-transform promo-mesh">
       <h2 className="text-xl font-semibold text-ink mb-2">
@@ -15,9 +18,10 @@ export function PromoCard({ onStartNow }: PromoCardProps): React.JSX.Element {
       </p>
       <button
         onClick={onStartNow}
-        className="px-5 py-2 bg-primary text-white text-sm rounded-full hover:bg-primary-hover active:scale-[0.98] transition-all"
+        onMouseMove={onMouseMove}
+        className="plasma-hover px-5 py-2 bg-primary text-white text-sm rounded-full hover:bg-primary-hover active:scale-[0.98] transition-all"
       >
-        Start now
+        <span className="relative z-[2]">Start now</span>
       </button>
     </div>
   )

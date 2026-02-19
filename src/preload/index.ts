@@ -40,6 +40,17 @@ contextBridge.exposeInMainWorld('annaAPI', {
   registerUser: (data: { name: string; email: string; consentedAt: string }): Promise<void> =>
     ipcRenderer.invoke('user:register', data),
 
+  // Auth
+  getAuthStatus: (): Promise<{ isAuthenticated: boolean }> =>
+    ipcRenderer.invoke('auth:get-status'),
+  openWebSignIn: (): Promise<void> =>
+    ipcRenderer.invoke('auth:open-sign-in'),
+  signOut: (): Promise<void> =>
+    ipcRenderer.invoke('auth:sign-out'),
+  onAuthChanged: (callback: (data: { isAuthenticated: boolean }) => void): void => {
+    ipcRenderer.on('auth:changed', (_event, data) => callback(data))
+  },
+
   // System: microphone + accessibility
   requestMicrophone: (): Promise<boolean> => ipcRenderer.invoke('system:request-microphone'),
   checkMicrophone: (): Promise<string> => ipcRenderer.invoke('system:check-microphone'),
@@ -102,5 +113,6 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.removeAllListeners('app:get-current-page')
     ipcRenderer.removeAllListeners('dictation:append-to-note')
     ipcRenderer.removeAllListeners('update:downloaded')
+    ipcRenderer.removeAllListeners('auth:changed')
   }
 })

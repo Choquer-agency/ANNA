@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { WelcomeStep } from './WelcomeStep'
-import { RegistrationStep } from './RegistrationStep'
 import { PermissionsStep } from './PermissionsStep'
 import { TestDictationStep } from './TestDictationStep'
 
@@ -8,7 +7,7 @@ interface OnboardingWizardProps {
   onComplete: () => void
 }
 
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 3
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps): React.JSX.Element {
   const [step, setStep] = useState(0)
@@ -22,10 +21,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): React.J
       case 0:
         return <WelcomeStep onNext={next} />
       case 1:
-        return <RegistrationStep onNext={next} />
-      case 2:
         return <PermissionsStep onNext={next} />
-      case 3:
+      case 2:
         return <TestDictationStep onComplete={onComplete} />
       default:
         return <WelcomeStep onNext={next} />

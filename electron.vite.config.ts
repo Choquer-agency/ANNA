@@ -13,6 +13,7 @@ export default defineConfig({
       'process.env.LANGFUSE_SECRET_KEY': JSON.stringify(process.env.LANGFUSE_SECRET_KEY),
       'process.env.LANGFUSE_PUBLIC_KEY': JSON.stringify(process.env.LANGFUSE_PUBLIC_KEY),
       'process.env.LANGFUSE_BASE_URL': JSON.stringify(process.env.LANGFUSE_BASE_URL),
+      'process.env.WEBSITE_URL': JSON.stringify(process.env.WEBSITE_URL || 'https://annatype.io'),
     }
   },
   preload: {

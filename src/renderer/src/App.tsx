@@ -13,19 +13,34 @@ import { SettingsPage } from './components/settings/SettingsPage'
 import { HelpPage } from './components/HelpPage'
 import { ToastContainer } from './components/Toast'
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
+import { SignInGate } from './components/SignInGate'
 
 function App(): React.JSX.Element {
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
   const [currentPage, setCurrentPage] = useState<Page>('home')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [dictationText, setDictationText] = useState<string | null>(null)
   useTheme()
 
-  // Check onboarding status on mount
+  // Check auth + onboarding status on mount
   useEffect(() => {
+    window.annaAPI.getAuthStatus().then((status) => {
+      setAuthenticated(status.isAuthenticated)
+    })
     window.annaAPI.getSetting('onboarding_completed').then((val) => {
       setOnboardingDone(val === 'true')
     })
+  }, [])
+
+  // Listen for auth changes from deep link
+  useEffect(() => {
+    window.annaAPI.onAuthChanged((data) => {
+      setAuthenticated(data.isAuthenticated)
+    })
+    return () => {
+      // Cleaned up via removeAllListeners
+    }
   }, [])
   const {
     sessions,
@@ -110,8 +125,13 @@ function App(): React.JSX.Element {
   }
 
   // Loading state
-  if (onboardingDone === null) {
+  if (authenticated === null || onboardingDone === null) {
     return <div className="flex h-screen bg-mesh" />
+  }
+
+  // Auth gate
+  if (!authenticated) {
+    return <SignInGate onSignedIn={() => setAuthenticated(true)} />
   }
 
   // Onboarding gate

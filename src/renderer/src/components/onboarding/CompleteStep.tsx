@@ -1,11 +1,13 @@
 import { AnnaLogo } from '../AnnaLogo'
 import { Check } from 'lucide-react'
+import { usePlasmaHover } from '../../hooks/usePlasmaHover'
 
 interface CompleteStepProps {
   onComplete: () => void
 }
 
 export function CompleteStep({ onComplete }: CompleteStepProps): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   async function handleFinish(): Promise<void> {
     await window.annaAPI.setSetting('onboarding_completed', 'true')
     onComplete()
@@ -29,9 +31,10 @@ export function CompleteStep({ onComplete }: CompleteStepProps): React.JSX.Eleme
 
       <button
         onClick={handleFinish}
-        className="bg-primary hover:bg-primary-hover text-white font-semibold px-8 py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
+        onMouseMove={onMouseMove}
+        className="plasma-hover bg-primary hover:bg-primary-hover text-white font-semibold px-8 py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
       >
-        Start Using Anna
+        <span className="relative z-[2]">Start Using Anna</span>
       </button>
     </div>
   )

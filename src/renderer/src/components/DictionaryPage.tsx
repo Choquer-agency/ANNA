@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Search, BookOpen, ArrowRight } from 'lucide-react'
 import { useDictionary } from '../hooks/useDictionary'
+import { usePlasmaHover } from '../hooks/usePlasmaHover'
 import type { DictionaryEntry } from '../types'
 
 export function DictionaryPage(): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const { entries, search, setSearch, addEntry, updateEntry, deleteEntry } = useDictionary()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<DictionaryEntry | null>(null)
@@ -44,10 +46,11 @@ export function DictionaryPage(): React.JSX.Element {
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all"
+          onMouseMove={onMouseMove}
+          className="plasma-hover flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all"
         >
-          <Plus size={16} />
-          Add Entry
+          <Plus size={16} className="relative z-[2]" />
+          <span className="relative z-[2]">Add Entry</span>
         </button>
       </div>
 
@@ -142,10 +145,11 @@ export function DictionaryPage(): React.JSX.Element {
               </button>
               <button
                 onClick={handleSave}
+                onMouseMove={onMouseMove}
                 disabled={!phrase.trim() || !replacement.trim()}
-                className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all disabled:opacity-40"
+                className="plasma-hover px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all disabled:opacity-40"
               >
-                {editing ? 'Save' : 'Add'}
+                <span className="relative z-[2]">{editing ? 'Save' : 'Add'}</span>
               </button>
             </div>
           </div>

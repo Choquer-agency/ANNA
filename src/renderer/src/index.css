@@ -218,6 +218,59 @@ body {
   transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
 
+/* ─── Plasma hover effect ─── */
+.plasma-hover {
+  position: relative;
+  overflow: hidden;
+}
+.plasma-hover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 150px 80px at var(--x, 50%) var(--y, 50%),
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0.2) 40%,
+    transparent 70%
+  );
+  filter: blur(8px);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+}
+.plasma-hover:hover::before {
+  opacity: 1;
+}
+
+.plasma-hover-soft {
+  position: relative;
+  overflow: hidden;
+}
+.plasma-hover-soft::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 150px 80px at var(--x, 50%) var(--y, 50%),
+    rgba(0, 0, 0, 0.08),
+    rgba(0, 0, 0, 0.03) 40%,
+    transparent 70%
+  );
+  filter: blur(8px);
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+}
+.plasma-hover-soft:hover::before {
+  opacity: 1;
+}
+
 /* Text selection */
 ::selection {
   background-color: #FFEBD0;

@@ -58,6 +58,12 @@ declare global {
       // User registration (onboarding)
       registerUser: (data: { name: string; email: string; consentedAt: string }) => Promise<void>
 
+      // Auth
+      getAuthStatus: () => Promise<{ isAuthenticated: boolean }>
+      openWebSignIn: () => Promise<void>
+      signOut: () => Promise<void>
+      onAuthChanged: (cb: (data: { isAuthenticated: boolean }) => void) => void
+
       // System: microphone + accessibility
       requestMicrophone: () => Promise<boolean>
       checkMicrophone: () => Promise<string>

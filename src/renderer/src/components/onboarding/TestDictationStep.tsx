@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Mic, RotateCcw } from 'lucide-react'
 import type { PipelineStatus } from '../../types'
+import { usePlasmaHover } from '../../hooks/usePlasmaHover'
 
 interface TestDictationStepProps {
   onComplete: () => void
 }
 
 export function TestDictationStep({ onComplete }: TestDictationStepProps): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const [status, setStatus] = useState<string>('idle')
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -94,10 +96,11 @@ export function TestDictationStep({ onComplete }: TestDictationStepProps): React
         {(status === 'completed' || status === 'error') && (
           <button
             onClick={reset}
-            className="flex-1 flex items-center justify-center gap-2 font-semibold py-3 rounded-xl border border-border text-ink-secondary hover:bg-surface-alt transition-colors cursor-pointer"
+            onMouseMove={onMouseMove}
+            className="plasma-hover-soft flex-1 flex items-center justify-center gap-2 font-semibold py-3 rounded-xl border border-border text-ink-secondary hover:bg-surface-alt transition-colors cursor-pointer"
           >
-            <RotateCcw size={16} />
-            Try Again
+            <RotateCcw size={16} className="relative z-[2]" />
+            <span className="relative z-[2]">Try Again</span>
           </button>
         )}
         <button
@@ -105,9 +108,10 @@ export function TestDictationStep({ onComplete }: TestDictationStepProps): React
             await window.annaAPI.setSetting('onboarding_completed', 'true')
             onComplete()
           }}
-          className="flex-1 bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
+          onMouseMove={onMouseMove}
+          className="plasma-hover flex-1 bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
         >
-          Start Using Anna
+          <span className="relative z-[2]">Start Using Anna</span>
         </button>
       </div>
     </div>

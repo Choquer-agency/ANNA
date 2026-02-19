@@ -1,10 +1,12 @@
 import { AnnaLogo } from '../AnnaLogo'
+import { usePlasmaHover } from '../../hooks/usePlasmaHover'
 
 interface WelcomeStepProps {
   onNext: () => void
 }
 
 export function WelcomeStep({ onNext }: WelcomeStepProps): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   return (
     <div className="flex flex-col items-center text-center max-w-md">
       <AnnaLogo className="h-8 text-ink mb-6" />
@@ -20,9 +22,10 @@ export function WelcomeStep({ onNext }: WelcomeStepProps): React.JSX.Element {
 
       <button
         onClick={onNext}
-        className="bg-primary hover:bg-primary-hover text-white font-semibold px-8 py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
+        onMouseMove={onMouseMove}
+        className="plasma-hover bg-primary hover:bg-primary-hover text-white font-semibold px-8 py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
       >
-        Get Started
+        <span className="relative z-[2]">Get Started</span>
       </button>
     </div>
   )

@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Mic, Accessibility } from 'lucide-react'
+import { usePlasmaHover } from '../../hooks/usePlasmaHover'
 
 interface PermissionsStepProps {
   onNext: () => void
 }
 
 export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const [micStatus, setMicStatus] = useState<string>('not-determined')
   const [accessibilityGranted, setAccessibilityGranted] = useState(false)
 
@@ -102,9 +104,10 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
 
       <button
         onClick={onNext}
-        className="mt-6 w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
+        onMouseMove={onMouseMove}
+        className="plasma-hover mt-6 w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-colors cursor-pointer shadow-soft"
       >
-        {allGranted ? 'Continue' : 'Continue Anyway'}
+        <span className="relative z-[2]">{allGranted ? 'Continue' : 'Continue Anyway'}</span>
       </button>
     </div>
   )

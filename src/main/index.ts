@@ -24,9 +24,92 @@ import { handleHotkeyToggle, setPipelineMainWindow, retrySession } from './pipel
 import { createRecordingIndicatorWindow, destroyRecordingIndicator } from './recordingIndicator'
 import { shutdownLangfuse } from './langfuse'
 import { createTray, destroyTray } from './tray'
-import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex } from './convex'
+import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient } from './convex'
+import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
+import { anyApi } from 'convex/server'
 
 let mainWindow: BrowserWindow | null = null
+
+// Register anna:// deep link protocol
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('anna', process.execPath, [process.argv[1]])
+  }
+} else {
+  app.setAsDefaultProtocolClient('anna')
+}
+
+// Migrate legacy UUID data to authenticated user
+async function migrateLegacyData(legacyUserId: string): Promise<void> {
+  try {
+    const client = ensureClient()
+    const result = await client.mutation(anyApi.migrations.linkLegacyData, {
+      legacyUserId,
+    })
+    console.log('[auth] Legacy data migrated:', result)
+    // Clear the legacy UUID after successful migration
+    setSetting('convex_user_id', '')
+  } catch (err) {
+    console.error('[auth] Migration error:', err)
+  }
+}
+
+// Handle deep link URL
+function handleDeepLink(url: string): void {
+  console.log('[auth] Deep link received:', url)
+  try {
+    const parsed = new URL(url)
+    if (parsed.host === 'auth' || parsed.pathname === '//auth' || parsed.pathname === '/auth') {
+      const token = parsed.searchParams.get('token')
+      if (token) {
+        storeAuthTokens(token)
+        refreshClientAuth()
+        // Enable sync automatically on auth
+        enableSync()
+        // Notify renderer
+        mainWindow?.webContents.send('auth:changed', { isAuthenticated: true })
+        console.log('[auth] Token received and stored via deep link')
+
+        // Migrate legacy data if UUID exists
+        const legacyUserId = getSetting('convex_user_id')
+        if (legacyUserId) {
+          migrateLegacyData(legacyUserId).catch((err) =>
+            console.error('[auth] Legacy data migration failed:', err)
+          )
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[auth] Failed to parse deep link:', err)
+  }
+}
+
+// macOS: handle deep link when app is already running
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  handleDeepLink(url)
+  // Bring window to front
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
+
+// Ensure single instance + handle cold-launch deep link on macOS
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    // On Windows/Linux, the deep link URL is in argv
+    const url = argv.find((arg) => arg.startsWith('anna://'))
+    if (url) handleDeepLink(url)
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -194,6 +277,23 @@ app.whenReady().then(() => {
   ipcMain.handle('convex:get-status', () => getConvexStatus())
   ipcMain.handle('convex:enable-sync', () => enableSync())
   ipcMain.handle('convex:disable-sync', () => disableSync())
+
+  // Auth
+  ipcMain.handle('auth:get-status', () => ({
+    isAuthenticated: isAuthValid(),
+  }))
+
+  ipcMain.handle('auth:open-sign-in', () => {
+    const { shell } = require('electron')
+    const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+    shell.openExternal(`${websiteUrl}/login?electron_redirect=true`)
+  })
+
+  ipcMain.handle('auth:sign-out', () => {
+    clearAuthTokens()
+    refreshClientAuth()
+    mainWindow?.webContents.send('auth:changed', { isAuthenticated: false })
+  })
 
   ipcMain.handle('system:get-username', () => {
     try {
