@@ -72,6 +72,8 @@ export function DownloadStep({ onComplete }: DownloadStepProps) {
       {!downloaded ? (
         <a
           href="/download/mac"
+          target="_blank"
+          rel="noopener noreferrer"
           onClick={handleDownload}
           onMouseMove={onMouseMove}
           className="w-full inline-flex items-center justify-center gap-2 bg-primary text-white py-3.5 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_20px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 cursor-pointer group"
