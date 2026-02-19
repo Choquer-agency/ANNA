@@ -140,7 +140,7 @@ export function SessionRow({
             <span>{isRetrying ? 'Analyzing...' : 'Processing...'}</span>
           </div>
         ) : isFailed ? (
-          <p className="text-sm text-pastel-rose-text italic">{session.error || 'Failed'}</p>
+          <p className="text-sm text-pastel-rose-text italic break-words">{session.error || 'Failed'}</p>
         ) : transcript ? (
           <p className="text-sm text-ink-secondary leading-relaxed">{transcript}</p>
         ) : (

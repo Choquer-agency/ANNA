@@ -143,7 +143,7 @@ function App(): React.JSX.Element {
       />
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-0 pr-2.5 pb-2.5">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 pr-2.5 pb-2.5">
         {/* Top drag bar */}
         <div
           className="h-10 shrink-0"
@@ -151,7 +151,7 @@ function App(): React.JSX.Element {
         />
 
         {/* Content card */}
-        <div className="flex-1 bg-surface-raised rounded-[20px] overflow-y-auto px-10 py-8 shadow-medium">
+        <div className="flex-1 bg-surface-raised rounded-[20px] overflow-y-auto overflow-x-hidden px-10 py-8 shadow-medium">
           {renderPage()}
         </div>
       </div>
