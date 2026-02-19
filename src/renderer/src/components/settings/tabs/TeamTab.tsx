@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
 
 export function TeamTab(): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const [emails, setEmails] = useState(['', '', ''])
 
   function updateEmail(index: number, value: string): void {
@@ -33,8 +35,8 @@ export function TeamTab(): React.JSX.Element {
         ))}
       </div>
 
-      <button className="px-5 py-2.5 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
-        Continue
+      <button onMouseMove={onMouseMove} className="plasma-hover px-5 py-2.5 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
+        <span className="relative z-[2]">Continue</span>
       </button>
 
       <p className="text-xs text-ink-faint">You can add members anytime after setup</p>

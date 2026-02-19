@@ -24,8 +24,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build fn-key-helper (universal binary)
-        run: npm run build:fn-helper
+      - name: Build native helpers (universal binaries)
+        run: npm run build:natives
 
       - name: Build app
         run: npx electron-vite build

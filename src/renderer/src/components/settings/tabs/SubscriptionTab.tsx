@@ -1,6 +1,8 @@
 import { SettingsCard } from '../SettingsCard'
+import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
 
 export function SubscriptionTab(): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   return (
     <div className="space-y-6">
       <SettingsCard title="Current Plan">
@@ -13,8 +15,8 @@ export function SubscriptionTab(): React.JSX.Element {
             <button className="px-4 py-2 text-sm text-ink-secondary border border-border rounded-xl hover:bg-surface-alt transition-colors">
               View features
             </button>
-            <button className="px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
-              Manage subscription
+            <button onMouseMove={onMouseMove} className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
+              <span className="relative z-[2]">Manage subscription</span>
             </button>
           </div>
         </div>
@@ -24,8 +26,8 @@ export function SubscriptionTab(): React.JSX.Element {
         <div className="px-5 py-5">
           <h3 className="text-sm font-medium text-ink mb-1">Use Anna with your team</h3>
           <p className="text-xs text-ink-muted mb-4">Share dictionaries, snippets, and more</p>
-          <button className="px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
-            Invite team
+          <button onMouseMove={onMouseMove} className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
+            <span className="relative z-[2]">Invite team</span>
           </button>
         </div>
       </SettingsCard>

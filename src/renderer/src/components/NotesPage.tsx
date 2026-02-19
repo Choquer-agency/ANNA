@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Plus, Trash2, StickyNote } from 'lucide-react'
 import { useNotes } from '../hooks/useNotes'
+import { usePlasmaHover } from '../hooks/usePlasmaHover'
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'Z')
@@ -13,6 +14,7 @@ interface NotesPageProps {
 }
 
 export function NotesPage({ onDictationText, onDictationConsumed }: NotesPageProps): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const { notes, activeNote, activeNoteId, setActiveNoteId, createNote, updateNote, deleteNote } = useNotes()
   const [editingTitle, setEditingTitle] = useState('')
   const [editingContent, setEditingContent] = useState('')
@@ -78,10 +80,11 @@ export function NotesPage({ onDictationText, onDictationConsumed }: NotesPagePro
         <div className="p-4 border-b border-border">
           <button
             onClick={handleCreate}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all"
+            onMouseMove={onMouseMove}
+            className="plasma-hover w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all"
           >
-            <Plus size={16} />
-            New Note
+            <Plus size={16} className="relative z-[2]" />
+            <span className="relative z-[2]">New Note</span>
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">

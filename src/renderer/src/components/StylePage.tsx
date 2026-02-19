@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Type, Star } from 'lucide-react'
 import { useStyleProfiles } from '../hooks/useStyleProfiles'
+import { usePlasmaHover } from '../hooks/usePlasmaHover'
 import type { StyleProfile } from '../types'
 
 export function StylePage(): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const { profiles, addProfile, updateProfile, deleteProfile } = useStyleProfiles()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<StyleProfile | null>(null)
@@ -53,10 +55,11 @@ export function StylePage(): React.JSX.Element {
         </div>
         <button
           onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all"
+          onMouseMove={onMouseMove}
+          className="plasma-hover flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all"
         >
-          <Plus size={16} />
-          Add Profile
+          <Plus size={16} className="relative z-[2]" />
+          <span className="relative z-[2]">Add Profile</span>
         </button>
       </div>
 
@@ -173,10 +176,11 @@ export function StylePage(): React.JSX.Element {
               </button>
               <button
                 onClick={handleSave}
+                onMouseMove={onMouseMove}
                 disabled={!name.trim() || !promptAddendum.trim()}
-                className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all disabled:opacity-40"
+                className="plasma-hover px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all disabled:opacity-40"
               >
-                {editing ? 'Save' : 'Add'}
+                <span className="relative z-[2]">{editing ? 'Save' : 'Add'}</span>
               </button>
             </div>
           </div>

@@ -11,8 +11,10 @@
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "rebuild": "npx @electron/rebuild -f -w better-sqlite3",
     "build:fn-helper": "bash scripts/build-fn-helper.sh",
-    "build:mac": "npm run build:fn-helper && electron-vite build && electron-builder --mac --config",
-    "build:mac:signed": "npm run build:fn-helper && electron-vite build && electron-builder --mac --config",
+    "build:accessibility-probe": "bash scripts/build-accessibility-probe.sh",
+    "build:natives": "npm run build:fn-helper && npm run build:accessibility-probe",
+    "build:mac": "npm run build:natives && electron-vite build && electron-builder --mac --config",
+    "build:mac:signed": "npm run build:natives && electron-vite build && electron-builder --mac --config",
     "convex:dev": "npx convex dev",
     "convex:deploy": "npx convex deploy"
   },
@@ -77,6 +79,10 @@
       {
         "from": "resources/fn-key-helper",
         "to": "fn-key-helper"
+      },
+      {
+        "from": "resources/accessibility-probe",
+        "to": "accessibility-probe"
       }
     ],
     "asar": true,

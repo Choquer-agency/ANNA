@@ -6,6 +6,7 @@ import { ProfileTab } from './tabs/ProfileTab'
 import { TeamTab } from './tabs/TeamTab'
 import { SubscriptionTab } from './tabs/SubscriptionTab'
 import { PrivacyTab } from './tabs/PrivacyTab'
+import { VersionTab } from './tabs/VersionTab'
 
 const tabTitles: Record<SettingsTab, string> = {
   general: 'General',
@@ -13,7 +14,8 @@ const tabTitles: Record<SettingsTab, string> = {
   profile: 'Profile',
   team: 'Team',
   subscription: 'Subscription',
-  privacy: 'Privacy'
+  privacy: 'Privacy',
+  version: 'Version'
 }
 
 export function SettingsPage({ onClose }: { onClose: () => void }): React.JSX.Element {
@@ -27,6 +29,7 @@ export function SettingsPage({ onClose }: { onClose: () => void }): React.JSX.El
       case 'team': return <TeamTab />
       case 'subscription': return <SubscriptionTab />
       case 'privacy': return <PrivacyTab />
+      case 'version': return <VersionTab />
     }
   }
 

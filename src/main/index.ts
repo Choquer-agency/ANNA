@@ -23,6 +23,7 @@ import { registerHotkey, unregisterHotkeys, reregisterHotkey } from './hotkey'
 import { handleHotkeyToggle, setPipelineMainWindow, retrySession } from './pipeline'
 import { createRecordingIndicatorWindow, destroyRecordingIndicator } from './recordingIndicator'
 import { shutdownLangfuse } from './langfuse'
+import { probeAccessibility } from './accessibilityProbe'
 import { createTray, destroyTray } from './tray'
 import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile } from './convex'
 import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
@@ -428,8 +429,27 @@ app.whenReady().then(async () => {
     shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility')
   })
 
-  ipcMain.handle('system:check-accessibility', () => {
-    return systemPreferences.isTrustedAccessibilityClient(false)
+  ipcMain.handle('system:check-accessibility', async () => {
+    // Fast path: Electron API (no false positives, only false negatives on stale cache)
+    if (systemPreferences.isTrustedAccessibilityClient(false)) {
+      return true
+    }
+
+    // Electron returned false — may be stale. Use ground-truth probe.
+    const granted = await probeAccessibility()
+
+    if (granted) {
+      // Permission is actually working. If we fell back from fn to Alt+Space
+      // during startup, re-register the fn key now.
+      const storedHotkey = getSetting('hotkey')
+      if (!storedHotkey || storedHotkey === 'fn') {
+        reregisterHotkey('fn').catch((err) =>
+          console.error('[hotkey] Auto re-register fn key failed:', err)
+        )
+      }
+    }
+
+    return granted
   })
 
   // Initialize Convex cloud sync

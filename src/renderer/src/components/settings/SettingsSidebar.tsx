@@ -1,6 +1,6 @@
-import { SlidersHorizontal, Monitor, User, Users, CreditCard, ShieldCheck } from 'lucide-react'
+import { SlidersHorizontal, Monitor, User, Users, CreditCard, ShieldCheck, Info } from 'lucide-react'
 
-export type SettingsTab = 'general' | 'system' | 'profile' | 'team' | 'subscription' | 'privacy'
+export type SettingsTab = 'general' | 'system' | 'profile' | 'team' | 'subscription' | 'privacy' | 'version'
 
 const groups = [
   {
@@ -17,6 +17,12 @@ const groups = [
       { id: 'team' as SettingsTab, label: 'Team', icon: Users },
       { id: 'subscription' as SettingsTab, label: 'Subscription', icon: CreditCard },
       { id: 'privacy' as SettingsTab, label: 'Privacy', icon: ShieldCheck }
+    ]
+  },
+  {
+    label: 'APP',
+    tabs: [
+      { id: 'version' as SettingsTab, label: 'Version', icon: Info }
     ]
   }
 ]

@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 import { Toggle } from '../Toggle'
+import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
 
 export function PrivacyTab(): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const [privacyMode, setPrivacyMode] = useState(false)
   const [contextAwareness, setContextAwareness] = useState(false)
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false)
@@ -126,9 +128,10 @@ export function PrivacyTab(): React.JSX.Element {
                   setCloudSyncEnabled(true)
                   await window.annaAPI.enableConvexSync()
                 }}
-                className="px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all"
+                onMouseMove={onMouseMove}
+                className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all"
               >
-                I Agree
+                <span className="relative z-[2]">I Agree</span>
               </button>
             </div>
           </div>

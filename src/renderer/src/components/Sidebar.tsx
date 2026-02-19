@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import {
   Home,
   BookOpen,
@@ -27,6 +28,12 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPage, onNavigate, settingsOpen, onSettingsOpen }: SidebarProps): React.JSX.Element {
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    window.annaAPI.getAppVersion().then(setVersion).catch(() => {})
+  }, [])
+
   return (
     <div
       className="w-56 flex flex-col h-full shrink-0"
@@ -100,6 +107,9 @@ export function Sidebar({ currentPage, onNavigate, settingsOpen, onSettingsOpen 
           <HelpCircle size={18} />
           <span>Help</span>
         </button>
+        {version && (
+          <div className="text-[10px] text-ink-faint px-3 pt-1">v{version}</div>
+        )}
       </div>
     </div>
   )
