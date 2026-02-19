@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 const GITHUB_OWNER = 'Choquer-agency'
 const GITHUB_REPO = 'ANNA'
 
@@ -13,7 +15,7 @@ export async function GET() {
           Accept: 'application/vnd.github+json',
           Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
         },
-        next: { revalidate: 300 }, // Cache for 5 minutes
+        cache: 'no-store',
       }
     )
 
