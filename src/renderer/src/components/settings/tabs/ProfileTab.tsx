@@ -2,20 +2,24 @@ import { useState, useEffect, useCallback } from 'react'
 import { Upload } from 'lucide-react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
+import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
 
 export function ProfileTab(): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [email] = useState('')
+  const [email, setEmail] = useState('')
   const [loaded, setLoaded] = useState(false)
 
   const loadSettings = useCallback(async () => {
-    const [fn, ln] = await Promise.all([
+    const [fn, ln, em] = await Promise.all([
       window.annaAPI.getSetting('first_name'),
-      window.annaAPI.getSetting('last_name')
+      window.annaAPI.getSetting('last_name'),
+      window.annaAPI.getSetting('user_email')
     ])
     setFirstName(fn || '')
     setLastName(ln || '')
+    setEmail(em || '')
     setLoaded(true)
   }, [])
 
@@ -80,9 +84,10 @@ export function ProfileTab(): React.JSX.Element {
         <div className="flex-1" />
         <button
           onClick={handleSave}
-          className="px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all"
+          onMouseMove={onMouseMove}
+          className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all"
         >
-          Save
+          <span className="relative z-[2]">Save</span>
         </button>
       </div>
     </div>

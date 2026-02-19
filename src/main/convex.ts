@@ -222,6 +222,20 @@ export async function registerUserInConvex(data: {
   console.log('[convex] User registered:', data.email)
 }
 
+export async function fetchRegistrationProfile(): Promise<{ name: string; email: string } | null> {
+  const c = ensureClient()
+  try {
+    const reg = await c.query(api.registrations.getRegistration, {})
+    if (reg && reg.name) {
+      return { name: reg.name, email: reg.email || '' }
+    }
+    return null
+  } catch (err) {
+    console.error('[convex] Failed to fetch registration profile:', err)
+    return null
+  }
+}
+
 export function getConvexStatus(): {
   syncEnabled: boolean
   consentedAt: string | undefined

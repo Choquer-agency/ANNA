@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '@convex/_generated/api'
@@ -11,11 +11,15 @@ import { PlanStep } from './PlanStep'
 import { DownloadStep } from './DownloadStep'
 import { ease } from '@/lib/animations'
 
-const STEPS = ['name', 'plan', 'download'] as const
-type Step = (typeof STEPS)[number]
+const ALL_STEPS = ['name', 'plan', 'download'] as const
+const ELECTRON_STEPS = ['name', 'plan'] as const
+type Step = (typeof ALL_STEPS)[number]
 
 export function OnboardingFlow() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isElectron = searchParams.get('electron_redirect') === 'true'
+  const STEPS = isElectron ? ELECTRON_STEPS : ALL_STEPS
   const { isAuthenticated, isLoading } = useConvexAuth()
   const registration = useQuery(api.registrations.getRegistration)
   const registerMutation = useMutation(api.registrations.register)
@@ -32,12 +36,12 @@ export function OnboardingFlow() {
     }
   }, [isAuthenticated, isLoading, router])
 
-  // If already registered, skip to dashboard
+  // If already registered, skip to destination
   useEffect(() => {
     if (registration) {
-      router.push('/dashboard')
+      router.push(isElectron ? '/electron-callback' : '/dashboard')
     }
-  }, [registration, router])
+  }, [registration, router, isElectron])
 
   // Pre-fill from registration if available
   useEffect(() => {
@@ -62,7 +66,7 @@ export function OnboardingFlow() {
     } catch {
       // Registration may already exist, continue anyway
     }
-    router.push('/dashboard')
+    router.push(isElectron ? '/electron-callback' : '/dashboard')
   }
 
   if (isLoading || !isAuthenticated || registration === undefined) {
@@ -154,7 +158,7 @@ export function OnboardingFlow() {
                 key="plan"
                 selectedPlan={selectedPlan}
                 onPlanChange={setSelectedPlan}
-                onContinue={() => setStep('download')}
+                onContinue={isElectron ? handleComplete : () => setStep('download')}
               />
             )}
             {step === 'download' && (

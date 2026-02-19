@@ -29,7 +29,7 @@ export function SignUpForm() {
   const [error, setError] = useState<string | null>(null)
 
   const getRedirectTo = (isOAuth = false) => {
-    if (isElectron) return '/electron-callback'
+    if (isElectron) return '/onboarding?electron_redirect=true'
     return isOAuth ? '/dashboard' : '/onboarding'
   }
 

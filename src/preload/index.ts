@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.invoke('auth:get-status'),
   openWebSignIn: (): Promise<void> =>
     ipcRenderer.invoke('auth:open-sign-in'),
+  openWeb: (path: string): Promise<void> =>
+    ipcRenderer.invoke('auth:open-web', path),
   signOut: (): Promise<void> =>
     ipcRenderer.invoke('auth:sign-out'),
   onAuthChanged: (callback: (data: { isAuthenticated: boolean }) => void): void => {

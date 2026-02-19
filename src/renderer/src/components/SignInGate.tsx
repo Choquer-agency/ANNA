@@ -9,9 +9,9 @@ export function SignInGate({ onSignedIn }: SignInGateProps): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
   const [loading, setLoading] = useState(false)
 
-  const handleSignIn = async () => {
+  const handleOpenWeb = async (path: string) => {
     setLoading(true)
-    await window.annaAPI.openWebSignIn()
+    await window.annaAPI.openWeb(path)
     // The actual sign-in completion happens via deep link → auth:changed event
     // Reset loading after a delay in case user cancels
     setTimeout(() => setLoading(false), 5000)
@@ -55,11 +55,11 @@ export function SignInGate({ onSignedIn }: SignInGateProps): React.JSX.Element {
 
           <h1 className="text-xl font-bold mb-2">Welcome to Anna</h1>
           <p className="text-ink-muted text-sm mb-8 leading-relaxed">
-            Sign in to your account to start using voice dictation.
+            Log in or create an account on annatype.io to get started.
           </p>
 
           <button
-            onClick={handleSignIn}
+            onClick={() => handleOpenWeb('login')}
             onMouseMove={onMouseMove}
             disabled={loading}
             className={`plasma-hover w-full font-semibold py-3 rounded-xl transition-colors ${
@@ -68,8 +68,19 @@ export function SignInGate({ onSignedIn }: SignInGateProps): React.JSX.Element {
                 : 'bg-border text-ink-faint cursor-not-allowed'
             }`}
           >
-            <span className="relative z-[2]">{loading ? 'Opening browser...' : 'Sign in on Website'}</span>
+            <span className="relative z-[2]">{loading ? 'Opening browser...' : 'Log in'}</span>
           </button>
+
+          <p className="mt-4 text-sm text-ink-muted">
+            Don&apos;t have an account?{' '}
+            <button
+              onClick={() => handleOpenWeb('signup')}
+              disabled={loading}
+              className="text-primary font-semibold hover:underline transition-colors cursor-pointer"
+            >
+              Create one
+            </button>
+          </p>
 
           <p className="mt-6 text-xs text-ink-faint leading-relaxed">
             You&apos;ll be taken to annatype.io to sign in, then redirected back to the app.

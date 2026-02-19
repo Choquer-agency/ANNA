@@ -24,7 +24,7 @@ import { handleHotkeyToggle, setPipelineMainWindow, retrySession } from './pipel
 import { createRecordingIndicatorWindow, destroyRecordingIndicator } from './recordingIndicator'
 import { shutdownLangfuse } from './langfuse'
 import { createTray, destroyTray } from './tray'
-import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient } from './convex'
+import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile } from './convex'
 import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
 import { anyApi } from 'convex/server'
 
@@ -54,6 +54,20 @@ async function migrateLegacyData(legacyUserId: string): Promise<void> {
   }
 }
 
+// Store profile data from Convex into local settings
+function storeProfileLocally(name: string, email: string): void {
+  const parts = name.trim().split(/\s+/)
+  const firstName = parts[0] || ''
+  const lastName = parts.slice(1).join(' ') || ''
+  setSetting('first_name', firstName)
+  setSetting('last_name', lastName)
+  setSetting('user_name', name.trim())
+  if (email) {
+    setSetting('user_email', email)
+  }
+  console.log('[auth] Profile stored locally:', { firstName, lastName, email })
+}
+
 // Handle deep link URL
 function handleDeepLink(url: string): void {
   console.log('[auth] Deep link received:', url)
@@ -77,6 +91,22 @@ function handleDeepLink(url: string): void {
             console.error('[auth] Legacy data migration failed:', err)
           )
         }
+
+        // Fetch user profile from Convex and store locally
+        fetchRegistrationProfile().then((profile) => {
+          if (profile) {
+            storeProfileLocally(profile.name, profile.email)
+          } else {
+            // User may not have completed onboarding yet — retry once after 5s
+            setTimeout(() => {
+              fetchRegistrationProfile().then((retryProfile) => {
+                if (retryProfile) {
+                  storeProfileLocally(retryProfile.name, retryProfile.email)
+                }
+              }).catch(() => {})
+            }, 5000)
+          }
+        }).catch((err) => console.error('[auth] Profile fetch failed:', err))
       }
     }
   } catch (err) {
@@ -332,6 +362,12 @@ app.whenReady().then(async () => {
     const { shell } = require('electron')
     const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
     shell.openExternal(`${websiteUrl}/login?electron_redirect=true`)
+  })
+
+  ipcMain.handle('auth:open-web', (_event, path: string) => {
+    const { shell } = require('electron')
+    const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+    shell.openExternal(`${websiteUrl}/${path}?electron_redirect=true`)
   })
 
   ipcMain.handle('auth:sign-out', () => {

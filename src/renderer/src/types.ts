@@ -62,6 +62,7 @@ declare global {
       // Auth
       getAuthStatus: () => Promise<{ isAuthenticated: boolean }>
       openWebSignIn: () => Promise<void>
+      openWeb: (path: string) => Promise<void>
       signOut: () => Promise<void>
       onAuthChanged: (cb: (data: { isAuthenticated: boolean }) => void) => void
 
