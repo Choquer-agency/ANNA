@@ -183,7 +183,7 @@ function App(): React.JSX.Element {
           <span className="text-ink">Update v{updateVersion} ready</span>
           <button
             onClick={() => window.annaAPI.installUpdate()}
-            className="px-3 py-1 rounded-lg bg-accent text-white text-xs font-medium hover:opacity-90 transition-opacity"
+            className="px-3 py-1 rounded-lg bg-primary text-white text-xs font-medium hover:opacity-90 transition-opacity"
           >
             Restart
           </button>
