@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "ANNA - Voice Dictation for macOS",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",
@@ -16,7 +16,8 @@
     "build:mac": "npm run build:natives && electron-vite build && electron-builder --mac --config",
     "build:mac:signed": "npm run build:natives && electron-vite build && electron-builder --mac --config",
     "convex:dev": "npx convex dev",
-    "convex:deploy": "npx convex deploy"
+    "convex:deploy": "npx convex deploy",
+    "typecheck": "tsc --noEmit"
   },
   "build": {
     "appId": "com.anna.dictation",
