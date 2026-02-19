@@ -10,7 +10,7 @@ export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
   if (isProtectedRoute(request) && !(await convexAuth.isAuthenticated())) {
     return nextjsMiddlewareRedirect(request, '/login')
   }
-}, { verbose: true })
+}, { verbose: true, convexUrl: process.env.NEXT_PUBLIC_CONVEX_URL })
 
 export const config = {
   matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
