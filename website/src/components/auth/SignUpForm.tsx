@@ -28,9 +28,9 @@ export function SignUpForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const getRedirectTo = () => {
+  const getRedirectTo = (isOAuth = false) => {
     if (isElectron) return '/electron-callback'
-    return '/onboarding'
+    return isOAuth ? '/dashboard' : '/onboarding'
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,7 +64,7 @@ export function SignUpForm() {
   const handleOAuth = async (provider: 'google' | 'apple') => {
     setError(null)
     try {
-      const redirectTo = getRedirectTo()
+      const redirectTo = getRedirectTo(true)
       const result = await signIn(provider, { redirectTo })
       if (result.redirect) {
         window.location.href = result.redirect.toString()
