@@ -12,6 +12,7 @@ import { NotesPage } from './components/NotesPage'
 import { SettingsPage } from './components/settings/SettingsPage'
 import { HelpPage } from './components/HelpPage'
 import { ToastContainer } from './components/Toast'
+import { FeedbackModal } from './components/FeedbackModal'
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
 import { SignInGate } from './components/SignInGate'
 
@@ -20,6 +21,7 @@ function App(): React.JSX.Element {
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
   const [currentPage, setCurrentPage] = useState<Page>('home')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [feedbackSessionId, setFeedbackSessionId] = useState<string | null>(null)
   const [dictationText, setDictationText] = useState<string | null>(null)
   useTheme()
 
@@ -54,7 +56,6 @@ function App(): React.JSX.Element {
     deleteSession,
     downloadAudio,
     copyTranscript,
-    flagSession,
     deleteAllSessions
   } = useAnna()
 
@@ -117,7 +118,7 @@ function App(): React.JSX.Element {
             onRetry={retrySession}
             onDownload={downloadAudio}
             onDelete={deleteSession}
-            onFlag={flagSession}
+            onFlag={setFeedbackSessionId}
             onNavigateToStyle={() => setCurrentPage('style')}
           />
         )
@@ -176,6 +177,13 @@ function App(): React.JSX.Element {
             <SettingsPage onClose={() => setSettingsOpen(false)} />
           </div>
         </div>
+      )}
+
+      {feedbackSessionId && (
+        <FeedbackModal
+          sessionId={feedbackSessionId}
+          onClose={() => setFeedbackSessionId(null)}
+        />
       )}
 
       {updateVersion && (

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Copy, Flag, MoreVertical, RotateCcw, Download, Trash2, Loader2 } from 'lucide-react'
+import { Copy, MessageSquare, MoreVertical, RotateCcw, Download, Trash2, Loader2 } from 'lucide-react'
 import type { Session } from '../types'
 
 const HOLD_DURATION = 1500
@@ -169,15 +169,15 @@ export function SessionRow({
             </div>
           )}
 
-          {/* Flag */}
+          {/* Feedback */}
           <div className="relative group/btn">
             <button
               onClick={() => onFlag(session.id)}
-              className={`p-1.5 rounded-full transition-colors duration-200 ${session.flagged ? 'text-pastel-rose-text' : 'text-ink-muted hover:text-primary hover:bg-primary-soft'}`}
+              className="p-1.5 rounded-full text-ink-muted hover:text-primary hover:bg-primary-soft transition-colors duration-200"
             >
-              <Flag size={15} fill={session.flagged ? 'currentColor' : 'none'} />
+              <MessageSquare size={15} />
             </button>
-            <Tooltip label={session.flagged ? 'Unflag' : 'Flag'} />
+            <Tooltip label="Send Feedback" />
           </div>
 
           {/* More */}
