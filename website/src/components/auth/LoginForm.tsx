@@ -46,9 +46,11 @@ export function LoginForm() {
         redirectTo,
       })
 
-      if (!result.signingIn && result.redirect) {
+      if (result?.redirect) {
         window.location.href = result.redirect.toString()
-      } else if (result.signingIn) {
+      } else if (result?.signingIn) {
+        window.location.href = redirectTo
+      } else {
         window.location.href = redirectTo
       }
     } catch (err) {
