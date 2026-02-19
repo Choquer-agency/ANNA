@@ -3,7 +3,7 @@ import { AnnaLogo } from '@/components/ui/AnnaLogo'
 const productLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'Download', href: '#download' },
+  { label: 'Download', href: '/signup' },
   { label: 'Changelog', href: '#' },
 ]
 

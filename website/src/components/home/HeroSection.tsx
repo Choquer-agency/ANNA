@@ -155,7 +155,7 @@ export function HeroSection() {
             className="mt-10 flex justify-center"
           >
             <a
-              href="#download"
+              href="/signup"
               className="inline-flex items-center gap-2.5 bg-primary text-white px-8 py-4 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_24px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 group"
             >
               Download for Mac

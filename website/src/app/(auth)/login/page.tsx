@@ -6,23 +6,17 @@ import { AnnaLogo } from '@/components/ui/AnnaLogo'
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-white flex">
-      {/* Left — orange gradient panel, inset with padding */}
+      {/* Left — vibrant gradient panel */}
       <div className="hidden lg:block w-[50%] p-5 pr-0">
         <div className="relative h-full rounded-[24px] overflow-hidden">
-          {/* Warm gradient background */}
+          {/* Vibrant gradient background */}
           <div
             className="absolute inset-0"
             style={{
               background:
-                'linear-gradient(160deg, #f5ede4 0%, #f0ddd0 25%, #edc8a8 50%, #e8b890 70%, #f0ddd0 100%)',
+                'radial-gradient(ellipse at 10% 0%, #FF9E19 0%, transparent 40%), radial-gradient(ellipse at 80% 10%, #EBC1FF 0%, transparent 45%), radial-gradient(ellipse at 50% 60%, #FFDBA6 0%, transparent 50%), radial-gradient(ellipse at 90% 90%, #EBC1FF 0%, transparent 40%), #FFF8F0',
             }}
           />
-          {/* Soft orange blobs */}
-          <div className="absolute inset-0">
-            <div className="absolute w-[500px] h-[500px] top-[20%] left-[30%] rounded-full bg-[#e8a060]/40 blur-[100px]" />
-            <div className="absolute w-[300px] h-[300px] top-[40%] left-[10%] rounded-full bg-[#d4956a]/30 blur-[80px]" />
-            <div className="absolute w-[400px] h-[400px] bottom-[10%] right-[10%] rounded-full bg-[#f0c8a0]/30 blur-[90px]" />
-          </div>
 
           {/* Content */}
           <div className="relative flex flex-col justify-between h-full p-10">
@@ -32,9 +26,16 @@ export default function LoginPage() {
             </a>
 
             {/* Heading bottom-left */}
-            <div className="max-w-[380px] pb-4">
-              <p className="text-sm font-medium text-ink-muted/70 mb-3">Welcome back</p>
-              <h2 className="text-[2rem] leading-[1.2] font-semibold text-ink tracking-[-0.02em]">
+            <div className="max-w-[520px] pb-4">
+              <p className="text-base font-medium text-ink-muted/70 mb-4">Welcome back</p>
+              <h2
+                className="text-ink tracking-[-0.03em]"
+                style={{
+                  fontSize: 'clamp(2.5rem, 4vw + 0.5rem, 4.5rem)',
+                  lineHeight: 1.05,
+                  fontWeight: 500,
+                }}
+              >
                 Your voice, perfectly
                 <br />
                 typed into anything.
