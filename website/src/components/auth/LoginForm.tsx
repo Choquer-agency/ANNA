@@ -29,7 +29,7 @@ export function LoginForm() {
 
   const getRedirectTo = () => {
     if (isElectron) return '/electron-callback'
-    return '/onboarding'
+    return '/dashboard'
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
