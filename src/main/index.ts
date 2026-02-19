@@ -1,5 +1,5 @@
 import { config } from 'dotenv'
-import { app, BrowserWindow, ipcMain, dialog, systemPreferences } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, systemPreferences } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { existsSync, unlinkSync, copyFileSync, readFileSync } from 'fs'
@@ -171,6 +171,14 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  // Set dock icon (ensures it shows in dev mode too)
+  if (process.platform === 'darwin') {
+    const iconPath = is.dev
+      ? join(__dirname, '../../build/icon.icns')
+      : join(process.resourcesPath, 'icon.icns')
+    app.dock.setIcon(nativeImage.createFromPath(iconPath))
+  }
+
   // Check API keys
   if (!process.env.OPENAI_API_KEY) {
     console.warn('[main] WARNING: OPENAI_API_KEY not set in .env')
