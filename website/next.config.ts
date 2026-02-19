@@ -19,7 +19,8 @@ const nextConfig: NextConfig = {
     // not by the Next.js build. Skip here to avoid missing @auth/core types.
     ignoreBuildErrors: true,
   },
-  outputFileTracingRoot: path.join(__dirname, '..'),
+  // Only trace up to monorepo root when it exists (local dev), not on Vercel
+  ...(fs.existsSync(monorepoConvex) ? { outputFileTracingRoot: path.join(__dirname, '..') } : {}),
   webpack: (config, { isServer: _ }) => {
     // Resolve @convex/* path alias
     config.resolve.alias = {
