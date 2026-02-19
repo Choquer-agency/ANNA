@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
           {/* Download */}
           <a
-            href="https://annatype.io/download/mac"
+            href="/download/mac"
             className="inline-flex items-center justify-center gap-2 border border-border text-ink py-3 px-8 rounded-full text-sm font-medium hover:bg-surface-alt transition-all duration-300 cursor-pointer"
           >
             <Download className="w-4 h-4" />
