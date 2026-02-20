@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { PermissionsStep } from './PermissionsStep'
 import { TestDictationStep } from './TestDictationStep'
 import { track } from '../../lib/analytics'
@@ -11,8 +11,11 @@ const TOTAL_STEPS = 2
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps): React.JSX.Element {
   const [step, setStep] = useState(0)
+  const tracked = useRef(false)
 
   useEffect(() => {
+    if (tracked.current) return
+    tracked.current = true
     track('onboarding_started')
     track('onboarding_step_viewed', { step: 'permissions', step_number: 0 })
   }, [])

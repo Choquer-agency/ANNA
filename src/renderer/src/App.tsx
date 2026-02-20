@@ -30,11 +30,12 @@ function App(): React.JSX.Element {
   useEffect(() => {
     initAnalytics()
 
-    // Set super properties
+    // Set super properties and link identity with main process
     Promise.all([
       window.annaAPI.getAppVersion(),
-      window.annaAPI.getSetting('analytics_enabled')
-    ]).then(([version, analyticsEnabled]) => {
+      window.annaAPI.getSetting('analytics_enabled'),
+      window.annaAPI.getSetting('device_id')
+    ]).then(([version, analyticsEnabled, deviceId]) => {
       if (analyticsEnabled === 'false') {
         optOut()
       }
@@ -42,6 +43,11 @@ function App(): React.JSX.Element {
         app_version: version,
         os_version: navigator.platform
       })
+      // Identify renderer PostHog with the same device_id the main process uses
+      // so both SDKs report under one person
+      if (deviceId) {
+        identify(deviceId)
+      }
     })
 
     window.annaAPI.getAuthStatus().then((status) => {

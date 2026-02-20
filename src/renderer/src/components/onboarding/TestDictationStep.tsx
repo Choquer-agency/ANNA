@@ -14,6 +14,7 @@ export function TestDictationStep({ onComplete }: TestDictationStepProps): React
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const attemptTracked = useRef(false)
+  const completionTracked = useRef(false)
 
   useEffect(() => {
     window.annaAPI.onPipelineStatus((data: PipelineStatus) => {
@@ -26,7 +27,10 @@ export function TestDictationStep({ onComplete }: TestDictationStepProps): React
     })
     window.annaAPI.onPipelineComplete(() => {
       setStatus('completed')
-      track('onboarding_test_dictation_succeeded')
+      if (!completionTracked.current) {
+        completionTracked.current = true
+        track('onboarding_test_dictation_succeeded')
+      }
     })
     window.annaAPI.onPipelineError((data: { error: string }) => {
       setStatus('error')
@@ -55,6 +59,7 @@ export function TestDictationStep({ onComplete }: TestDictationStepProps): React
     setResult(null)
     setError(null)
     attemptTracked.current = false
+    completionTracked.current = false
   }
 
   const isRecording = status === 'recording'
