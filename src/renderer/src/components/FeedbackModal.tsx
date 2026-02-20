@@ -8,17 +8,17 @@ interface FeedbackModalProps {
 
 export function FeedbackModal({ sessionId, onClose }: FeedbackModalProps): React.JSX.Element {
   const [text, setText] = useState('')
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle')
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
 
   async function handleSubmit(): Promise<void> {
-    if (!text.trim() || status !== 'idle') return
+    if (!text.trim() || status === 'submitting') return
     setStatus('submitting')
     try {
       await window.annaAPI.submitFeedback(sessionId, text.trim())
       setStatus('success')
       setTimeout(onClose, 1500)
     } catch {
-      setStatus('idle')
+      setStatus('error')
     }
   }
 
@@ -26,7 +26,7 @@ export function FeedbackModal({ sessionId, onClose }: FeedbackModalProps): React
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-ink/20 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
 
@@ -63,6 +63,10 @@ export function FeedbackModal({ sessionId, onClose }: FeedbackModalProps): React
               disabled={status === 'submitting'}
             />
 
+            {status === 'error' && (
+              <p className="text-sm text-red-500 mt-2">Failed to send feedback. Please try again.</p>
+            )}
+
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={onClose}
@@ -73,7 +77,7 @@ export function FeedbackModal({ sessionId, onClose }: FeedbackModalProps): React
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!text.trim() || status === 'submitting'}
+                disabled={!text.trim() || status === 'submitting' || status === 'success'}
                 className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {status === 'submitting' ? (

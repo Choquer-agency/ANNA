@@ -64,7 +64,7 @@ export const send = action({
 
     // Send via Resend REST API
     const body: Record<string, unknown> = {
-      from: 'Anna Feedback <feedback@olliebooks.io>',
+      from: 'Anna Feedback <noreply@ollieinvoice.com>',
       to: ['bryce@choquer.agency'],
       subject: `[Anna Feedback] from ${args.userName || args.userEmail || 'User'} — ${args.sessionId.slice(0, 8)}`,
       html,

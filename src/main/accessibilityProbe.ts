@@ -18,7 +18,7 @@ export function probeAccessibility(): Promise<boolean> {
   }
 
   try {
-    execSync(`chmod +x "${probePath}"`)
+    execSync(`chmod +x "${probePath}"`, { stdio: 'ignore' })
   } catch {
     /* ignore */
   }

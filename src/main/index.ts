@@ -1,3 +1,7 @@
+// Suppress EPIPE errors on stdout/stderr (harmless pipe breaks during dev shutdown)
+process.stdout?.on('error', (err) => { if ((err as NodeJS.ErrnoException).code !== 'EPIPE') throw err })
+process.stderr?.on('error', (err) => { if ((err as NodeJS.ErrnoException).code !== 'EPIPE') throw err })
+
 import { config } from 'dotenv'
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, systemPreferences } from 'electron'
 import { autoUpdater } from 'electron-updater'
@@ -237,57 +241,67 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('feedback:submit', async (_event, sessionId: string, feedbackText: string) => {
-    // Flag the session and store the feedback reason locally
-    toggleSessionFlag(sessionId, feedbackText)
+    try {
+      // Flag the session and store the feedback reason locally
+      toggleSessionFlag(sessionId, feedbackText)
 
-    const session = getSessionById(sessionId)
-    if (!session) throw new Error('Session not found')
+      const session = getSessionById(sessionId)
+      if (!session) throw new Error('Session not found')
 
-    const userName = getSetting('user_name')
-    const userEmail = getSetting('user_email')
-    const appVersion = app.getVersion()
+      const userName = getSetting('user_name')
+      const userEmail = getSetting('user_email')
+      const appVersion = app.getVersion()
 
-    let audioStorageId: string | undefined
+      let audioStorageId: string | undefined
 
-    // Upload audio to Convex storage if available
-    if (session.audio_path && existsSync(session.audio_path)) {
-      try {
-        const convexClient = ensureClient()
-        const uploadUrl: string = await convexClient.mutation(anyApi.sessions.generateUploadUrl, {})
-        const audioBuffer = readFileSync(session.audio_path)
-        const response = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'audio/wav' },
-          body: audioBuffer,
-        })
-        const result = (await response.json()) as { storageId: string }
-        audioStorageId = result.storageId
-      } catch (err) {
-        console.error('[feedback] Audio upload failed:', err)
+      // Upload audio to Convex storage if available
+      if (session.audio_path && existsSync(session.audio_path)) {
+        try {
+          const convexClient = ensureClient()
+          const uploadUrl: string = await convexClient.mutation(
+            anyApi.sessions.generateUploadUrl,
+            {}
+          )
+          const audioBuffer = readFileSync(session.audio_path)
+          const response = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'audio/wav' },
+            body: audioBuffer,
+          })
+          const result = (await response.json()) as { storageId: string }
+          audioStorageId = result.storageId
+        } catch (err) {
+          console.error('[feedback] Audio upload failed:', err)
+        }
       }
+
+      // Sync the flagged session (with reason) to Convex
+      syncSession(session).catch(() => {})
+
+      // Call the Convex action to send email (use fresh unauthenticated client
+      // to avoid stale auth tokens causing Server Error)
+      const { ConvexHttpClient } = require('convex/browser')
+      const feedbackClient = new ConvexHttpClient(process.env.CONVEX_URL!)
+      await feedbackClient.action(anyApi.feedback.send, {
+        userName,
+        userEmail,
+        appVersion,
+        feedbackText,
+        sessionId: session.id,
+        sessionCreatedAt: session.created_at,
+        sessionStatus: session.status,
+        sessionAppName: session.app_name ?? undefined,
+        sessionDurationMs: session.duration_ms ?? undefined,
+        rawTranscript: session.raw_transcript ?? undefined,
+        processedTranscript: session.processed_transcript ?? undefined,
+        audioStorageId,
+      })
+
+      return { success: true }
+    } catch (err) {
+      console.error('[feedback] Submit failed:', err)
+      throw err
     }
-
-    // Sync the flagged session (with reason) to Convex
-    syncSession(session).catch(() => {})
-
-    // Call the Convex action to send email
-    const convexClient = ensureClient()
-    await convexClient.action(anyApi.feedback.send, {
-      userName,
-      userEmail,
-      appVersion,
-      feedbackText,
-      sessionId: session.id,
-      sessionCreatedAt: session.created_at,
-      sessionStatus: session.status,
-      sessionAppName: session.app_name ?? undefined,
-      sessionDurationMs: session.duration_ms ?? undefined,
-      rawTranscript: session.raw_transcript ?? undefined,
-      processedTranscript: session.processed_transcript ?? undefined,
-      audioStorageId,
-    })
-
-    return { success: true }
   })
 
   ipcMain.handle('sessions:delete-all', () => deleteAllSessions())

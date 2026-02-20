@@ -26,7 +26,7 @@ export function startFnKeyMonitor(onPress: () => void): Promise<boolean> {
 
   // Ensure execute permissions (may be stripped during packaging)
   try {
-    execSync(`chmod +x "${helperPath}"`)
+    execSync(`chmod +x "${helperPath}"`, { stdio: 'ignore' })
   } catch {
     console.error('[fn-key] Failed to set execute permissions')
   }
