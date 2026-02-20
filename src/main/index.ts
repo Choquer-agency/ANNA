@@ -437,16 +437,20 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('system:get-username', () => {
+    // Prefer the name from registration/auth profile
+    const firstName = getSetting('first_name')
+    if (firstName) return firstName
+
+    // Fallback: full stored name (split to first name)
+    const fullName = getSetting('user_name')
+    if (fullName) return fullName.split(' ')[0]
+
+    // Last resort: OS account name (pre-login state)
     try {
-      // Try to get the macOS full name first
       const { execSync } = require('child_process')
-      const fullName = execSync('id -F', { encoding: 'utf-8' }).trim()
-      if (fullName) {
-        return fullName.split(' ')[0] // First name only
-      }
-    } catch {
-      // Fallback to system username
-    }
+      const osName = execSync('id -F', { encoding: 'utf-8' }).trim()
+      if (osName) return osName.split(' ')[0]
+    } catch {}
     const name = userInfo().username
     return name.charAt(0).toUpperCase() + name.slice(1)
   })

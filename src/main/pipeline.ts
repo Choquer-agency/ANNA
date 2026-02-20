@@ -86,16 +86,17 @@ let cachedActiveWindow: Awaited<ReturnType<typeof getActiveWindow>> = null
  */
 async function verifiedTranscribe(
   wavBuffer: Buffer,
+  language: string = 'auto',
   trace?: ReturnType<ReturnType<typeof getLangfuse>['trace']>
 ): Promise<string> {
-  const first = await transcribe(wavBuffer, trace)
-  const second = await transcribe(wavBuffer)
+  const first = await transcribe(wavBuffer, language, trace)
+  const second = await transcribe(wavBuffer, language)
 
   // If both passes agree, we're confident
   if (first.trim() === second.trim()) return first
 
   // Disagreement — run a third pass and pick the majority result
-  const third = await transcribe(wavBuffer)
+  const third = await transcribe(wavBuffer, language)
   if (first.trim() === third.trim()) return first
   if (second.trim() === third.trim()) return second
 
@@ -130,7 +131,8 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     sendStatus('transcribing', { sessionId })
 
     // Multi-pass transcription for consistency on retries
-    const rawTranscript = await verifiedTranscribe(wavBuffer, trace)
+    const language = getSetting('language') ?? 'auto'
+    const rawTranscript = await verifiedTranscribe(wavBuffer, language, trace)
     trace.update({ input: rawTranscript })
     updateSession(sessionId, { raw_transcript: rawTranscript })
 
@@ -151,7 +153,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     const processed = await processTranscript(expanded, {
       appName: session.app_name ?? undefined,
       windowTitle: session.window_title ?? undefined
-    }, styleProfile?.prompt_addendum, trace, customPrompt)
+    }, styleProfile?.prompt_addendum, trace, customPrompt, language)
 
     // Apply dictionary replacements
     const final = applyDictionaryReplacements(processed)
@@ -253,8 +255,9 @@ export async function handleHotkeyToggle(): Promise<void> {
       // Transcribe
       sendStatus('transcribing', { sessionId: session.id })
       updateSession(session.id, { status: 'transcribing' })
+      const language = getSetting('language') ?? 'auto'
       console.time('[pipeline] transcribe')
-      const rawTranscript = await transcribe(wavBuffer, trace)
+      const rawTranscript = await transcribe(wavBuffer, language, trace)
       console.timeEnd('[pipeline] transcribe')
       trace.update({ input: rawTranscript })
       updateSession(session.id, { raw_transcript: rawTranscript })
@@ -279,7 +282,7 @@ export async function handleHotkeyToggle(): Promise<void> {
       sendStatus('processing', { sessionId: session.id })
       updateSession(session.id, { status: 'processing' })
       console.time('[pipeline] processTranscript')
-      const processed = await processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace)
+      const processed = await processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language)
       console.timeEnd('[pipeline] processTranscript')
 
       // Apply dictionary replacements

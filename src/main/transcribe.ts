@@ -7,9 +7,9 @@ import { app } from 'electron'
 import { get } from 'https'
 import type Langfuse from 'langfuse'
 
-const MODEL_NAME = 'ggml-base.en.bin'
+const MODEL_NAME = 'ggml-base.bin'
 const MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_NAME}`
-const MODEL_MIN_SIZE = 100_000_000 // ~142MB expected, anything under 100MB is corrupt
+const MODEL_MIN_SIZE = 147_000_000 // actual size is ~148MB, anything under is corrupt/partial
 
 let whisperContext: WhisperContext | null = null
 
@@ -118,14 +118,15 @@ async function getContext(): Promise<WhisperContext> {
 
 export async function transcribe(
   wavBuffer: Buffer,
+  language: string = 'auto',
   trace?: ReturnType<Langfuse['trace']>
 ): Promise<string> {
   const tempPath = join(tmpdir(), `anna-${randomUUID()}.wav`)
 
   const generation = trace?.generation({
     name: 'whisper-transcription',
-    model: 'whisper.cpp/base.en',
-    input: { audioSizeBytes: wavBuffer.length }
+    model: 'whisper.cpp/base',
+    input: { audioSizeBytes: wavBuffer.length, language }
   })
 
   try {
@@ -133,7 +134,7 @@ export async function transcribe(
 
     const ctx = await getContext()
     const { promise } = ctx.transcribeFile(tempPath, {
-      language: 'en',
+      language: language === 'auto' ? undefined : language,
       temperature: 0.0,
       maxThreads: 4,
     })
