@@ -26,10 +26,9 @@ export function initConvex(): void {
 
   client = new ConvexHttpClient(convexUrl)
 
-  // Apply auth token if available
-  if (isAuthValid()) {
-    applyAuthToClient(client)
-  }
+  // NOTE: Auth tokens are only applied after successful authentication flow
+  // via refreshClientAuth(). Don't apply stale tokens at init — the server
+  // will reject them if auth providers aren't configured yet.
 
   console.log('[convex] Client initialized')
 }
@@ -75,9 +74,8 @@ export async function syncSession(session: Session): Promise<void> {
   if (!isSyncEnabled() || !client) return
 
   try {
-    // If authenticated, server reads userId from auth context
-    // Otherwise fall back to legacy userId arg
-    const userId = isAuthValid() ? undefined : getUserId()
+    // Always pass userId as fallback — server prefers auth context if available
+    const userId = getUserId()
 
     await client.mutation(api.sessions.upsert, {
       localId: session.id,

@@ -1,5 +1,6 @@
 import type { Session } from '../types'
 import { SessionRow } from './SessionRow'
+import { FirstDictationGuide } from './FirstDictationGuide'
 
 interface SessionListProps {
   sessions: Session[]
@@ -44,12 +45,7 @@ export function SessionList({
   hotkey = 'fn'
 }: SessionListProps): React.JSX.Element {
   if (sessions.length === 0) {
-    return (
-      <div className="text-center py-16 text-ink-faint text-sm">
-        No dictations yet. Press{' '}
-        <kbd className="px-1.5 py-0.5 bg-surface-alt rounded text-xs font-mono">{hotkey}</kbd> to start.
-      </div>
-    )
+    return <FirstDictationGuide hotkey={hotkey} />
   }
 
   const groups = groupByDate(sessions)

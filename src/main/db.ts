@@ -182,7 +182,7 @@ export function getUnsyncedSessions(): Session[] {
 }
 
 export function markSynced(id: string): void {
-  db.prepare('UPDATE sessions SET synced_at = datetime("now") WHERE id = ?').run(id)
+  db.prepare("UPDATE sessions SET synced_at = datetime('now') WHERE id = ?").run(id)
 }
 
 // --- Settings ---

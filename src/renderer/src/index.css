@@ -271,6 +271,32 @@ body {
   opacity: 1;
 }
 
+/* Plasma hover — light variant (lighter glow, no darkening) for orange buttons */
+.plasma-hover-light {
+  position: relative;
+  overflow: hidden;
+}
+.plasma-hover-light::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 150px 80px at var(--x, 50%) var(--y, 50%),
+    rgba(255, 198, 120, 0.7),
+    rgba(255, 198, 120, 0.3) 40%,
+    transparent 70%
+  );
+  filter: blur(8px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+}
+.plasma-hover-light:hover::before {
+  opacity: 1;
+}
+
 /* Text selection */
 ::selection {
   background-color: #FFEBD0;
