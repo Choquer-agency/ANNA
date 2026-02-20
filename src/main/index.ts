@@ -176,11 +176,9 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
-  // Set dock icon (ensures it shows in dev mode too)
-  if (process.platform === 'darwin') {
-    const iconPath = is.dev
-      ? join(__dirname, '../../build/icon.icns')
-      : join(process.resourcesPath, 'icon.icns')
+  // Set dock icon in dev mode (production uses the bundled .icns from the app bundle)
+  if (process.platform === 'darwin' && is.dev) {
+    const iconPath = join(__dirname, '../../build/icon.icns')
     app.dock.setIcon(nativeImage.createFromPath(iconPath))
   }
 

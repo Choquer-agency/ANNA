@@ -22,21 +22,55 @@ const barMultipliers = Array.from({ length: NUM_BARS }, (_, i) => {
 
 const barLevels: number[] = new Array(NUM_BARS).fill(BAR_BASE_HEIGHT)
 let currentLevel = 0
+let smoothLevel = 0
 
 const container = document.getElementById('root')!
 container.innerHTML = `
   <style>
+    @property --glow-angle {
+      syntax: '<angle>';
+      initial-value: 0deg;
+      inherits: false;
+    }
+
+    .glow-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 0 0px rgba(255, 158, 25, 0)) drop-shadow(0 0 0px rgba(255, 107, 157, 0));
+      transition: filter 0.15s ease;
+    }
+
+    .gradient-border {
+      position: relative;
+      padding: 1px;
+      border-radius: 22px;
+      background: conic-gradient(
+        from var(--glow-angle),
+        #FF9E19,
+        rgba(255, 255, 255, 0.9),
+        #FF6B9D,
+        #FF9E19
+      );
+      animation: spin-glow 3s linear infinite;
+    }
+
+    @keyframes spin-glow {
+      0% { --glow-angle: 0deg; }
+      100% { --glow-angle: 360deg; }
+    }
+
     .pill {
       display: flex;
       align-items: center;
       gap: 8px;
-      background: #2C2C2E;
-      border-radius: 20px;
+      background: #1A1A1C;
+      border-radius: 21px;
       padding: 5px 8px;
       height: 34px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       color: white;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
       user-select: none;
     }
 
@@ -119,22 +153,26 @@ container.innerHTML = `
     }
   </style>
 
-  <div class="pill">
-    <button class="btn cancel-btn" id="cancel-btn">
-      <svg width="9" height="9" viewBox="0 0 14 14" fill="none">
-        <path d="M1 1L13 13M13 1L1 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-      </svg>
-      <div class="tooltip">Cancel</div>
-    </button>
+  <div class="glow-wrap" id="glow-wrap">
+    <div class="gradient-border">
+      <div class="pill">
+        <button class="btn cancel-btn" id="cancel-btn">
+          <svg width="9" height="9" viewBox="0 0 14 14" fill="none">
+            <path d="M1 1L13 13M13 1L1 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          <div class="tooltip">Cancel</div>
+        </button>
 
-    <div class="waveform" id="waveform">
-      ${Array.from({ length: NUM_BARS }, (_, i) => `<div class="wave-bar" id="bar-${i}"></div>`).join('')}
+        <div class="waveform" id="waveform">
+          ${Array.from({ length: NUM_BARS }, (_, i) => `<div class="wave-bar" id="bar-${i}"></div>`).join('')}
+        </div>
+
+        <button class="btn stop-btn" id="stop-btn">
+          <div class="stop-icon"></div>
+          <div class="tooltip">Finish and paste</div>
+        </button>
+      </div>
     </div>
-
-    <button class="btn stop-btn" id="stop-btn">
-      <div class="stop-icon"></div>
-      <div class="tooltip">Finish and paste</div>
-    </button>
   </div>
 `
 
@@ -149,9 +187,17 @@ document.getElementById('stop-btn')!.addEventListener('click', () => {
 const bars = Array.from({ length: NUM_BARS }, (_, i) =>
   document.getElementById(`bar-${i}`)!
 )
+const glowWrap = document.getElementById('glow-wrap')!
 
 function animate(): void {
   const time = Date.now() / 1000
+
+  smoothLevel += (currentLevel - smoothLevel) * 0.2
+
+  // Reactive glow — starts at zero, ramps up with audio
+  const glowOrange = Math.round(smoothLevel * 20)
+  const glowPink = Math.round(smoothLevel * 16)
+  glowWrap.style.filter = `drop-shadow(0 0 ${glowOrange}px rgba(255, 158, 25, ${smoothLevel * 0.5})) drop-shadow(0 0 ${glowPink + smoothLevel * 12}px rgba(255, 107, 157, ${smoothLevel * 0.3}))`
 
   for (let i = 0; i < NUM_BARS; i++) {
     // Each bar has a unique phase for subtle motion

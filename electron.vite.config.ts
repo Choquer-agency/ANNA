@@ -46,7 +46,10 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/renderer/index.html'),
           'audio-capture': resolve(__dirname, 'src/renderer/audio-capture.html'),
-          'recording-indicator': resolve(__dirname, 'src/renderer/recording-indicator.html')
+          'recording-indicator': resolve(__dirname, 'src/renderer/recording-indicator.html'),
+          'recording-indicator-v2': resolve(__dirname, 'src/renderer/recording-indicator-v2.html'),
+          'recording-indicator-v3': resolve(__dirname, 'src/renderer/recording-indicator-v3.html'),
+          'recording-indicator-v4': resolve(__dirname, 'src/renderer/recording-indicator-v4.html')
         }
       }
     }
