@@ -205,35 +205,46 @@ function LanguagesIllustration() {
 
   return (
     <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-white relative flex flex-col items-center justify-center">
+      {/* Pink glow */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse at 30% 40%, rgba(235,193,255,0.15) 0%, transparent 50%), radial-gradient(ellipse at 75% 65%, rgba(235,193,255,0.12) 0%, transparent 45%)',
+      }} />
+
       {/* Floating background bubbles */}
       {[
-        { flag: '🇮🇹', text: 'Ciao', x: 8, y: 12, dur: 3.5 },
-        { flag: '🇩🇪', text: 'Hallo', x: 85, y: 8, dur: 4.2 },
-        { flag: '🇷🇺', text: 'Привет', x: 5, y: 55, dur: 3.8 },
-        { flag: '🇮🇳', text: 'नमस्ते', x: 88, y: 50, dur: 4.0 },
-        { flag: '🇸🇦', text: 'مرحباً', x: 12, y: 88, dur: 3.3 },
-        { flag: '🇹🇷', text: 'Merhaba', x: 82, y: 85, dur: 3.6 },
-        { flag: '🇳🇱', text: 'Hallo', x: 50, y: 5, dur: 4.1 },
-        { flag: '🇸🇪', text: 'Hej', x: 48, y: 92, dur: 3.4 },
+        { flag: '🇮🇹', text: 'Ciao', x: 6, y: 10, dur: 3.5 },
+        { flag: '🇩🇪', text: 'Hallo', x: 88, y: 7, dur: 4.2 },
+        { flag: '🇷🇺', text: 'Привет', x: 3, y: 45, dur: 3.8 },
+        { flag: '🇮🇳', text: 'नमस्ते', x: 92, y: 42, dur: 4.0 },
+        { flag: '🇸🇦', text: 'مرحباً', x: 10, y: 82, dur: 3.3 },
+        { flag: '🇹🇷', text: 'Merhaba', x: 85, y: 80, dur: 3.6 },
+        { flag: '🇳🇱', text: 'Hallo', x: 50, y: 3, dur: 4.1 },
+        { flag: '🇸🇪', text: 'Hej', x: 45, y: 94, dur: 3.4 },
+        { flag: '🇬🇷', text: 'Γεια', x: 25, y: 5, dur: 3.9 },
+        { flag: '🇵🇱', text: 'Cześć', x: 75, y: 6, dur: 4.3 },
+        { flag: '🇹🇭', text: 'สวัสดี', x: 2, y: 70, dur: 3.7 },
+        { flag: '🇻🇳', text: 'Xin chào', x: 93, y: 65, dur: 4.4 },
+        { flag: '🇺🇦', text: 'Привіт', x: 20, y: 92, dur: 3.2 },
+        { flag: '🇷🇴', text: 'Salut', x: 78, y: 92, dur: 3.5 },
       ].map((b, i) => (
         <motion.div
           key={b.flag}
           initial={{ opacity: 0 }}
           animate={inView ? {
-            opacity: 0.5,
-            y: [0, -(5 + i * 2), 0, (4 + i), 0],
-            x: [0, (3 + i), 0, -(2 + i), 0],
+            opacity: 0.55,
+            y: [0, -(6 + i * 2), 0, (5 + i), 0],
+            x: [0, (4 + i), 0, -(3 + i), 0],
           } : {}}
           transition={{
-            opacity: { duration: 0.5, delay: 0.2 + i * 0.08 },
+            opacity: { duration: 0.5, delay: 0.2 + i * 0.06 },
             y: { duration: b.dur, repeat: Infinity, ease: 'easeInOut' },
             x: { duration: b.dur * 1.3, repeat: Infinity, ease: 'easeInOut' },
           }}
-          className="absolute bg-surface-alt/80 rounded-full px-3 py-1.5 flex items-center gap-1.5 border border-black/5"
+          className="absolute bg-surface-alt/80 rounded-full px-5 py-2.5 flex items-center gap-2 border border-black/5 shadow-sm"
           style={{ left: `${b.x}%`, top: `${b.y}%`, transform: 'translate(-50%, -50%)' }}
         >
-          <span className="text-xs">{b.flag}</span>
-          <span className="text-[0.65rem] font-medium text-ink-muted">{b.text}</span>
+          <span className="text-base">{b.flag}</span>
+          <span className="text-[0.8rem] font-medium text-ink-muted">{b.text}</span>
         </motion.div>
       ))}
 
