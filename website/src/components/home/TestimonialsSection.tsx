@@ -99,6 +99,7 @@ function VideoCard({
             src={videoSrc}
             className="absolute inset-0 w-full h-full object-cover"
             playsInline
+            preload="metadata"
             onEnded={() => setPlaying(false)}
           />
         )}
@@ -138,17 +139,44 @@ export function TestimonialsSection() {
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
 
+  // Triple the items for seamless looping: [clone-end] [original] [clone-start]
+  const items = [...testimonials, ...testimonials, ...testimonials]
+
+  const getCardWidth = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return 360
+    const card = el.querySelector<HTMLElement>('[data-card]')
+    return card ? card.offsetWidth + 20 : 360 // card width + gap
+  }, [])
+
+  // Start scrolled to the middle set
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const singleSetWidth = testimonials.length * getCardWidth()
+    el.scrollLeft = singleSetWidth
+  }, [getCardWidth])
+
   const checkScroll = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
-    setCanScrollLeft(el.scrollLeft > 4)
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
-  }, [])
+    setCanScrollLeft(true)
+    setCanScrollRight(true)
+
+    // Seamless loop: if we've scrolled past the end set, jump back to middle
+    const singleSetWidth = testimonials.length * getCardWidth()
+    if (el.scrollLeft >= singleSetWidth * 2) {
+      el.scrollLeft = singleSetWidth
+    }
+    // If we've scrolled before the start set, jump forward to middle
+    if (el.scrollLeft <= 0) {
+      el.scrollLeft = singleSetWidth
+    }
+  }, [getCardWidth])
 
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    checkScroll()
     el.addEventListener('scroll', checkScroll, { passive: true })
     window.addEventListener('resize', checkScroll)
     return () => {
@@ -160,10 +188,9 @@ export function TestimonialsSection() {
   const scroll = (direction: 'left' | 'right') => {
     const el = scrollRef.current
     if (!el) return
-    const cardWidth = el.querySelector<HTMLElement>(':scope > div')?.offsetWidth ?? 340
-    const gap = 20
+    const cardW = getCardWidth()
     el.scrollBy({
-      left: direction === 'left' ? -(cardWidth + gap) : cardWidth + gap,
+      left: direction === 'left' ? -cardW : cardW,
       behavior: 'smooth',
     })
   }
@@ -184,20 +211,18 @@ export function TestimonialsSection() {
             </h2>
           </FadeIn>
 
-          {/* Nav arrows */}
+          {/* Nav arrows — always enabled for loop */}
           <FadeIn delay={0.15} className="hidden md:flex items-center gap-3">
             <button
               onClick={() => scroll('left')}
-              disabled={!canScrollLeft}
-              className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white transition-all duration-300 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white transition-all duration-300 hover:bg-white/10 cursor-pointer"
               aria-label="Previous testimonial"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={() => scroll('right')}
-              disabled={!canScrollRight}
-              className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white transition-all duration-300 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white transition-all duration-300 hover:bg-white/10 cursor-pointer"
               aria-label="Next testimonial"
             >
               <ChevronRight className="w-5 h-5" />
@@ -209,20 +234,18 @@ export function TestimonialsSection() {
       {/* Carousel */}
       <div
         ref={scrollRef}
-        className="flex gap-5 overflow-x-auto px-6 md:px-10 pb-4 snap-x snap-mandatory scrollbar-hide"
+        className="flex gap-5 overflow-x-auto px-6 md:px-10 pb-4 scrollbar-hide"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {/* Left spacer to center within max-w-1400 */}
-        <div className="shrink-0 hidden lg:block" style={{ width: 'max(0px, calc((100vw - 1400px) / 2))' }} />
-
-        {testimonials.map((t) => (
+        {items.map((t, i) => (
           <div
-            key={t.author}
-            className="shrink-0 w-[300px] md:w-[340px] snap-start"
+            key={`${t.author}-${i}`}
+            data-card
+            className="shrink-0 w-[300px] md:w-[340px]"
           >
             {t.type === 'video' ? (
               <VideoCard
@@ -243,10 +266,6 @@ export function TestimonialsSection() {
             )}
           </div>
         ))}
-
-        {/* Right spacer */}
-        <div className="shrink-0 w-6 md:w-10 lg:hidden" />
-        <div className="shrink-0 hidden lg:block" style={{ width: 'max(0px, calc((100vw - 1400px) / 2))' }} />
       </div>
     </section>
   )
