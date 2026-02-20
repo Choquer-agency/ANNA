@@ -46,7 +46,7 @@ export default function PricingPage() {
             <p className="text-primary text-sm uppercase tracking-[0.15em] font-medium mb-4">
               Pricing
             </p>
-            <h1 className="heading-xl text-ink">
+            <h1 className="hero-heading text-ink">
               Simple, transparent
               <br />
               pricing.
