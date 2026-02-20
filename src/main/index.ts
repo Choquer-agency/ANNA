@@ -527,6 +527,11 @@ app.whenReady().then(async () => {
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
 
+    // Private repo: provide token for GitHub Releases access
+    if (process.env.AUTO_UPDATE_TOKEN) {
+      autoUpdater.requestHeaders = { Authorization: `token ${process.env.AUTO_UPDATE_TOKEN}` }
+    }
+
     autoUpdater.on('checking-for-update', () => {
       mainWindow?.webContents.send('update:checking')
     })

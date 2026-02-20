@@ -20,6 +20,7 @@ export default defineConfig({
       'process.env.WEBSITE_URL': JSON.stringify(process.env.WEBSITE_URL || 'https://annatype.io'),
       'process.env.POSTHOG_API_KEY': JSON.stringify(process.env.POSTHOG_API_KEY),
       'process.env.POSTHOG_HOST': JSON.stringify(process.env.POSTHOG_HOST),
+      'process.env.AUTO_UPDATE_TOKEN': JSON.stringify(process.env.AUTO_UPDATE_TOKEN),
     }
   },
   preload: {

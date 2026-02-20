@@ -32,6 +32,8 @@ jobs:
 
       - name: Build app
         run: npx electron-vite build
+        env:
+          AUTO_UPDATE_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN }}
 
       - name: Build & publish to GitHub Releases
         run: npx electron-builder --mac --arm64 --x64 --publish always
