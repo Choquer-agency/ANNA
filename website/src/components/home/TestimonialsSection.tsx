@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Play } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Play, Pause } from 'lucide-react'
 import { testimonials } from '@/lib/constants'
 import { FadeIn } from '@/components/ui/FadeIn'
 
@@ -64,6 +64,7 @@ function VideoCard({
   author,
   role,
   avatar,
+  videoSrc,
 }: {
   quote: string
   author: string
@@ -71,12 +72,45 @@ function VideoCard({
   avatar: string
   videoSrc?: string
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [playing, setPlaying] = useState(false)
+
+  const togglePlay = () => {
+    const v = videoRef.current
+    if (!v) return
+    if (playing) {
+      v.pause()
+    } else {
+      v.play()
+    }
+    setPlaying(!playing)
+  }
+
   return (
     <div className="rounded-[20px] overflow-hidden bg-[#2A2A2A] flex flex-col h-full">
-      {/* Video thumbnail area */}
-      <div className="relative aspect-[4/3] bg-gradient-to-br from-[#3A3A3A] to-[#222] flex items-center justify-center">
-        <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors duration-300">
-          <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+      {/* Video area */}
+      <div
+        className="relative aspect-[4/3] bg-gradient-to-br from-[#3A3A3A] to-[#222] cursor-pointer group"
+        onClick={togglePlay}
+      >
+        {videoSrc && (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            className="absolute inset-0 w-full h-full object-cover"
+            playsInline
+            onEnded={() => setPlaying(false)}
+          />
+        )}
+        {/* Play/Pause overlay */}
+        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${playing ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
+          <div className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/50 transition-colors duration-300">
+            {playing ? (
+              <Pause className="w-6 h-6 text-white fill-white" />
+            ) : (
+              <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -85,9 +119,14 @@ function VideoCard({
         <p className="text-[0.95rem] text-white/80 leading-relaxed mb-5 flex-1">
           &ldquo;{quote}&rdquo;
         </p>
-        <div>
-          <p className="font-semibold text-[0.95rem] text-white">{author}</p>
-          {role && <p className="text-sm text-white/40 mt-0.5">{role}</p>}
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-white/10">
+            <img src={avatar} alt={author} className="w-full h-full object-cover" />
+          </div>
+          <div>
+            <p className="font-semibold text-[0.9rem] text-white">{author}</p>
+            {role && <p className="text-xs text-white/40">{role}</p>}
+          </div>
         </div>
       </div>
     </div>

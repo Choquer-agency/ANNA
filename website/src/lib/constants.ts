@@ -127,12 +127,13 @@ export const testimonials: Testimonial[] = [
     type: 'text',
   },
   {
-    quote: 'Watch how I use Anna to write an entire blog post in under 5 minutes.',
-    author: 'Jake Thompson',
-    role: 'Content Creator',
-    avatar: '/images/avatars/jake.jpg',
+    quote:
+      'I can just speak without having to type anything — English, Spanish, any language. It\u0027s so cool!',
+    author: 'Andres A.',
+    role: 'Marketing Specialist',
+    avatar: '/images/avatars/andres.jpg',
     type: 'video',
-    videoSrc: '/videos/testimonial-1.mp4',
+    videoSrc: '/videos/testimonial-andres.mp4',
   },
   {
     quote:
@@ -160,12 +161,12 @@ export const testimonials: Testimonial[] = [
     type: 'text',
   },
   {
-    quote: 'Here is my honest review after 3 months of using Anna every single day.',
+    quote:
+      'After 3 months of daily use, Anna has completely replaced my keyboard for first drafts. I just talk and the words flow.',
     author: 'Lena Kowalski',
     role: 'Freelance Writer',
     avatar: '/images/avatars/lena.jpg',
-    type: 'video',
-    videoSrc: '/videos/testimonial-2.mp4',
+    type: 'text',
   },
   {
     quote:
@@ -192,12 +193,12 @@ export const testimonials: Testimonial[] = [
     type: 'text',
   },
   {
-    quote: 'Anna is the tool I recommend to every creator I know. Let me show you why.',
+    quote:
+      'Anna is the tool I recommend to every creator I know. It handles scripts, captions, and emails — all by voice.',
     author: 'Sofia Morales',
     role: 'YouTuber',
     avatar: '/images/avatars/sofia.jpg',
-    type: 'video',
-    videoSrc: '/videos/testimonial-3.mp4',
+    type: 'text',
   },
 ]
 
