@@ -27,6 +27,7 @@ import { registerHotkey, unregisterHotkeys, reregisterHotkey } from './hotkey'
 import { handleHotkeyToggle, setPipelineMainWindow, retrySession } from './pipeline'
 import { createRecordingIndicatorWindow, destroyRecordingIndicator } from './recordingIndicator'
 import { shutdownLangfuse } from './langfuse'
+import { trackMainEvent, shutdownPostHog } from './analytics'
 import { probeAccessibility } from './accessibilityProbe'
 import { createTray, destroyTray } from './tray'
 import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile } from './convex'
@@ -192,9 +193,39 @@ app.whenReady().then(async () => {
   }
 
   initDB()
+
+  // Generate device_id for anonymous analytics tracking before auth
+  if (!getSetting('device_id')) {
+    const { randomUUID } = require('crypto')
+    setSetting('device_id', randomUUID())
+  }
+
+  const isFirstLaunch = !getSetting('first_dictation_tracked') && !getSetting('onboarding_completed')
+  trackMainEvent('app_launched', {
+    app_version: app.getVersion(),
+    os_version: process.getSystemVersion(),
+    is_first_launch: isFirstLaunch,
+    is_authenticated: isAuthValid()
+  })
+
+  // Migration: existing authenticated users should skip onboarding
+  // (temporarily disabled for onboarding demo)
+  // if (isAuthValid() && getSetting('onboarding_completed') !== 'true') {
+  //   setSetting('onboarding_completed', 'true')
+  // }
+
   createAudioWindow()
   createRecordingIndicatorWindow() // Pre-create hidden — shows instantly when recording
   createWindow()
+
+  // Silent auth: on first launch without a token, auto-open browser to check for existing session
+  if (!isAuthValid() && !getSetting('has_launched_before')) {
+    setSetting('has_launched_before', 'true')
+    const { shell } = require('electron')
+    const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+    shell.openExternal(`${websiteUrl}/silent-auth`)
+  }
+
   // Register hotkey — use stored setting or default to fn
   const storedHotkey = getSetting('hotkey')
   await registerHotkey(handleHotkeyToggle, storedHotkey || 'fn')
@@ -511,6 +542,10 @@ app.whenReady().then(async () => {
     autoUpdater.on('update-downloaded', (info) => {
       console.log('[updater] Update downloaded:', info.version)
       mainWindow?.webContents.send('update:downloaded', info.version)
+      trackMainEvent('app_updated', {
+        previous_version: app.getVersion(),
+        new_version: info.version
+      })
     })
 
     autoUpdater.checkForUpdatesAndNotify().catch((err) =>
@@ -551,10 +586,12 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
+  trackMainEvent('app_quit', { app_version: app.getVersion() })
   unregisterHotkeys()
   destroyRecordingIndicator()
   destroyAudioWindow()
   destroyTray()
   shutdownLangfuse()
+  shutdownPostHog().catch(() => {})
   closeDB()
 })

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import './types'
+import { initAnalytics, identify, setSuperProperties, optOut, reset } from './lib/analytics'
 import { useAnna } from './hooks/useAnna'
 import { useTheme } from './hooks/useTheme'
 import { Sidebar } from './components/Sidebar'
@@ -14,19 +15,48 @@ import { HelpPage } from './components/HelpPage'
 import { ToastContainer } from './components/Toast'
 import { FeedbackModal } from './components/FeedbackModal'
 import { SignInGate } from './components/SignInGate'
+import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
 
 function App(): React.JSX.Element {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null)
   const [currentPage, setCurrentPage] = useState<Page>('home')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [feedbackSessionId, setFeedbackSessionId] = useState<string | null>(null)
   const [dictationText, setDictationText] = useState<string | null>(null)
   useTheme()
 
-  // Check auth + onboarding status on mount
+  // Initialize analytics + check auth + onboarding status on mount
   useEffect(() => {
+    initAnalytics()
+
+    // Set super properties
+    Promise.all([
+      window.annaAPI.getAppVersion(),
+      window.annaAPI.getSetting('analytics_enabled')
+    ]).then(([version, analyticsEnabled]) => {
+      if (analyticsEnabled === 'false') {
+        optOut()
+      }
+      setSuperProperties({
+        app_version: version,
+        os_version: navigator.platform
+      })
+    })
+
     window.annaAPI.getAuthStatus().then((status) => {
       setAuthenticated(status.isAuthenticated)
+      if (status.isAuthenticated) {
+        Promise.all([
+          window.annaAPI.getSetting('user_email'),
+          window.annaAPI.getSetting('user_name')
+        ]).then(([email, name]) => {
+          if (email) identify(email, { name, email })
+        })
+      }
+    })
+    window.annaAPI.getSetting('onboarding_completed').then((val) => {
+      setOnboardingCompleted(val === 'true')
     })
   }, [])
 
@@ -34,6 +64,16 @@ function App(): React.JSX.Element {
   useEffect(() => {
     window.annaAPI.onAuthChanged((data) => {
       setAuthenticated(data.isAuthenticated)
+      if (data.isAuthenticated) {
+        Promise.all([
+          window.annaAPI.getSetting('user_email'),
+          window.annaAPI.getSetting('user_name')
+        ]).then(([email, name]) => {
+          if (email) identify(email, { name, email })
+        })
+      } else {
+        reset()
+      }
     })
     return () => {
       // Cleaned up via removeAllListeners
@@ -121,7 +161,7 @@ function App(): React.JSX.Element {
   }
 
   // Loading state
-  if (authenticated === null) {
+  if (authenticated === null || onboardingCompleted === null) {
     return <div className="flex h-screen bg-mesh" />
   }
 
@@ -130,7 +170,10 @@ function App(): React.JSX.Element {
     return <SignInGate onSignedIn={() => setAuthenticated(true)} />
   }
 
-  // Onboarding is now handled on the website — skip the in-app wizard
+  // Onboarding gate — permissions + test dictation
+  if (!onboardingCompleted) {
+    return <OnboardingWizard onComplete={() => setOnboardingCompleted(true)} />
+  }
 
   return (
     <div className="flex h-screen bg-mesh text-ink">

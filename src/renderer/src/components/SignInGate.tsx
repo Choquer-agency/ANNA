@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePlasmaHover } from '../hooks/usePlasmaHover'
+import { track } from '../lib/analytics'
 
 interface SignInGateProps {
   onSignedIn: () => void
@@ -8,18 +9,40 @@ interface SignInGateProps {
 export function SignInGate({ onSignedIn }: SignInGateProps): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
   const [loading, setLoading] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
+  const silentAuthResolved = useRef(false)
+
+  // On mount, track silent auth attempt
+  useEffect(() => {
+    track('silent_auth_attempted')
+  }, [])
+
+  // On mount, check if silent auth is in progress (first launch auto-opened browser)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCheckingSession(false)
+      if (!silentAuthResolved.current) {
+        track('silent_auth_failed', { reason: 'timeout' })
+        track('login_page_shown', { source: 'silent_auth_fallback' })
+      }
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleOpenWeb = async (path: string) => {
     setLoading(true)
     await window.annaAPI.openWeb(path)
-    // The actual sign-in completion happens via deep link → auth:changed event
-    // Reset loading after a delay in case user cancels
     setTimeout(() => setLoading(false), 5000)
   }
 
   // Listen for auth changes
   window.annaAPI.onAuthChanged((data) => {
     if (data.isAuthenticated) {
+      silentAuthResolved.current = true
+      if (checkingSession) {
+        track('silent_auth_succeeded')
+      }
+      track('login_completed', { method: 'web' })
       onSignedIn()
     }
   })
@@ -53,38 +76,58 @@ export function SignInGate({ onSignedIn }: SignInGateProps): React.JSX.Element {
             </svg>
           </div>
 
-          <h1 className="text-xl font-bold mb-2">Welcome to Anna</h1>
-          <p className="text-ink-muted text-sm mb-8 leading-relaxed">
-            Log in or create an account on annatype.io to get started.
-          </p>
+          {checkingSession ? (
+            <>
+              <h1 className="text-xl font-bold mb-2">Checking for your account...</h1>
+              <p className="text-ink-muted text-sm mb-8 leading-relaxed">
+                Looking for an existing session. This will only take a moment.
+              </p>
+              <div className="flex justify-center mb-4">
+                <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              </div>
+              <button
+                onClick={() => setCheckingSession(false)}
+                className="text-xs text-ink-faint hover:text-ink-muted transition-colors cursor-pointer"
+              >
+                Skip and log in manually
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold mb-2">Welcome to Anna</h1>
+              <p className="text-ink-muted text-sm mb-8 leading-relaxed">
+                Log in or create an account on annatype.io to get started.
+              </p>
 
-          <button
-            onClick={() => handleOpenWeb('login')}
-            onMouseMove={onMouseMove}
-            disabled={loading}
-            className={`plasma-hover w-full font-semibold py-3 rounded-xl transition-colors ${
-              !loading
-                ? 'bg-primary hover:bg-primary-hover text-white cursor-pointer shadow-soft'
-                : 'bg-border text-ink-faint cursor-not-allowed'
-            }`}
-          >
-            <span className="relative z-[2]">{loading ? 'Opening browser...' : 'Log in'}</span>
-          </button>
+              <button
+                onClick={() => handleOpenWeb('login')}
+                onMouseMove={onMouseMove}
+                disabled={loading}
+                className={`plasma-hover w-full font-semibold py-3 rounded-xl transition-colors ${
+                  !loading
+                    ? 'bg-primary hover:bg-primary-hover text-white cursor-pointer shadow-soft'
+                    : 'bg-border text-ink-faint cursor-not-allowed'
+                }`}
+              >
+                <span className="relative z-[2]">{loading ? 'Opening browser...' : 'Log in'}</span>
+              </button>
 
-          <p className="mt-4 text-sm text-ink-muted">
-            Don&apos;t have an account?{' '}
-            <button
-              onClick={() => handleOpenWeb('signup')}
-              disabled={loading}
-              className="text-primary font-semibold hover:underline transition-colors cursor-pointer"
-            >
-              Create one
-            </button>
-          </p>
+              <p className="mt-4 text-sm text-ink-muted">
+                Don&apos;t have an account?{' '}
+                <button
+                  onClick={() => handleOpenWeb('signup')}
+                  disabled={loading}
+                  className="text-primary font-semibold hover:underline transition-colors cursor-pointer"
+                >
+                  Create one
+                </button>
+              </p>
 
-          <p className="mt-6 text-xs text-ink-faint leading-relaxed">
-            You&apos;ll be taken to annatype.io to sign in, then redirected back to the app.
-          </p>
+              <p className="mt-6 text-xs text-ink-faint leading-relaxed">
+                You&apos;ll be taken to annatype.io to sign in, then redirected back to the app.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

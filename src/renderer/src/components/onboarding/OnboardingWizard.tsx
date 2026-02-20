@@ -1,31 +1,39 @@
-import { useState } from 'react'
-import { WelcomeStep } from './WelcomeStep'
+import { useState, useEffect } from 'react'
 import { PermissionsStep } from './PermissionsStep'
 import { TestDictationStep } from './TestDictationStep'
+import { track } from '../../lib/analytics'
 
 interface OnboardingWizardProps {
   onComplete: () => void
 }
 
-const TOTAL_STEPS = 3
+const TOTAL_STEPS = 2
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps): React.JSX.Element {
   const [step, setStep] = useState(0)
 
+  useEffect(() => {
+    track('onboarding_started')
+    track('onboarding_step_viewed', { step: 'permissions', step_number: 0 })
+  }, [])
+
   function next(): void {
-    setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1))
+    setStep((s) => {
+      const nextStep = Math.min(s + 1, TOTAL_STEPS - 1)
+      const stepNames = ['permissions', 'test_dictation']
+      track('onboarding_step_viewed', { step: stepNames[nextStep], step_number: nextStep })
+      return nextStep
+    })
   }
 
   function renderStep(): React.JSX.Element {
     switch (step) {
       case 0:
-        return <WelcomeStep onNext={next} />
-      case 1:
         return <PermissionsStep onNext={next} />
-      case 2:
+      case 1:
         return <TestDictationStep onComplete={onComplete} />
       default:
-        return <WelcomeStep onNext={next} />
+        return <PermissionsStep onNext={next} />
     }
   }
 

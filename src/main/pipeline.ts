@@ -4,7 +4,7 @@ import { join } from 'path'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { getActiveWindow } from './activeWindow'
 import { startRecording, stopRecording, getRecordingState, getRecordingDuration } from './audio'
-import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting } from './db'
+import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions } from './db'
 import { transcribe } from './transcribe'
 import { processTranscript } from './process'
 import { injectText } from './inject'
@@ -16,6 +16,7 @@ import {
   setupRecordingIndicatorIPC
 } from './recordingIndicator'
 import { updateTrayRecordingState } from './tray'
+import { trackMainEvent } from './analytics'
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -105,6 +106,7 @@ async function verifiedTranscribe(
 }
 
 export async function retrySession(sessionId: string, customPrompt?: string): Promise<void> {
+  trackMainEvent('dictation_retried')
   const session = getSessionById(sessionId)
   if (!session) throw new Error('Session not found')
   if (!session.audio_path || !existsSync(session.audio_path)) {
@@ -213,6 +215,7 @@ export async function handleHotkeyToggle(): Promise<void> {
     // Check for empty recording (WAV header is 44 bytes)
     if (wavBuffer.length <= 44) {
       console.log('[pipeline] Empty recording, skipping')
+      trackMainEvent('dictation_cancelled', { reason: 'empty_recording' })
       sendStatus('idle')
       return
     }
@@ -314,6 +317,29 @@ export async function handleHotkeyToggle(): Promise<void> {
       console.log(`[pipeline] TOTAL: ${(performance.now() - t0).toFixed(1)}ms`)
       console.log('[pipeline] Complete:', session.id)
 
+      // Analytics: dictation completed
+      trackMainEvent('dictation_completed', {
+        duration_ms: durationMs,
+        word_count: wordCount,
+        app_context: activeWin?.appName
+      })
+
+      // Analytics: first dictation ever
+      if (!getSetting('first_dictation_tracked')) {
+        trackMainEvent('first_dictation_completed')
+        setSetting('first_dictation_tracked', 'true')
+      }
+
+      // Analytics: milestone check
+      const totalSessions = getSessions().length
+      const milestones = [10, 50, 100, 500, 1000]
+      for (const m of milestones) {
+        if (totalSessions === m) {
+          trackMainEvent('milestone_reached', { milestone: String(m) })
+          break
+        }
+      }
+
       // Sync to Convex (lazy-load to avoid eager module weight)
       const completedSession = getSessionById(session.id)
       if (completedSession) {
@@ -326,6 +352,7 @@ export async function handleHotkeyToggle(): Promise<void> {
       trace.update({ metadata: { status: 'failed', error: errorMsg } })
       updateSession(session.id, { status: 'failed', error: errorMsg })
       sendError(errorMsg)
+      trackMainEvent('dictation_error', { error_type: errorMsg })
 
       // Sync failed session to Convex too
       const failedSession = getSessionById(session.id)
@@ -347,6 +374,7 @@ export async function handleHotkeyToggle(): Promise<void> {
     updateTrayRecordingState(true)
     repositionInterval = setInterval(repositionToActiveScreen, 500)
     sendStatus('recording')
+    trackMainEvent('dictation_started', { trigger: 'hotkey' })
     console.log('[pipeline] Recording started')
   }
 }

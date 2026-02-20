@@ -107,7 +107,9 @@
     "electron-updater": "^6.8.3",
     "langfuse": "^3.38.6",
     "lucide-react": "^0.574.0",
-    "openai": "^4.0.0"
+    "openai": "^4.0.0",
+    "posthog-js": "^1.352.0",
+    "posthog-node": "^5.21.2"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.0",

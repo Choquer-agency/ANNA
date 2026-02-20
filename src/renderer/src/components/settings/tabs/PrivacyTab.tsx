@@ -3,11 +3,13 @@ import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 import { Toggle } from '../Toggle'
 import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
+import { optIn, optOut } from '../../../lib/analytics'
 
 export function PrivacyTab(): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
   const [privacyMode, setPrivacyMode] = useState(false)
   const [contextAwareness, setContextAwareness] = useState(false)
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(false)
   const [hasConvexUrl, setHasConvexUrl] = useState(false)
   const [showConsentDialog, setShowConsentDialog] = useState(false)
@@ -15,13 +17,15 @@ export function PrivacyTab(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   const loadSettings = useCallback(async () => {
-    const [pm, ca, convexStatus] = await Promise.all([
+    const [pm, ca, ae, convexStatus] = await Promise.all([
       window.annaAPI.getSetting('privacy_mode'),
       window.annaAPI.getSetting('context_awareness'),
+      window.annaAPI.getSetting('analytics_enabled'),
       window.annaAPI.getConvexStatus()
     ])
     setPrivacyMode(pm === 'true')
     setContextAwareness(ca === 'true')
+    setAnalyticsEnabled(ae !== 'false')
     setCloudSyncEnabled(convexStatus.syncEnabled)
     setHasConvexUrl(convexStatus.hasConvexUrl)
     setLoaded(true)
@@ -55,6 +59,23 @@ export function PrivacyTab(): React.JSX.Element {
             onChange={async (v) => {
               setContextAwareness(v)
               await window.annaAPI.setSetting('context_awareness', String(v))
+            }}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Share usage analytics"
+          description="Help improve Anna by sharing anonymous usage data (no dictation content is ever shared)"
+        >
+          <Toggle
+            value={analyticsEnabled}
+            onChange={async (v) => {
+              setAnalyticsEnabled(v)
+              await window.annaAPI.setSetting('analytics_enabled', String(v))
+              if (v) {
+                optIn()
+              } else {
+                optOut()
+              }
             }}
           />
         </SettingsRow>

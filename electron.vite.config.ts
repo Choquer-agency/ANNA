@@ -2,6 +2,10 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { config } from 'dotenv'
+
+// Load .env so define values are available at build time
+config({ path: resolve(__dirname, '.env') })
 
 export default defineConfig({
   main: {
@@ -14,6 +18,8 @@ export default defineConfig({
       'process.env.LANGFUSE_PUBLIC_KEY': JSON.stringify(process.env.LANGFUSE_PUBLIC_KEY),
       'process.env.LANGFUSE_BASE_URL': JSON.stringify(process.env.LANGFUSE_BASE_URL),
       'process.env.WEBSITE_URL': JSON.stringify(process.env.WEBSITE_URL || 'https://annatype.io'),
+      'process.env.POSTHOG_API_KEY': JSON.stringify(process.env.POSTHOG_API_KEY),
+      'process.env.POSTHOG_HOST': JSON.stringify(process.env.POSTHOG_HOST),
     }
   },
   preload: {
@@ -30,6 +36,10 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), tailwindcss()],
+    define: {
+      'process.env.POSTHOG_API_KEY': JSON.stringify(process.env.POSTHOG_API_KEY),
+      'process.env.POSTHOG_HOST': JSON.stringify(process.env.POSTHOG_HOST),
+    },
     build: {
       rollupOptions: {
         input: {
