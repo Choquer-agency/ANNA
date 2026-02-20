@@ -1,5 +1,5 @@
 import { initWhisper, type WhisperContext } from '@fugood/whisper.node'
-import { writeFileSync, unlinkSync, existsSync, createWriteStream, mkdirSync } from 'fs'
+import { writeFileSync, unlinkSync, existsSync, createWriteStream, mkdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
@@ -9,6 +9,7 @@ import type Langfuse from 'langfuse'
 
 const MODEL_NAME = 'ggml-base.en.bin'
 const MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_NAME}`
+const MODEL_MIN_SIZE = 100_000_000 // ~142MB expected, anything under 100MB is corrupt
 
 let whisperContext: WhisperContext | null = null
 
@@ -20,6 +21,15 @@ function getModelDir(): string {
 
 function getModelPath(): string {
   return join(getModelDir(), MODEL_NAME)
+}
+
+function isModelValid(path: string): boolean {
+  try {
+    const stat = statSync(path)
+    return stat.size >= MODEL_MIN_SIZE
+  } catch {
+    return false
+  }
 }
 
 function downloadModel(dest: string): Promise<void> {
@@ -63,24 +73,44 @@ async function getContext(): Promise<WhisperContext> {
   if (whisperContext) return whisperContext
 
   const modelPath = getModelPath()
-  if (!existsSync(modelPath)) {
+
+  // Download model if missing or corrupted (partial download)
+  if (!existsSync(modelPath) || !isModelValid(modelPath)) {
+    if (existsSync(modelPath)) {
+      console.warn('[transcribe] Model file appears corrupted, re-downloading...')
+      try { unlinkSync(modelPath) } catch { /* ignore */ }
+    }
     await downloadModel(modelPath)
   }
 
-  // Use GPU only on Apple Silicon — older Intel Macs have incompatible Metal GPUs
   const useGpu = process.arch === 'arm64'
   console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}, GPU: ${useGpu}`)
   console.log(`[transcribe] Loading whisper model from ${modelPath}...`)
+
+  // Try with GPU first, fall back to CPU if initialization fails
   try {
     whisperContext = await initWhisper({
       filePath: modelPath,
       useGpu,
     })
-    console.log('[transcribe] Whisper model loaded')
+    console.log(`[transcribe] Whisper model loaded (GPU: ${useGpu})`)
     return whisperContext
   } catch (err) {
+    if (useGpu) {
+      console.warn(`[transcribe] GPU init failed, retrying with CPU only:`, err)
+      try {
+        whisperContext = await initWhisper({
+          filePath: modelPath,
+          useGpu: false,
+        })
+        console.log('[transcribe] Whisper model loaded (CPU fallback)')
+        return whisperContext
+      } catch (cpuErr) {
+        console.error('[transcribe] CPU fallback also failed:', cpuErr)
+        throw cpuErr
+      }
+    }
     console.error(`[transcribe] Failed to load whisper. Platform: ${process.platform}, Arch: ${process.arch}`)
-    console.error(`[transcribe] Ensure @fugood/node-whisper-${process.platform}-${process.arch} is installed.`)
     console.error('[transcribe] Error:', err)
     throw err
   }
