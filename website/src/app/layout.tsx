@@ -15,7 +15,9 @@ export const metadata: Metadata = {
   description:
     'AI-powered voice dictation for macOS. Press a shortcut, speak naturally, and watch polished text appear anywhere you type.',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
     apple: '/apple-touch-icon.png',
   },
   openGraph: {

@@ -10,7 +10,7 @@ export default function MarketingLayout({
   return (
     <SmoothScroll>
       <Navbar />
-      <main>{children}</main>
+      <main className="relative z-10 bg-surface">{children}</main>
       <Footer />
     </SmoothScroll>
   )
