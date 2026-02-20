@@ -103,6 +103,15 @@ export interface Testimonial {
 export const testimonials: Testimonial[] = [
   {
     quote:
+      'I save about 4 hours a week just speaking instead of typing. Anna changed how I work completely.',
+    author: 'Bryce Choquer',
+    role: 'Founder',
+    avatar: '/images/avatars/bryce.jpg',
+    type: 'video',
+    videoSrc: '/videos/testimonial-bryce.mp4',
+  },
+  {
+    quote:
       'Anna completely changed how I write emails. I just talk and perfect prose appears. It saves me at least an hour every day.',
     author: 'Sarah Chen',
     role: 'Product Manager',
