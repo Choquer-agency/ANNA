@@ -204,47 +204,47 @@ function LanguagesIllustration() {
   const lang = languages[activeLang]
 
   return (
-    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-white relative flex flex-col items-center justify-center">
+    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FDF5FF] relative flex flex-col items-center justify-center">
       {/* Pink glow */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at 30% 40%, rgba(235,193,255,0.15) 0%, transparent 50%), radial-gradient(ellipse at 75% 65%, rgba(235,193,255,0.12) 0%, transparent 45%)',
+        background: 'radial-gradient(ellipse at 30% 40%, rgba(235,193,255,0.2) 0%, transparent 50%), radial-gradient(ellipse at 75% 65%, rgba(235,193,255,0.15) 0%, transparent 45%)',
       }} />
 
-      {/* Floating background bubbles */}
+      {/* Floating background bubbles — arranged in a ring around center */}
       {[
-        { flag: '🇮🇹', text: 'Ciao', x: 6, y: 10, dur: 3.5 },
-        { flag: '🇩🇪', text: 'Hallo', x: 88, y: 7, dur: 4.2 },
-        { flag: '🇷🇺', text: 'Привет', x: 3, y: 45, dur: 3.8 },
-        { flag: '🇮🇳', text: 'नमस्ते', x: 92, y: 42, dur: 4.0 },
-        { flag: '🇸🇦', text: 'مرحباً', x: 10, y: 82, dur: 3.3 },
-        { flag: '🇹🇷', text: 'Merhaba', x: 85, y: 80, dur: 3.6 },
-        { flag: '🇳🇱', text: 'Hallo', x: 50, y: 3, dur: 4.1 },
-        { flag: '🇸🇪', text: 'Hej', x: 45, y: 94, dur: 3.4 },
-        { flag: '🇬🇷', text: 'Γεια', x: 25, y: 5, dur: 3.9 },
-        { flag: '🇵🇱', text: 'Cześć', x: 75, y: 6, dur: 4.3 },
-        { flag: '🇹🇭', text: 'สวัสดี', x: 2, y: 70, dur: 3.7 },
-        { flag: '🇻🇳', text: 'Xin chào', x: 93, y: 65, dur: 4.4 },
-        { flag: '🇺🇦', text: 'Привіт', x: 20, y: 92, dur: 3.2 },
-        { flag: '🇷🇴', text: 'Salut', x: 78, y: 92, dur: 3.5 },
+        { flag: '🇮🇹', text: 'Ciao', x: 14, y: 12, rot: -4, dur: 5.5 },
+        { flag: '🇩🇪', text: 'Hallo', x: 52, y: 6, rot: 2, dur: 6.2 },
+        { flag: '🇬🇷', text: 'Γεια', x: 86, y: 14, rot: -3, dur: 5.8 },
+        { flag: '🇷🇺', text: 'Привет', x: 6, y: 42, rot: 3, dur: 6.0 },
+        { flag: '🇮🇳', text: 'नमस्ते', x: 92, y: 44, rot: -2, dur: 5.6 },
+        { flag: '🇹🇭', text: 'สวัสดี', x: 4, y: 72, rot: 2, dur: 6.3 },
+        { flag: '🇻🇳', text: 'Xin chào', x: 90, y: 70, rot: -3, dur: 5.4 },
+        { flag: '🇸🇦', text: 'مرحباً', x: 16, y: 90, rot: 4, dur: 5.9 },
+        { flag: '🇹🇷', text: 'Merhaba', x: 54, y: 93, rot: -2, dur: 6.1 },
+        { flag: '🇵🇱', text: 'Cześć', x: 84, y: 88, rot: 3, dur: 5.7 },
       ].map((b, i) => (
         <motion.div
           key={b.flag}
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 0, scale: 0.8 }}
           animate={inView ? {
-            opacity: 0.55,
-            y: [0, -(6 + i * 2), 0, (5 + i), 0],
-            x: [0, (4 + i), 0, -(3 + i), 0],
+            opacity: [0.45, 0.6, 0.45],
+            scale: 1,
+            y: [0, -6, 0, 5, 0],
+            x: [0, 4, 0, -3, 0],
+            rotate: [b.rot, b.rot + 1, b.rot, b.rot - 1, b.rot],
           } : {}}
           transition={{
-            opacity: { duration: 0.5, delay: 0.2 + i * 0.06 },
-            y: { duration: b.dur, repeat: Infinity, ease: 'easeInOut' },
-            x: { duration: b.dur * 1.3, repeat: Infinity, ease: 'easeInOut' },
+            opacity: { duration: b.dur, repeat: Infinity, ease: 'easeInOut' },
+            scale: { duration: 0.6, delay: 0.15 + i * 0.07 },
+            y: { duration: b.dur, repeat: Infinity, ease: 'easeInOut', delay: i * 0.3 },
+            x: { duration: b.dur * 1.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.2 },
+            rotate: { duration: b.dur * 1.5, repeat: Infinity, ease: 'easeInOut' },
           }}
-          className="absolute bg-surface-alt/80 rounded-full px-5 py-2.5 flex items-center gap-2 border border-black/5 shadow-sm"
+          className="absolute bg-white rounded-full px-5 py-3 flex items-center gap-2.5 shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-black/[0.04]"
           style={{ left: `${b.x}%`, top: `${b.y}%`, transform: 'translate(-50%, -50%)' }}
         >
-          <span className="text-base">{b.flag}</span>
-          <span className="text-[0.8rem] font-medium text-ink-muted">{b.text}</span>
+          <span className="text-lg">{b.flag}</span>
+          <span className="text-sm font-medium text-ink/70">{b.text}</span>
         </motion.div>
       ))}
 
