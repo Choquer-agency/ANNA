@@ -205,6 +205,38 @@ function LanguagesIllustration() {
 
   return (
     <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-white relative flex flex-col items-center justify-center">
+      {/* Floating background bubbles */}
+      {[
+        { flag: '🇮🇹', text: 'Ciao', x: 8, y: 12, dur: 3.5 },
+        { flag: '🇩🇪', text: 'Hallo', x: 85, y: 8, dur: 4.2 },
+        { flag: '🇷🇺', text: 'Привет', x: 5, y: 55, dur: 3.8 },
+        { flag: '🇮🇳', text: 'नमस्ते', x: 88, y: 50, dur: 4.0 },
+        { flag: '🇸🇦', text: 'مرحباً', x: 12, y: 88, dur: 3.3 },
+        { flag: '🇹🇷', text: 'Merhaba', x: 82, y: 85, dur: 3.6 },
+        { flag: '🇳🇱', text: 'Hallo', x: 50, y: 5, dur: 4.1 },
+        { flag: '🇸🇪', text: 'Hej', x: 48, y: 92, dur: 3.4 },
+      ].map((b, i) => (
+        <motion.div
+          key={b.flag}
+          initial={{ opacity: 0 }}
+          animate={inView ? {
+            opacity: 0.5,
+            y: [0, -(5 + i * 2), 0, (4 + i), 0],
+            x: [0, (3 + i), 0, -(2 + i), 0],
+          } : {}}
+          transition={{
+            opacity: { duration: 0.5, delay: 0.2 + i * 0.08 },
+            y: { duration: b.dur, repeat: Infinity, ease: 'easeInOut' },
+            x: { duration: b.dur * 1.3, repeat: Infinity, ease: 'easeInOut' },
+          }}
+          className="absolute bg-surface-alt/80 rounded-full px-3 py-1.5 flex items-center gap-1.5 border border-black/5"
+          style={{ left: `${b.x}%`, top: `${b.y}%`, transform: 'translate(-50%, -50%)' }}
+        >
+          <span className="text-xs">{b.flag}</span>
+          <span className="text-[0.65rem] font-medium text-ink-muted">{b.text}</span>
+        </motion.div>
+      ))}
+
       <AnimatePresence mode="wait">
         <motion.div
           key={activeLang}
