@@ -13,12 +13,12 @@ function AIAutoEditsIllustration() {
   const inView = useInView(ref, { once: true, margin: '-100px' })
 
   return (
-    <div ref={ref} className="relative w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FFF8F0]">
+    <div ref={ref} className="relative w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FDF5FF]">
       {/* Blurred background */}
       <div
         className="absolute inset-0"
         style={{
-          background: 'radial-gradient(ellipse at 40% 30%, #FFDBA6 0%, transparent 50%), radial-gradient(ellipse at 70% 60%, #EBC1FF 0%, transparent 50%), #FFF8F0',
+          background: 'radial-gradient(ellipse at 40% 30%, #E8B4FF 0%, transparent 50%), radial-gradient(ellipse at 70% 60%, #FFDBA6 0%, transparent 50%), #FDF5FF',
           filter: 'blur(30px)',
           opacity: 0.6,
         }}
@@ -133,7 +133,7 @@ function PersonalDictionaryIllustration() {
   const inView = useInView(ref, { once: true, margin: '-100px' })
 
   return (
-    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FFF8F0] p-5 md:p-7 flex flex-col">
+    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FAFAFA] p-5 md:p-7 flex flex-col">
       {/* Search bar */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -214,12 +214,12 @@ function LanguagesIllustration() {
   }, [inView])
 
   return (
-    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FFF8F0] relative">
+    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FDF5FF] relative">
       {/* Soft radial glow in center */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(circle at 50% 50%, rgba(255,158,25,0.08) 0%, transparent 60%)',
+          background: 'radial-gradient(circle at 50% 50%, rgba(235,193,255,0.12) 0%, transparent 60%)',
         }}
       />
 
