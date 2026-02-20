@@ -1,22 +1,34 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, useScroll, useMotionValueEvent } from 'framer-motion'
-import { Menu, X, ArrowRight } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-motion'
+import { Menu, X, ArrowRight, Download } from 'lucide-react'
 import { AnnaLogo } from '@/components/ui/AnnaLogo'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
 
 const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'Download', href: '#download' },
 ]
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [downloadOpen, setDownloadOpen] = useState(false)
+  const downloadRef = useRef<HTMLDivElement>(null)
   const { scrollY } = useScroll()
   const { onMouseMove } = usePlasmaHover()
+
+  // Close download dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (downloadRef.current && !downloadRef.current.contains(e.target as Node)) {
+        setDownloadOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
     setScrolled(latest > 50)
@@ -49,6 +61,36 @@ export function Navbar() {
               {link.label}
             </a>
           ))}
+
+          {/* Download dropdown */}
+          <div ref={downloadRef} className="relative">
+            <button
+              onClick={() => setDownloadOpen(!downloadOpen)}
+              className="text-[0.9rem] text-ink-muted hover:text-ink transition-colors duration-300 cursor-pointer"
+            >
+              Download
+            </button>
+            <AnimatePresence>
+              {downloadOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                  className="absolute top-full mt-3 left-1/2 -translate-x-1/2"
+                >
+                  <a
+                    href="/download/mac"
+                    onClick={() => setDownloadOpen(false)}
+                    className="inline-flex items-center gap-2.5 whitespace-nowrap bg-white border border-border rounded-full px-5 py-2.5 text-[0.85rem] font-medium text-ink shadow-sm hover:shadow-md hover:border-ink/20 transition-all duration-300"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Anna</span>
+                  </a>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         <div className="hidden md:flex items-center gap-4">
@@ -96,6 +138,14 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
+            <a
+              href="/download/mac"
+              className="inline-flex items-center gap-2 text-lg text-ink-secondary hover:text-ink"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Download className="w-4 h-4" />
+              Download Anna
+            </a>
             <hr className="border-border" />
             <a href="/login" className="text-lg text-ink-secondary">
               Sign In
