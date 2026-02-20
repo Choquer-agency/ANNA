@@ -67,13 +67,21 @@ async function getContext(): Promise<WhisperContext> {
     await downloadModel(modelPath)
   }
 
-  console.log('[transcribe] Loading whisper model...')
-  whisperContext = await initWhisper({
-    filePath: modelPath,
-    useGpu: true,
-  })
-  console.log('[transcribe] Whisper model loaded')
-  return whisperContext
+  console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}`)
+  console.log(`[transcribe] Loading whisper model from ${modelPath}...`)
+  try {
+    whisperContext = await initWhisper({
+      filePath: modelPath,
+      useGpu: true,
+    })
+    console.log('[transcribe] Whisper model loaded')
+    return whisperContext
+  } catch (err) {
+    console.error(`[transcribe] Failed to load whisper. Platform: ${process.platform}, Arch: ${process.arch}`)
+    console.error(`[transcribe] Ensure @fugood/node-whisper-${process.platform}-${process.arch} is installed.`)
+    console.error('[transcribe] Error:', err)
+    throw err
+  }
 }
 
 export async function transcribe(

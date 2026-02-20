@@ -93,6 +93,7 @@ export async function syncSession(session: Session): Promise<void> {
       windowTitle: session.window_title ?? undefined,
       wordCount: session.word_count ?? undefined,
       flagged: session.flagged,
+      flagReason: session.flag_reason ?? undefined,
       error: session.error ?? undefined,
     })
 

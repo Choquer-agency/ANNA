@@ -26,6 +26,7 @@ export default defineSchema({
     windowTitle: v.optional(v.string()),
     wordCount: v.optional(v.number()),
     flagged: v.boolean(),
+    flagReason: v.optional(v.string()),
 
     // Audio (only populated when flagged)
     audioStorageId: v.optional(v.id('_storage')),

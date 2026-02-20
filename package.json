@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "ANNA - Voice Dictation for macOS",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",
@@ -13,8 +13,9 @@
     "build:fn-helper": "bash scripts/build-fn-helper.sh",
     "build:accessibility-probe": "bash scripts/build-accessibility-probe.sh",
     "build:natives": "npm run build:fn-helper && npm run build:accessibility-probe",
-    "build:mac": "npm run build:natives && electron-vite build && electron-builder --mac --config",
-    "build:mac:signed": "npm run build:natives && electron-vite build && electron-builder --mac --config",
+    "install:cross-arch": "bash scripts/install-cross-arch.sh",
+    "build:mac": "npm run install:cross-arch && npm run build:natives && electron-vite build && electron-builder --mac --config",
+    "build:mac:signed": "npm run install:cross-arch && npm run build:natives && electron-vite build && electron-builder --mac --config",
     "convex:dev": "npx convex dev",
     "convex:deploy": "npx convex deploy",
     "typecheck": "tsc --noEmit"
@@ -34,13 +35,15 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64"
+            "arm64",
+            "x64"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "arm64"
+            "arm64",
+            "x64"
           ]
         }
       ],
@@ -49,7 +52,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "hardenedRuntime": true,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "notarize": true
     },
     "dmg": {
       "title": "Anna",
@@ -73,7 +77,7 @@
       "repo": "ANNA",
       "private": true
     },
-    "afterSign": "scripts/notarize.js",
+    "afterAllArtifactBuild": "scripts/notarize-dmg.js",
     "extraResources": [
       {
         "from": "resources/fn-key-helper",

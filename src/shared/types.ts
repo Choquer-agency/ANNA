@@ -12,6 +12,7 @@ export interface Session {
   audio_path: string | null
   error: string | null
   flagged: boolean
+  flag_reason: string | null
 }
 
 export interface Stats {

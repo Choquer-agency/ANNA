@@ -237,6 +237,9 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('feedback:submit', async (_event, sessionId: string, feedbackText: string) => {
+    // Flag the session and store the feedback reason locally
+    toggleSessionFlag(sessionId, feedbackText)
+
     const session = getSessionById(sessionId)
     if (!session) throw new Error('Session not found')
 
@@ -263,6 +266,9 @@ app.whenReady().then(async () => {
         console.error('[feedback] Audio upload failed:', err)
       }
     }
+
+    // Sync the flagged session (with reason) to Convex
+    syncSession(session).catch(() => {})
 
     // Call the Convex action to send email
     const convexClient = ensureClient()

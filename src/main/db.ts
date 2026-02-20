@@ -100,6 +100,11 @@ function runMigrations(): void {
     db.exec(`ALTER TABLE sessions ADD COLUMN synced_at TEXT DEFAULT NULL`)
     setSchemaVersion(5)
   }
+
+  if (version < 6) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN flag_reason TEXT DEFAULT NULL`)
+    setSchemaVersion(6)
+  }
 }
 
 function getSchemaVersion(): number {
@@ -153,8 +158,12 @@ export function deleteSession(id: string): void {
   db.prepare('DELETE FROM sessions WHERE id = ?').run(id)
 }
 
-export function toggleSessionFlag(id: string): boolean {
-  db.prepare('UPDATE sessions SET flagged = CASE WHEN flagged = 0 THEN 1 ELSE 0 END WHERE id = ?').run(id)
+export function toggleSessionFlag(id: string, reason?: string): boolean {
+  if (reason) {
+    db.prepare('UPDATE sessions SET flagged = 1, flag_reason = ? WHERE id = ?').run(reason, id)
+    return true
+  }
+  db.prepare('UPDATE sessions SET flagged = CASE WHEN flagged = 0 THEN 1 ELSE 0 END, flag_reason = CASE WHEN flagged = 0 THEN flag_reason ELSE NULL END WHERE id = ?').run(id)
   const row = db.prepare('SELECT flagged FROM sessions WHERE id = ?').get(id) as { flagged: number } | undefined
   return Boolean(row?.flagged)
 }

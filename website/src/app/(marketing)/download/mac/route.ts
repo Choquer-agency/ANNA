@@ -1,12 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
 const GITHUB_OWNER = 'Choquer-agency'
 const GITHUB_REPO = 'ANNA'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Determine architecture: query param override > User-Agent detection
+    const archParam = request.nextUrl.searchParams.get('arch')
+    let wantsArm64: boolean
+
+    if (archParam === 'x64') {
+      wantsArm64 = false
+    } else if (archParam === 'arm64') {
+      wantsArm64 = true
+    } else {
+      // Auto-detect from User-Agent
+      const ua = request.headers.get('user-agent') || ''
+      wantsArm64 = !ua.includes('Intel Mac OS X')
+    }
+
     // Fetch the latest release from GitHub API
     const res = await fetch(
       `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
@@ -28,11 +42,21 @@ export async function GET() {
 
     const release = await res.json()
 
-    // Find the DMG asset (prefer arm64)
-    const dmgAsset = release.assets?.find(
+    // Find the correct DMG for the architecture
+    // arm64 DMGs have "arm64" in the filename, x64 DMGs do not
+    const dmgAssets = (release.assets || []).filter(
       (a: { name: string }) =>
         a.name.endsWith('.dmg') && !a.name.includes('blockmap')
     )
+
+    let dmgAsset = dmgAssets.find((a: { name: string }) =>
+      wantsArm64 ? a.name.includes('arm64') : !a.name.includes('arm64')
+    )
+
+    // Fallback: use any available DMG if preferred arch isn't found
+    if (!dmgAsset && dmgAssets.length > 0) {
+      dmgAsset = dmgAssets[0]
+    }
 
     if (!dmgAsset) {
       return NextResponse.json(
