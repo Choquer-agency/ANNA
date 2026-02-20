@@ -26,21 +26,12 @@ function TextCard({
     >
       {/* Avatar */}
       <div className="mb-5">
-        <div className="w-11 h-11 rounded-full bg-[#3A3A3A] overflow-hidden ring-2 ring-white/10">
-          <div
-            className="w-full h-full rounded-full flex items-center justify-center text-sm font-bold"
-            style={{
-              background: accent
-                ? 'linear-gradient(135deg, #FF9E19 0%, #FFD088 100%)'
-                : 'linear-gradient(135deg, #3A3A3A 0%, #555 100%)',
-              color: accent ? '#fff' : '#aaa',
-            }}
-          >
-            {author
-              .split(' ')
-              .map((n) => n[0])
-              .join('')}
-          </div>
+        <div className={`w-11 h-11 rounded-full overflow-hidden ring-2 ${accent ? 'ring-[#FF9E19]/30' : 'ring-white/10'}`}>
+          <img
+            src={avatar}
+            alt={author}
+            className="w-full h-full object-cover"
+          />
         </div>
       </div>
 
