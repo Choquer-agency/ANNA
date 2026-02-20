@@ -67,12 +67,14 @@ async function getContext(): Promise<WhisperContext> {
     await downloadModel(modelPath)
   }
 
-  console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}`)
+  // Use GPU only on Apple Silicon — older Intel Macs have incompatible Metal GPUs
+  const useGpu = process.arch === 'arm64'
+  console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}, GPU: ${useGpu}`)
   console.log(`[transcribe] Loading whisper model from ${modelPath}...`)
   try {
     whisperContext = await initWhisper({
       filePath: modelPath,
-      useGpu: true,
+      useGpu,
     })
     console.log('[transcribe] Whisper model loaded')
     return whisperContext
