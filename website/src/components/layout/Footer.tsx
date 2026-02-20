@@ -1,101 +1,91 @@
-import { AnnaLogo } from '@/components/ui/AnnaLogo'
+'use client'
 
-const productLinks = [
+import { AnnaLogo } from '@/components/ui/AnnaLogo'
+import { ArrowRight, ArrowUpRight } from 'lucide-react'
+import { usePlasmaHover } from '@/hooks/usePlasmaHover'
+import { motion } from 'framer-motion'
+
+const footerLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '/pricing' },
   { label: 'Download', href: '/signup' },
-  { label: 'Changelog', href: '#' },
-]
-
-const companyLinks = [
-  { label: 'About', href: '#' },
-  { label: 'Blog', href: '#' },
-  { label: 'Contact', href: '#' },
-]
-
-const legalLinks = [
   { label: 'Privacy', href: '/privacy' },
   { label: 'Terms', href: '/terms' },
 ]
 
 export function Footer() {
+  const { onMouseMove } = usePlasmaHover()
+
   return (
-    <footer className="bg-surface-dark text-white">
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-16 md:py-24">
-        <div className="grid grid-cols-2 md:grid-cols-12 gap-12 md:gap-8">
-          {/* Brand */}
-          <div className="col-span-2 md:col-span-5">
-            <AnnaLogo className="h-5 text-white mb-5" />
-            <p className="text-[0.95rem] text-white/40 max-w-[320px] leading-relaxed">
-              Voice dictation that actually works.
+    <footer className="relative bg-surface-dark text-white overflow-hidden">
+      {/* Ambient glow orbs */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-[300px] -left-[200px] w-[600px] h-[600px] rounded-full bg-[#FF9E19]/[0.04] blur-[120px]" />
+        <div className="absolute -bottom-[200px] -right-[200px] w-[500px] h-[500px] rounded-full bg-[#FF9E19]/[0.03] blur-[100px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full bg-white/[0.01] blur-[80px]" />
+      </div>
+
+      <div className="relative mx-auto max-w-[1400px] px-6 md:px-10">
+        {/* Hero CTA area */}
+        <div className="pt-24 md:pt-36 pb-20 md:pb-28 border-b border-white/[0.06]">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <p className="text-[0.8rem] uppercase tracking-[0.2em] text-white/25 font-medium mb-8">
+              Start dictating today
+            </p>
+
+            {/* Large typographic headline */}
+            <h2 className="text-[clamp(2.5rem,6vw+0.5rem,5.5rem)] font-medium leading-[0.95] tracking-[-0.04em] text-white max-w-[900px]">
+              Your voice deserves
               <br />
-              Built for macOS, powered by AI.
-            </p>
-            <p className="mt-6 text-sm text-white/25">
-              curious@anna.app
-            </p>
-          </div>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF9E19] via-[#FFB84D] to-[#FF9E19]">
+                better software.
+              </span>
+            </h2>
 
-          {/* Product */}
-          <div className="md:col-span-2 md:col-start-8">
-            <h4 className="text-xs uppercase tracking-[0.15em] text-white/30 font-medium mb-5">Product</h4>
-            <ul className="space-y-3">
-              {productLinks.map((link) => (
-                <li key={link.label}>
-                  <a href={link.href} className="text-[0.9rem] text-white/50 hover:text-white transition-colors duration-300">
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div className="md:col-span-2">
-            <h4 className="text-xs uppercase tracking-[0.15em] text-white/30 font-medium mb-5">Company</h4>
-            <ul className="space-y-3">
-              {companyLinks.map((link) => (
-                <li key={link.label}>
-                  <a href={link.href} className="text-[0.9rem] text-white/50 hover:text-white transition-colors duration-300">
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div className="md:col-span-1">
-            <h4 className="text-xs uppercase tracking-[0.15em] text-white/30 font-medium mb-5">Legal</h4>
-            <ul className="space-y-3">
-              {legalLinks.map((link) => (
-                <li key={link.label}>
-                  <a href={link.href} className="text-[0.9rem] text-white/50 hover:text-white transition-colors duration-300">
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+            <div className="mt-12 flex flex-col sm:flex-row items-start gap-4">
+              <a
+                href="/signup"
+                onMouseMove={onMouseMove}
+                className="plasma-hover inline-flex items-center gap-2.5 bg-white text-surface-dark px-8 py-4 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_40px_rgba(255,255,255,0.15)] transition-all duration-500 group"
+              >
+                <span className="relative z-[2]">Get Anna — Free</span>
+                <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+              </a>
+              <span className="text-[0.8rem] text-white/25 mt-3 sm:mt-4 ml-1">
+                macOS 13+. Apple Silicon &amp; Intel.
+              </span>
+            </div>
+          </motion.div>
         </div>
 
-        {/* Bottom */}
-        <div className="mt-20 pt-8 border-t border-white/8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-white/25">
-            &copy; {new Date().getFullYear()} Anna. All rights reserved.
-          </p>
-          <div className="flex items-center gap-5">
-            <a href="https://twitter.com" className="text-white/25 hover:text-white/60 transition-colors duration-300">
-              <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-            </a>
-            <a href="https://github.com" className="text-white/25 hover:text-white/60 transition-colors duration-300">
-              <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-              </svg>
-            </a>
+        {/* Bottom nav */}
+        <div className="py-10 md:py-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+          {/* Logo + copyright */}
+          <div className="flex items-center gap-6">
+            <AnnaLogo className="h-4 text-white/30" />
+            <span className="text-[0.8rem] text-white/20">
+              &copy; {new Date().getFullYear()} Choquer Creative Corp.
+            </span>
           </div>
+
+          {/* Links */}
+          <nav className="flex flex-wrap items-center gap-x-8 gap-y-3">
+            {footerLinks.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="group inline-flex items-center gap-1 text-[0.85rem] text-white/35 hover:text-white/80 transition-colors duration-300"
+              >
+                {link.label}
+                <ArrowUpRight className="w-3 h-3 opacity-0 -translate-y-0.5 translate-x-0.5 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-all duration-300" />
+              </a>
+            ))}
+          </nav>
         </div>
       </div>
     </footer>
