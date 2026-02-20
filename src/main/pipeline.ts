@@ -129,6 +129,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
 
     // Multi-pass transcription for consistency on retries
     const rawTranscript = await verifiedTranscribe(wavBuffer, trace)
+    trace.update({ input: rawTranscript })
     updateSession(sessionId, { raw_transcript: rawTranscript })
 
     if (!rawTranscript.trim()) {
@@ -152,6 +153,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
 
     // Apply dictionary replacements
     const final = applyDictionaryReplacements(processed)
+    trace.update({ output: final })
     const wordCount = final.split(/\s+/).filter(Boolean).length
 
     updateSession(sessionId, {
@@ -251,6 +253,7 @@ export async function handleHotkeyToggle(): Promise<void> {
       console.time('[pipeline] transcribe')
       const rawTranscript = await transcribe(wavBuffer, trace)
       console.timeEnd('[pipeline] transcribe')
+      trace.update({ input: rawTranscript })
       updateSession(session.id, { raw_transcript: rawTranscript })
 
       if (!rawTranscript.trim()) {
@@ -279,6 +282,7 @@ export async function handleHotkeyToggle(): Promise<void> {
       // Apply dictionary replacements
       console.time('[pipeline] dictionaryReplace')
       const final = applyDictionaryReplacements(processed)
+      trace.update({ output: final })
       console.timeEnd('[pipeline] dictionaryReplace')
 
       const wordCount = final.split(/\s+/).filter(Boolean).length
