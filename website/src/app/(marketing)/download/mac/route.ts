@@ -28,10 +28,10 @@ export async function GET() {
 
     const release = await res.json()
 
-    // Find the universal DMG (not arm64-specific)
+    // Find the DMG asset (prefer arm64)
     const dmgAsset = release.assets?.find(
       (a: { name: string }) =>
-        a.name.endsWith('.dmg') && !a.name.includes('arm64') && !a.name.includes('blockmap')
+        a.name.endsWith('.dmg') && !a.name.includes('blockmap')
     )
 
     if (!dmgAsset) {
