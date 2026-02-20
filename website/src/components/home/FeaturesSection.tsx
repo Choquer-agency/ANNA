@@ -1,6 +1,6 @@
 'use client'
 
-import { motion, useScroll, useTransform, useInView } from 'framer-motion'
+import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion'
 import { useRef, useState, useEffect } from 'react'
 import { FadeIn } from '@/components/ui/FadeIn'
 import { ease } from '@/lib/animations'
@@ -170,34 +170,22 @@ function PersonalDictionaryIllustration() {
 
 /* ═══════════════════════════════════════════════════════
    Feature 3: 100+ Languages — illustration
-   Orbiting language bubbles around a central waveform
+   Big hello cycling through languages with waveform
    ═══════════════════════════════════════════════════════ */
-const languageBubbles = [
-  { flag: '🇺🇸', text: 'Hello!', x: 50, y: 8, size: 'lg', delay: 0 },
-  { flag: '🇪🇸', text: 'Hola', x: 88, y: 18, size: 'md', delay: 0.15 },
-  { flag: '🇫🇷', text: 'Bonjour', x: 8, y: 22, size: 'md', delay: 0.3 },
-  { flag: '🇯🇵', text: 'こんにちは', x: 78, y: 48, size: 'sm', delay: 0.1 },
-  { flag: '🇩🇪', text: 'Hallo', x: 12, y: 52, size: 'sm', delay: 0.25 },
-  { flag: '🇧🇷', text: 'Olá', x: 90, y: 72, size: 'md', delay: 0.35 },
-  { flag: '🇰🇷', text: '안녕', x: 6, y: 76, size: 'sm', delay: 0.2 },
-  { flag: '🇸🇦', text: 'مرحباً', x: 70, y: 88, size: 'sm', delay: 0.4 },
-  { flag: '🇮🇹', text: 'Ciao', x: 28, y: 90, size: 'md', delay: 0.05 },
-  { flag: '🇨🇳', text: '你好', x: 48, y: 82, size: 'sm', delay: 0.45 },
-  { flag: '🇮🇳', text: 'नमस्ते', x: 35, y: 15, size: 'sm', delay: 0.5 },
-  { flag: '🇷🇺', text: 'Привет', x: 65, y: 12, size: 'sm', delay: 0.55 },
+const languages = [
+  { flag: '🇺🇸', hello: 'Hello' },
+  { flag: '🇪🇸', hello: 'Hola' },
+  { flag: '🇫🇷', hello: 'Bonjour' },
+  { flag: '🇯🇵', hello: 'こんにちは' },
+  { flag: '🇰🇷', hello: '안녕하세요' },
+  { flag: '🇧🇷', hello: 'Olá' },
+  { flag: '🇨🇳', hello: '你好' },
 ]
 
-const sizeClasses = {
-  lg: 'px-5 py-3 text-base',
-  md: 'px-4 py-2.5 text-sm',
-  sm: 'px-3.5 py-2 text-xs',
-}
-
-// Deterministic float offsets
-const floatOffsets = languageBubbles.map((_, i) => ({
-  yAmp: 6 + (i * 3) % 8,
-  xAmp: 3 + (i * 5) % 6,
-  dur: 3 + (i * 7) % 4,
+// Waveform bar presets for language illustration
+const langWaveformBars = Array.from({ length: 7 }).map((_, i) => ({
+  height: 30 + ((i * 37 + 13) % 65),
+  duration: 0.6 + ((i * 53 + 7) % 50) / 100,
 }))
 
 function LanguagesIllustration() {
@@ -208,40 +196,51 @@ function LanguagesIllustration() {
   useEffect(() => {
     if (!inView) return
     const interval = setInterval(() => {
-      setActiveLang((a) => (a + 1) % languageBubbles.length)
-    }, 1800)
+      setActiveLang((a) => (a + 1) % languages.length)
+    }, 2200)
     return () => clearInterval(interval)
   }, [inView])
 
-  return (
-    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FDF5FF] relative">
-      {/* Soft radial glow in center */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle at 50% 50%, rgba(235,193,255,0.12) 0%, transparent 60%)',
-        }}
-      />
+  const lang = languages[activeLang]
 
-      {/* Center waveform + text */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+  return (
+    <div ref={ref} className="w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-white relative flex flex-col items-center justify-center">
+      <AnimatePresence mode="wait">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={inView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 0.6, ease }}
-          className="bg-white rounded-2xl px-6 py-4 shadow-lg border border-black/5 text-center"
+          key={activeLang}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.35, ease }}
+          className="flex flex-col items-center"
         >
-          <div className="flex items-center justify-center gap-[2px] h-8 mb-2">
-            {Array.from({ length: 24 }).map((_, i) => (
+          {/* Flag */}
+          <span className="text-2xl md:text-3xl mb-3">{lang.flag}</span>
+
+          {/* Big hello */}
+          <h3
+            className="text-ink font-medium text-center"
+            style={{
+              fontSize: 'clamp(2.5rem, 5vw + 1rem, 4.5rem)',
+              lineHeight: 1.1,
+              letterSpacing: '-0.04em',
+            }}
+          >
+            {lang.hello}
+          </h3>
+
+          {/* Waveform */}
+          <div className="flex items-center justify-center gap-[3px] h-8 mt-5">
+            {langWaveformBars.map((bar, i) => (
               <motion.div
                 key={i}
-                className="w-[2.5px] rounded-full bg-primary/50"
-                animate={inView ? {
-                  height: ['20%', `${30 + ((i * 37 + 13) % 60)}%`, '20%'],
-                } : { height: '20%' }}
+                className="w-[3px] rounded-full bg-primary/60"
+                animate={{
+                  height: ['20%', `${bar.height}%`, '20%'],
+                }}
                 transition={{
-                  duration: 0.7 + ((i * 53 + 7) % 60) / 100,
-                  delay: i * 0.04,
+                  duration: bar.duration,
+                  delay: i * 0.06,
                   repeat: Infinity,
                   repeatType: 'loop',
                   ease: 'easeInOut',
@@ -249,58 +248,8 @@ function LanguagesIllustration() {
               />
             ))}
           </div>
-          <motion.p
-            key={activeLang}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-xs font-medium text-ink-muted"
-          >
-            Detected: <span className="text-ink font-semibold">{languageBubbles[activeLang].flag} {languageBubbles[activeLang].text}</span>
-          </motion.p>
         </motion.div>
-      </div>
-
-      {/* Floating language bubbles */}
-      {languageBubbles.map((bubble, i) => {
-        const f = floatOffsets[i]
-        return (
-          <motion.div
-            key={bubble.flag}
-            initial={{ opacity: 0, scale: 0 }}
-            animate={inView ? {
-              opacity: activeLang === i ? 1 : 0.7,
-              scale: activeLang === i ? 1.12 : 1,
-              y: [0, -f.yAmp, 0, f.yAmp * 0.6, 0],
-              x: [0, f.xAmp, 0, -f.xAmp * 0.7, 0],
-            } : {}}
-            transition={{
-              opacity: { duration: 0.3 },
-              scale: { duration: 0.3 },
-              y: { duration: f.dur, repeat: Infinity, ease: 'easeInOut' },
-              x: { duration: f.dur * 1.3, repeat: Infinity, ease: 'easeInOut' },
-              default: { duration: 0.5, delay: bubble.delay },
-            }}
-            className={`absolute rounded-full shadow-md border font-medium text-ink flex items-center gap-1.5 ${sizeClasses[bubble.size as keyof typeof sizeClasses]} ${
-              activeLang === i ? 'bg-accent-pink border-accent-pink/60 shadow-lg ring-2 ring-accent-pink/30' : 'bg-accent-pink/40 border-accent-pink/30'
-            }`}
-            style={{ left: `${bubble.x}%`, top: `${bubble.y}%`, transform: 'translate(-50%, -50%)' }}
-          >
-            <span>{bubble.flag}</span>
-            <span>{bubble.text}</span>
-          </motion.div>
-        )
-      })}
-
-      {/* "100+" counter */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={inView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.6, delay: 0.8 }}
-        className="absolute bottom-4 right-4 md:bottom-6 md:right-6 bg-primary/10 backdrop-blur-sm rounded-xl px-3 py-2 border border-primary/20"
-      >
-        <span className="text-lg md:text-xl font-bold text-primary">100+</span>
-        <span className="text-[0.6rem] md:text-xs text-ink-muted ml-1">languages</span>
-      </motion.div>
+      </AnimatePresence>
     </div>
   )
 }

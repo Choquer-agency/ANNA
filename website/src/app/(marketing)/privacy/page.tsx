@@ -24,7 +24,7 @@ export default function PrivacyPage() {
               This Privacy Policy describes how Choquer Creative Corp. (&ldquo;Anna,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) collects, uses, and handles your personal information when you use our website, macOS application, and related services (collectively, the &ldquo;Services&rdquo;). By using the Services, you agree to the collection and use of information as described in this Privacy Policy. If you do not agree, please do not use the Services.
             </p>
             <p>
-              Choquer Creative Corp. is incorporated in British Columbia, Canada. Our contact email is <a href="mailto:curious@anna.app">curious@anna.app</a>.
+              Choquer Creative Corp. is incorporated in British Columbia, Canada. Our contact email is <a href="mailto:anna@choquer.agency?subject=Privacy%20Policy">anna@choquer.agency</a>.
             </p>
 
             <h2>2. Information We Collect</h2>
@@ -145,11 +145,11 @@ export default function PrivacyPage() {
               <li><strong>Opt out of analytics:</strong> Disable PostHog analytics in Settings &gt; Privacy.</li>
               <li><strong>Disable cloud sync:</strong> Turn off cloud sync in Settings &gt; Privacy. When disabled, no new session data is uploaded.</li>
               <li><strong>Erase local data:</strong> Use the &ldquo;Erase all activity&rdquo; option in Settings &gt; Privacy to delete all locally stored dictation sessions and audio files.</li>
-              <li><strong>Delete your account:</strong> Contact us at <a href="mailto:curious@anna.app">curious@anna.app</a> to request full account deletion, including any cloud-stored data.</li>
+              <li><strong>Delete your account:</strong> Contact us at <a href="mailto:anna@choquer.agency?subject=Privacy%20Policy">anna@choquer.agency</a> to request full account deletion, including any cloud-stored data.</li>
               <li><strong>Access your data:</strong> Contact us to request a copy of the personal information we hold about you.</li>
             </ul>
             <p>
-              If you are located in a jurisdiction that grants additional data protection rights (such as under PIPEDA, GDPR, or CCPA), you may exercise those rights by contacting us at <a href="mailto:curious@anna.app">curious@anna.app</a>. We will respond to valid requests within the timeframes required by applicable law.
+              If you are located in a jurisdiction that grants additional data protection rights (such as under PIPEDA, GDPR, or CCPA), you may exercise those rights by contacting us at <a href="mailto:anna@choquer.agency?subject=Privacy%20Policy">anna@choquer.agency</a>. We will respond to valid requests within the timeframes required by applicable law.
             </p>
 
             <h2>7. Data Retention</h2>
@@ -159,7 +159,7 @@ export default function PrivacyPage() {
 
             <h2>8. Children&apos;s Privacy</h2>
             <p>
-              The Services are intended for users who are at least 18 years old. We do not knowingly collect personal information from anyone under the age of 18. If we become aware that we have collected personal information from a minor, we will take steps to delete that information promptly. If you believe a minor has provided us with personal information, please contact us at <a href="mailto:curious@anna.app">curious@anna.app</a>.
+              The Services are intended for users who are at least 18 years old. We do not knowingly collect personal information from anyone under the age of 18. If we become aware that we have collected personal information from a minor, we will take steps to delete that information promptly. If you believe a minor has provided us with personal information, please contact us at <a href="mailto:anna@choquer.agency?subject=Privacy%20Policy">anna@choquer.agency</a>.
             </p>
 
             <h2>9. International Data Transfers</h2>
@@ -174,7 +174,7 @@ export default function PrivacyPage() {
 
             <h2>11. Contact Us</h2>
             <p>
-              If you have any questions about this Privacy Policy or our data practices, please contact us at <a href="mailto:curious@anna.app">curious@anna.app</a>.
+              If you have any questions about this Privacy Policy or our data practices, please contact us at <a href="mailto:anna@choquer.agency?subject=Privacy%20Policy">anna@choquer.agency</a>.
             </p>
           </div>
         </FadeIn>
