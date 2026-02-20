@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install cross-architecture native modules
+        run: npm run install:cross-arch
+
       - name: Build native helpers (universal binaries)
         run: npm run build:natives
 

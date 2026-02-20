@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "ANNA - Voice Dictation for macOS",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",
@@ -98,7 +98,6 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@auth/core": "^0.37.4",
     "@convex-dev/auth": "^0.0.90",
-    "@fugood/node-whisper-darwin-arm64": "^1.0.16",
     "@fugood/whisper.node": "^1.0.16",
     "active-win": "^8.1.0",
     "better-sqlite3": "^11.0.0",
@@ -110,6 +109,10 @@
     "openai": "^4.0.0",
     "posthog-js": "^1.352.0",
     "posthog-node": "^5.21.2"
+  },
+  "optionalDependencies": {
+    "@fugood/node-whisper-darwin-arm64": "^1.0.16",
+    "@fugood/node-whisper-darwin-x64": "^1.0.16"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.0",
