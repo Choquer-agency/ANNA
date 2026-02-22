@@ -58,7 +58,35 @@ export default defineSchema({
     deviceName: v.optional(v.string()),
     platform: v.optional(v.string()),
     selectedPlan: v.optional(v.string()),
+    profileImageUrl: v.optional(v.string()),
   })
     .index('by_user', ['userId'])
     .index('by_email', ['email']),
+
+  // ─── Stripe / Subscriptions ────────────────────────────────────────────
+  subscriptions: defineTable({
+    userId: v.string(),
+    stripeCustomerId: v.string(),
+    stripeSubscriptionId: v.optional(v.string()), // null for lifetime (one-time payment)
+    stripePriceId: v.string(),
+    planId: v.string(), // 'free' | 'pro' | 'lifetime'
+    billingInterval: v.optional(v.string()), // 'monthly' | 'annual' | 'lifetime'
+    status: v.string(), // 'active' | 'canceled' | 'past_due' | 'trialing' | 'incomplete'
+    currentPeriodStart: v.optional(v.string()),
+    currentPeriodEnd: v.optional(v.string()),
+    cancelAtPeriodEnd: v.optional(v.boolean()),
+    trialEnd: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_stripe_customer', ['stripeCustomerId'])
+    .index('by_stripe_subscription', ['stripeSubscriptionId']),
+
+  stripeEvents: defineTable({
+    stripeEventId: v.string(),
+    type: v.string(),
+    processedAt: v.string(),
+  })
+    .index('by_event_id', ['stripeEventId']),
 })

@@ -4,21 +4,8 @@ import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 import { Toggle } from '../Toggle'
 
-function StatusBadge({ configured }: { configured: boolean }): React.JSX.Element {
-  return (
-    <span
-      className={`text-xs px-2 py-0.5 rounded-full ${
-        configured ? 'bg-success-bg text-success-text' : 'bg-error-bg text-error-text'
-      }`}
-    >
-      {configured ? 'Configured' : 'Not set'}
-    </span>
-  )
-}
-
 export function SystemTab(): React.JSX.Element {
   const [autoPaste, setAutoPaste] = useState(true)
-  const [envStatus, setEnvStatus] = useState({ hasOpenAI: false, hasAnthropic: false })
   const [defaultStyleId, setDefaultStyleId] = useState<string | null>(null)
   const [styleProfiles, setStyleProfiles] = useState<StyleProfile[]>([])
   const [dictationSounds, setDictationSounds] = useState(false)
@@ -26,15 +13,13 @@ export function SystemTab(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   const loadSettings = useCallback(async () => {
-    const [ap, env, styles, sounds, lang] = await Promise.all([
+    const [ap, styles, sounds, lang] = await Promise.all([
       window.annaAPI.getSetting('auto_paste'),
-      window.annaAPI.getEnvStatus(),
       window.annaAPI.getStyleProfiles(),
       window.annaAPI.getSetting('dictation_sounds'),
       window.annaAPI.getSetting('language')
     ])
     setAutoPaste(ap !== 'false')
-    setEnvStatus(env)
     setStyleProfiles(styles)
     const defaultProfile = styles.find((s) => s.is_default)
     setDefaultStyleId(defaultProfile?.id ?? null)
@@ -121,14 +106,7 @@ export function SystemTab(): React.JSX.Element {
         </SettingsRow>
       </SettingsCard>
 
-      <SettingsCard title="API Configuration">
-        <SettingsRow label="OpenAI (Whisper)">
-          <StatusBadge configured={envStatus.hasOpenAI} />
-        </SettingsRow>
-        <SettingsRow label="Anthropic (Claude)">
-          <StatusBadge configured={envStatus.hasAnthropic} />
-        </SettingsRow>
-      </SettingsCard>
+{/* API Configuration section hidden for now */}
 
       {styleProfiles.length > 0 && (
         <SettingsCard title="Default Style">

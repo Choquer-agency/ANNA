@@ -24,13 +24,14 @@ import {
 } from './db'
 import { createAudioWindow, destroyAudioWindow } from './audio'
 import { registerHotkey, unregisterHotkeys, reregisterHotkey } from './hotkey'
-import { handleHotkeyToggle, setPipelineMainWindow, retrySession } from './pipeline'
-import { createRecordingIndicatorWindow, destroyRecordingIndicator } from './recordingIndicator'
+import { handleHotkeyToggle, setPipelineMainWindow, retrySession, cleanupStaleSessions } from './pipeline'
+import { createRecordingIndicatorWindow, destroyRecordingIndicator, sendHotkeyInfo } from './recordingIndicator'
 import { shutdownLangfuse } from './langfuse'
 import { trackMainEvent, shutdownPostHog } from './analytics'
 import { probeAccessibility } from './accessibilityProbe'
+import { getActiveWindow } from './activeWindow'
 import { createTray, destroyTray } from './tray'
-import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile } from './convex'
+import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex } from './convex'
 import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
 import { anyApi } from 'convex/server'
 
@@ -61,7 +62,7 @@ async function migrateLegacyData(legacyUserId: string): Promise<void> {
 }
 
 // Store profile data from Convex into local settings
-function storeProfileLocally(name: string, email: string): void {
+function storeProfileLocally(name: string, email: string, profileImageUrl?: string): void {
   const parts = name.trim().split(/\s+/)
   const firstName = parts[0] || ''
   const lastName = parts.slice(1).join(' ') || ''
@@ -71,7 +72,10 @@ function storeProfileLocally(name: string, email: string): void {
   if (email) {
     setSetting('user_email', email)
   }
-  console.log('[auth] Profile stored locally:', { firstName, lastName, email })
+  if (profileImageUrl) {
+    setSetting('profile_picture', profileImageUrl)
+  }
+  console.log('[auth] Profile stored locally:', { firstName, lastName, email, hasImage: !!profileImageUrl })
 }
 
 // Handle deep link URL
@@ -101,13 +105,13 @@ function handleDeepLink(url: string): void {
         // Fetch user profile from Convex and store locally
         fetchRegistrationProfile().then((profile) => {
           if (profile) {
-            storeProfileLocally(profile.name, profile.email)
+            storeProfileLocally(profile.name, profile.email, profile.profileImageUrl)
           } else {
             // User may not have completed onboarding yet — retry once after 5s
             setTimeout(() => {
               fetchRegistrationProfile().then((retryProfile) => {
                 if (retryProfile) {
-                  storeProfileLocally(retryProfile.name, retryProfile.email)
+                  storeProfileLocally(retryProfile.name, retryProfile.email, retryProfile.profileImageUrl)
                 }
               }).catch(() => {})
             }, 5000)
@@ -213,8 +217,14 @@ app.whenReady().then(async () => {
   // }
 
   createAudioWindow()
-  createRecordingIndicatorWindow() // Pre-create hidden — shows instantly when recording
+  createRecordingIndicatorWindow() // Always visible — starts as idle pill
+  cleanupStaleSessions() // Mark any stale processing sessions as failed
   createWindow()
+
+  // Send hotkey info to idle indicator tooltip
+  const currentHotkey = getSetting('hotkey') || 'fn'
+  // Small delay to ensure renderer is loaded
+  setTimeout(() => sendHotkeyInfo(currentHotkey), 1000)
 
   // Silent auth: on first launch without a token, auto-open browser to check for existing session
   if (!isAuthValid() && !getSetting('has_launched_before')) {
@@ -434,6 +444,57 @@ app.whenReady().then(async () => {
     mainWindow?.webContents.send('auth:changed', { isAuthenticated: false })
   })
 
+  // Profile sync
+  ipcMain.handle('profile:update-name', async (_event, name: string) => {
+    try {
+      await updateProfileNameInConvex(name)
+    } catch (err) {
+      console.error('[profile] Failed to sync name to Convex:', err)
+    }
+  })
+
+  ipcMain.handle('profile:update-image', async (_event, profileImageUrl: string) => {
+    try {
+      await updateProfileImageInConvex(profileImageUrl)
+    } catch (err) {
+      console.error('[profile] Failed to sync image to Convex:', err)
+    }
+  })
+
+  ipcMain.handle('profile:refresh', async () => {
+    try {
+      const profile = await fetchRegistrationProfile()
+      if (profile) {
+        storeProfileLocally(profile.name, profile.email, profile.profileImageUrl)
+        return { name: profile.name, email: profile.email, profileImageUrl: profile.profileImageUrl }
+      }
+      return null
+    } catch (err) {
+      console.error('[profile] Failed to refresh profile from Convex:', err)
+      return null
+    }
+  })
+
+  // Subscription / Paywall
+  ipcMain.handle('subscription:get-status', () => {
+    const { getSubscriptionStatus } = require('./subscription')
+    return getSubscriptionStatus()
+  })
+
+  ipcMain.handle('subscription:open-billing', async () => {
+    // For now, open the website pricing page. When Stripe is fully wired,
+    // this would call createBillingPortalSession and open the returned URL.
+    const { shell } = require('electron')
+    const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+    shell.openExternal(`${websiteUrl}/pricing`)
+  })
+
+  ipcMain.handle('subscription:open-upgrade', () => {
+    const { shell } = require('electron')
+    const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+    shell.openExternal(`${websiteUrl}/pricing`)
+  })
+
   ipcMain.handle('system:get-username', () => {
     // Prefer the name from registration/auth profile
     const firstName = getSetting('first_name')
@@ -513,8 +574,57 @@ app.whenReady().then(async () => {
     return granted
   })
 
+  // System: screen recording
+  ipcMain.handle('system:check-screen-recording', () => {
+    return systemPreferences.getMediaAccessStatus('screen')
+  })
+
+  ipcMain.handle('system:trigger-screen-recording', async () => {
+    try {
+      await getActiveWindow()
+    } catch {
+      const { shell } = require('electron')
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+    }
+  })
+
+  // System: System Events automation (for pasting via osascript)
+  ipcMain.handle('system:check-system-events', async () => {
+    const { execFile } = require('child_process')
+    const { promisify } = require('util')
+    const execFileAsync = promisify(execFile)
+    try {
+      await execFileAsync('osascript', ['-e', 'tell application "System Events" to return ""'], { timeout: 3000 })
+      return true
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('system:trigger-system-events', async () => {
+    const { execFile } = require('child_process')
+    const { promisify } = require('util')
+    const execFileAsync = promisify(execFile)
+    try {
+      await execFileAsync('osascript', ['-e', 'tell application "System Events" to return ""'], { timeout: 10000 })
+      return true
+    } catch {
+      return false
+    }
+  })
+
+  // App relaunch (for permission changes that require restart)
+  ipcMain.handle('system:relaunch-app', () => {
+    app.relaunch()
+    app.exit(0)
+  })
+
   // Initialize Convex cloud sync
   initConvex()
+
+  // Start subscription status refresh
+  const { startSubscriptionRefresh } = require('./subscription')
+  startSubscriptionRefresh()
 
   // Run catch-up sync every 5 minutes
   setInterval(() => {

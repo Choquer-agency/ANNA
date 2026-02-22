@@ -3,10 +3,11 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
 let indicatorWindow: BrowserWindow | null = null
+let idleRepositionInterval: ReturnType<typeof setInterval> | null = null
 
-const WIN_WIDTH = 200
-const WIN_HEIGHT = 120
-const BOTTOM_OFFSET = 16
+const WIN_WIDTH = 420
+const WIN_HEIGHT = 200
+const BOTTOM_OFFSET = 6
 
 function getPosition(): { x: number; y: number } {
   const cursorPoint = screen.getCursorScreenPoint()
@@ -19,8 +20,8 @@ function getPosition(): { x: number; y: number } {
 }
 
 /**
- * Pre-create the indicator window (hidden) so showing it is instant.
- * Call this once at app startup.
+ * Create the indicator window and show it immediately in idle state.
+ * The window is always visible — it starts as a tiny pill and expands when recording.
  */
 export function createRecordingIndicatorWindow(): void {
   if (indicatorWindow) return
@@ -49,6 +50,7 @@ export function createRecordingIndicatorWindow(): void {
   })
 
   indicatorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  indicatorWindow.setIgnoreMouseEvents(true, { forward: true })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     indicatorWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/recording-indicator.html`)
@@ -56,11 +58,25 @@ export function createRecordingIndicatorWindow(): void {
     indicatorWindow.loadFile(join(__dirname, '../renderer/recording-indicator.html'))
   }
 
+  // Show once content is loaded (starts in idle state)
+  indicatorWindow.webContents.on('did-finish-load', () => {
+    if (indicatorWindow) {
+      // Force resize to ensure dimensions are correct after restart/reload
+      indicatorWindow.setSize(WIN_WIDTH, WIN_HEIGHT)
+      const pos = getPosition()
+      indicatorWindow.setPosition(pos.x, pos.y)
+      indicatorWindow.showInactive()
+    }
+  })
+
   indicatorWindow.on('closed', () => {
     indicatorWindow = null
   })
 
-  console.log('[recording-indicator] Window pre-created (hidden)')
+  // Start idle repositioning (follow active screen every 2s)
+  startIdleReposition()
+
+  console.log('[recording-indicator] Window created (idle state)')
 }
 
 export function showRecordingIndicator(): void {
@@ -72,18 +88,17 @@ export function showRecordingIndicator(): void {
   const pos = getPosition()
   indicatorWindow.setPosition(pos.x, pos.y)
   indicatorWindow.showInactive()
-
-  console.log('[recording-indicator] Shown')
 }
 
+/**
+ * Return indicator to idle state (tiny pill). Window stays visible.
+ */
 export function hideRecordingIndicator(): void {
-  if (indicatorWindow) {
-    indicatorWindow.hide()
-  }
-  console.log('[recording-indicator] Hidden')
+  sendStateChange('idle')
 }
 
 export function destroyRecordingIndicator(): void {
+  stopIdleReposition()
   if (indicatorWindow) {
     indicatorWindow.destroy()
     indicatorWindow = null
@@ -96,17 +111,71 @@ export function sendAudioLevel(level: number): void {
   }
 }
 
+export function sendStateChange(state: string): void {
+  if (indicatorWindow) {
+    indicatorWindow.webContents.send('recording:state-change', state)
+  }
+}
+
+export function sendHotkeyInfo(hotkey: string): void {
+  if (indicatorWindow) {
+    indicatorWindow.webContents.send('recording:hotkey-info', hotkey)
+  }
+}
+
+export function sendMicrophoneInfo(micName: string): void {
+  if (indicatorWindow) {
+    indicatorWindow.webContents.send('recording:microphone-info', micName)
+  }
+}
+
 export function repositionToActiveScreen(): void {
-  if (!indicatorWindow || !indicatorWindow.isVisible()) return
+  if (!indicatorWindow) return
   const pos = getPosition()
   indicatorWindow.setPosition(pos.x, pos.y)
 }
 
-export function setupRecordingIndicatorIPC(onStop: () => void): void {
+function startIdleReposition(): void {
+  if (idleRepositionInterval) return
+  idleRepositionInterval = setInterval(() => {
+    repositionToActiveScreen()
+  }, 2000)
+}
+
+function stopIdleReposition(): void {
+  if (idleRepositionInterval) {
+    clearInterval(idleRepositionInterval)
+    idleRepositionInterval = null
+  }
+}
+
+export function setupRecordingIndicatorIPC(
+  onStop: () => void,
+  onCancel: () => void,
+  onUndoCancel: () => void,
+  onDismissSlowNotice: () => void
+): void {
+  ipcMain.removeAllListeners('recording:stop-from-indicator')
+  ipcMain.removeAllListeners('recording:cancel-from-indicator')
+  ipcMain.removeAllListeners('recording:undo-cancel')
+  ipcMain.removeAllListeners('recording:dismiss-slow-notice')
+  ipcMain.removeAllListeners('recording:set-ignore-mouse')
+
   ipcMain.on('recording:stop-from-indicator', () => {
     onStop()
   })
   ipcMain.on('recording:cancel-from-indicator', () => {
-    onStop()
+    onCancel()
+  })
+  ipcMain.on('recording:undo-cancel', () => {
+    onUndoCancel()
+  })
+  ipcMain.on('recording:dismiss-slow-notice', () => {
+    onDismissSlowNotice()
+  })
+  ipcMain.on('recording:set-ignore-mouse', (_event, ignore: boolean, forward: boolean) => {
+    if (indicatorWindow) {
+      indicatorWindow.setIgnoreMouseEvents(ignore, { forward })
+    }
   })
 }

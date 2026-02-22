@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Mic, ChevronRight, ToggleRight } from 'lucide-react'
+import { Mic, ChevronRight, ToggleRight, Monitor, Terminal } from 'lucide-react'
 import { usePlasmaHover } from '../../hooks/usePlasmaHover'
 import { track } from '../../lib/analytics'
 
 interface PermissionsStepProps {
-  onNext: () => void
+  onNext: (screenRecordingNewlyGranted: boolean) => void
 }
 
 function AppleIcon({ size = 14 }: { size?: number }): React.JSX.Element {
@@ -25,7 +25,10 @@ function AccessibilityIcon({ size = 20 }: { size?: number }): React.JSX.Element 
   )
 }
 
-function ManualInstructions({ target }: { target: 'Microphone' | 'Accessibility' }): React.JSX.Element {
+function ManualInstructions({ target }: { target: 'Microphone' | 'Accessibility' | 'Screen Recording' | 'Automation' }): React.JSX.Element {
+  const settingsTarget = target === 'Automation' ? 'Automation' : target
+  const restartNote = target === 'Screen Recording'
+
   return (
     <div className="mt-2 p-4 rounded-xl border border-border bg-surface-alt">
       <p className="text-xs font-semibold text-ink-secondary mb-3">
@@ -41,7 +44,7 @@ function ManualInstructions({ target }: { target: 'Microphone' | 'Accessibility'
         <ChevronRight size={10} className="text-ink-faint" />
         <span className="font-medium text-ink-secondary">Privacy & Security</span>
         <ChevronRight size={10} className="text-ink-faint" />
-        <span className="font-medium text-ink-secondary">{target}</span>
+        <span className="font-medium text-ink-secondary">{settingsTarget}</span>
         <ChevronRight size={10} className="text-ink-faint" />
         <span className="inline-flex items-center gap-1">
           <ToggleRight size={14} className="text-success-text" />
@@ -49,7 +52,9 @@ function ManualInstructions({ target }: { target: 'Microphone' | 'Accessibility'
         </span>
       </div>
       <p className="text-[11px] text-ink-faint mt-2.5">
-        Anna detects changes automatically — no restart needed.
+        {restartNote
+          ? 'After granting, Anna may need to restart.'
+          : 'Anna detects changes automatically — no restart needed.'}
       </p>
     </div>
   )
@@ -59,28 +64,60 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
   const { onMouseMove } = usePlasmaHover()
   const [micStatus, setMicStatus] = useState<string>('not-determined')
   const [accessibilityGranted, setAccessibilityGranted] = useState(false)
+  const [screenRecordingStatus, setScreenRecordingStatus] = useState<string>('not-determined')
+  const [systemEventsGranted, setSystemEventsGranted] = useState(false)
+
   const [micAttempted, setMicAttempted] = useState(false)
   const [accessibilityAttempted, setAccessibilityAttempted] = useState(false)
+  const [screenRecordingAttempted, setScreenRecordingAttempted] = useState(false)
+  const [systemEventsAttempted, setSystemEventsAttempted] = useState(false)
+
   const prevAccessibilityGranted = useRef(false)
+  const prevScreenRecordingGranted = useRef(false)
+  const initialScreenRecordingStatus = useRef<string | null>(null)
+
   const micInstructionsTracked = useRef(false)
   const accInstructionsTracked = useRef(false)
+  const screenInstructionsTracked = useRef(false)
+  const sysEventsInstructionsTracked = useRef(false)
 
   const checkPermissions = useCallback(async () => {
     const mic = await window.annaAPI.checkMicrophone()
     setMicStatus(mic)
+
     const acc = await window.annaAPI.checkAccessibility()
     if (acc && !prevAccessibilityGranted.current) {
       track('permission_granted', { permission: 'accessibility' })
     }
     prevAccessibilityGranted.current = acc
     setAccessibilityGranted(acc)
+
+    const screen = await window.annaAPI.checkScreenRecording()
+    if (initialScreenRecordingStatus.current === null) {
+      initialScreenRecordingStatus.current = screen
+    }
+    if (screen === 'granted' && !prevScreenRecordingGranted.current) {
+      track('permission_granted', { permission: 'screen_recording' })
+    }
+    prevScreenRecordingGranted.current = screen === 'granted'
+    setScreenRecordingStatus(screen)
   }, [])
+
+  // Only poll system events after user has attempted it (to avoid triggering the dialog)
+  const checkSystemEvents = useCallback(async () => {
+    if (!systemEventsAttempted) return
+    const granted = await window.annaAPI.checkSystemEvents()
+    setSystemEventsGranted(granted)
+  }, [systemEventsAttempted])
 
   useEffect(() => {
     checkPermissions()
-    const interval = setInterval(checkPermissions, 2000)
+    const interval = setInterval(() => {
+      checkPermissions()
+      checkSystemEvents()
+    }, 2000)
     return () => clearInterval(interval)
-  }, [checkPermissions])
+  }, [checkPermissions, checkSystemEvents])
 
   async function requestMic(): Promise<void> {
     setMicAttempted(true)
@@ -100,10 +137,29 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
     window.annaAPI.openAccessibilitySettings()
   }
 
+  async function triggerScreenRecording(): Promise<void> {
+    setScreenRecordingAttempted(true)
+    track('permission_requested', { permission: 'screen_recording' })
+    await window.annaAPI.triggerScreenRecording()
+  }
+
+  async function triggerSystemEvents(): Promise<void> {
+    setSystemEventsAttempted(true)
+    track('permission_requested', { permission: 'system_events' })
+    const granted = await window.annaAPI.triggerSystemEvents()
+    setSystemEventsGranted(granted)
+    if (granted) {
+      track('permission_granted', { permission: 'system_events' })
+    }
+  }
+
   const micGranted = micStatus === 'granted'
   const micDenied = micAttempted && !micGranted
   const accessibilityDenied = accessibilityAttempted && !accessibilityGranted
-  const allGranted = micGranted && accessibilityGranted
+  const screenRecordingGranted = screenRecordingStatus === 'granted'
+  const screenRecordingDenied = screenRecordingAttempted && !screenRecordingGranted
+  const systemEventsDenied = systemEventsAttempted && !systemEventsGranted
+  const allGranted = micGranted && accessibilityGranted && screenRecordingGranted && systemEventsGranted
 
   // Track when manual instructions become visible
   useEffect(() => {
@@ -119,6 +175,26 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
       track('permission_instructions_shown', { permission: 'accessibility' })
     }
   }, [accessibilityDenied])
+
+  useEffect(() => {
+    if (screenRecordingDenied && !screenInstructionsTracked.current) {
+      screenInstructionsTracked.current = true
+      track('permission_instructions_shown', { permission: 'screen_recording' })
+    }
+  }, [screenRecordingDenied])
+
+  useEffect(() => {
+    if (systemEventsDenied && !sysEventsInstructionsTracked.current) {
+      sysEventsInstructionsTracked.current = true
+      track('permission_instructions_shown', { permission: 'system_events' })
+    }
+  }, [systemEventsDenied])
+
+  function handleContinue(): void {
+    const screenRecordingNewlyGranted =
+      initialScreenRecordingStatus.current !== 'granted' && screenRecordingStatus === 'granted'
+    onNext(screenRecordingNewlyGranted)
+  }
 
   return (
     <div className="bg-surface-raised rounded-[20px] shadow-medium p-10 w-full max-w-md">
@@ -183,6 +259,62 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
           </div>
           {accessibilityDenied && <ManualInstructions target="Accessibility" />}
         </div>
+
+        {/* Screen Recording */}
+        <div>
+          <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-surface">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              screenRecordingGranted ? 'bg-success-bg text-success-text' : 'bg-primary-soft text-primary'
+            }`}>
+              <Monitor size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Screen Recording</p>
+              <p className="text-xs text-ink-muted">Identifies which app you're dictating into</p>
+            </div>
+            {screenRecordingGranted ? (
+              <span className="text-xs font-semibold text-success-text bg-success-bg px-2.5 py-1 rounded-full">
+                Granted
+              </span>
+            ) : (
+              <button
+                onClick={triggerScreenRecording}
+                className="text-xs font-semibold text-primary bg-primary-soft px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white transition-colors cursor-pointer"
+              >
+                Allow
+              </button>
+            )}
+          </div>
+          {screenRecordingDenied && <ManualInstructions target="Screen Recording" />}
+        </div>
+
+        {/* System Events */}
+        <div>
+          <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-surface">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              systemEventsGranted ? 'bg-success-bg text-success-text' : 'bg-primary-soft text-primary'
+            }`}>
+              <Terminal size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">System Events</p>
+              <p className="text-xs text-ink-muted">Required for pasting dictated text</p>
+            </div>
+            {systemEventsGranted ? (
+              <span className="text-xs font-semibold text-success-text bg-success-bg px-2.5 py-1 rounded-full">
+                Granted
+              </span>
+            ) : (
+              <button
+                onClick={triggerSystemEvents}
+                className="text-xs font-semibold text-primary bg-primary-soft px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white transition-colors cursor-pointer"
+              >
+                Allow
+              </button>
+            )}
+          </div>
+          {systemEventsDenied && <ManualInstructions target="Automation" />}
+        </div>
       </div>
 
       {!allGranted && (
@@ -192,7 +324,7 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
       )}
 
       <button
-        onClick={onNext}
+        onClick={handleContinue}
         onMouseMove={onMouseMove}
         className="plasma-hover-light mt-6 w-full bg-primary text-white font-semibold py-3 rounded-full transition-colors cursor-pointer shadow-soft"
       >

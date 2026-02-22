@@ -37,6 +37,16 @@ const howItWorksSteps = [
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(true)
+  const [isLifetime, setIsLifetime] = useState(false)
+
+  function handleToggle(annual: boolean) {
+    setIsAnnual(annual)
+    setIsLifetime(false)
+  }
+
+  function handleLifetimeToggle() {
+    setIsLifetime((prev) => !prev)
+  }
 
   return (
     <>
@@ -57,7 +67,14 @@ export default function PricingPage() {
             <p className="body-lg text-ink-muted max-w-[440px] mx-auto mb-10">
               Start free and upgrade when you&apos;re ready. No hidden fees, no surprises.
             </p>
-            <PricingToggle isAnnual={isAnnual} onToggle={setIsAnnual} />
+            <div className="flex justify-center">
+              <PricingToggle
+                isAnnual={isAnnual}
+                isLifetime={isLifetime}
+                onToggle={handleToggle}
+                onLifetimeToggle={handleLifetimeToggle}
+              />
+            </div>
           </FadeIn>
 
           <motion.div
@@ -68,7 +85,13 @@ export default function PricingPage() {
             className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-[1100px] mx-auto items-stretch"
           >
             {pricingTiers.map((tier, i) => (
-              <PricingCard key={tier.name} tier={tier} isAnnual={isAnnual} index={i} />
+              <PricingCard
+                key={tier.name}
+                tier={tier}
+                isAnnual={isAnnual}
+                isLifetime={isLifetime}
+                index={i}
+              />
             ))}
           </motion.div>
         </div>

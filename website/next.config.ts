@@ -7,8 +7,17 @@ const monorepoConvex = path.join(__dirname, '..', 'convex')
 const localConvex = path.join(__dirname, 'convex')
 const convexDir = fs.existsSync(monorepoConvex) ? monorepoConvex : localConvex
 
+// Resolve shared directory: use ../src/shared (monorepo) if available
+const monorepoShared = path.join(__dirname, '..', 'src', 'shared')
+const sharedDir = fs.existsSync(monorepoShared) ? monorepoShared : path.join(__dirname, 'src', 'shared')
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'cdn.sanity.io' },
+    ],
+  },
   env: {
     // Ensure NEXT_PUBLIC_CONVEX_URL is available at runtime in Edge middleware,
     // not just inlined at build time for client code
@@ -26,6 +35,7 @@ const nextConfig: NextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@convex': convexDir,
+      '@shared': sharedDir,
     }
     // Ensure convex/_generated files can resolve 'convex/server' etc.
     // from the website's node_modules

@@ -51,6 +51,12 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.invoke('auth:open-web', path),
   signOut: (): Promise<void> =>
     ipcRenderer.invoke('auth:sign-out'),
+  updateProfileName: (name: string): Promise<void> =>
+    ipcRenderer.invoke('profile:update-name', name),
+  updateProfileImage: (profileImageUrl: string): Promise<void> =>
+    ipcRenderer.invoke('profile:update-image', profileImageUrl),
+  refreshProfile: (): Promise<{ name: string; email: string; profileImageUrl?: string } | null> =>
+    ipcRenderer.invoke('profile:refresh'),
   onAuthChanged: (callback: (data: { isAuthenticated: boolean }) => void): void => {
     ipcRenderer.on('auth:changed', (_event, data) => callback(data))
   },
@@ -60,6 +66,13 @@ contextBridge.exposeInMainWorld('annaAPI', {
   checkMicrophone: (): Promise<string> => ipcRenderer.invoke('system:check-microphone'),
   openAccessibilitySettings: (): Promise<void> => ipcRenderer.invoke('system:open-accessibility-settings'),
   checkAccessibility: (): Promise<boolean> => ipcRenderer.invoke('system:check-accessibility'),
+
+  // System: screen recording + system events + relaunch
+  checkScreenRecording: (): Promise<string> => ipcRenderer.invoke('system:check-screen-recording'),
+  triggerScreenRecording: (): Promise<void> => ipcRenderer.invoke('system:trigger-screen-recording'),
+  checkSystemEvents: (): Promise<boolean> => ipcRenderer.invoke('system:check-system-events'),
+  triggerSystemEvents: (): Promise<boolean> => ipcRenderer.invoke('system:trigger-system-events'),
+  relaunchApp: (): Promise<void> => ipcRenderer.invoke('system:relaunch-app'),
 
   // Convex Cloud Sync
   getConvexStatus: (): Promise<{
@@ -75,6 +88,17 @@ contextBridge.exposeInMainWorld('annaAPI', {
   getSetting: (key: string): Promise<string | undefined> => ipcRenderer.invoke('settings:get', key),
   setSetting: (key: string, value: string): Promise<void> => ipcRenderer.invoke('settings:set', key, value),
   getEnvStatus: (): Promise<{ hasOpenAI: boolean; hasAnthropic: boolean }> => ipcRenderer.invoke('settings:get-env'),
+
+  // Subscription / Paywall
+  getSubscriptionStatus: (): Promise<unknown> => ipcRenderer.invoke('subscription:get-status'),
+  openBillingPortal: (): Promise<void> => ipcRenderer.invoke('subscription:open-billing'),
+  openUpgrade: (): Promise<void> => ipcRenderer.invoke('subscription:open-upgrade'),
+  onPaywallLimitReached: (callback: () => void): void => {
+    ipcRenderer.on('paywall:limit-reached', () => callback())
+  },
+  removePaywallListener: (): void => {
+    ipcRenderer.removeAllListeners('paywall:limit-reached')
+  },
 
   // Page query + dictation to note
   onGetCurrentPage: (callback: () => string): void => {
@@ -140,5 +164,6 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.removeAllListeners('update:available')
     ipcRenderer.removeAllListeners('update:not-available')
     ipcRenderer.removeAllListeners('auth:changed')
+    ipcRenderer.removeAllListeners('paywall:limit-reached')
   }
 })

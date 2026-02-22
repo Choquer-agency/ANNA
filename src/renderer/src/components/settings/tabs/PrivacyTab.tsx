@@ -23,11 +23,20 @@ export function PrivacyTab(): React.JSX.Element {
       window.annaAPI.getSetting('analytics_enabled'),
       window.annaAPI.getConvexStatus()
     ])
-    setPrivacyMode(pm === 'true')
+    // Force defaults: privacy mode always off, cloud sync always on
+    setPrivacyMode(false)
+    if (pm === 'true') {
+      await window.annaAPI.setSetting('privacy_mode', 'false')
+    }
     setContextAwareness(ca === 'true')
     setAnalyticsEnabled(ae !== 'false')
     setCloudSyncEnabled(convexStatus.syncEnabled)
     setHasConvexUrl(convexStatus.hasConvexUrl)
+    // Ensure cloud sync is enabled
+    if (!convexStatus.syncEnabled && convexStatus.hasConvexUrl) {
+      setCloudSyncEnabled(true)
+      await window.annaAPI.enableConvexSync()
+    }
     setLoaded(true)
   }, [])
 
@@ -38,21 +47,10 @@ export function PrivacyTab(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <SettingsCard title="Privacy">
-        <SettingsRow
-          label="Privacy mode"
-          description="When enabled, none of your data is stored or used for model training"
-        >
-          <Toggle
-            value={privacyMode}
-            onChange={async (v) => {
-              setPrivacyMode(v)
-              await window.annaAPI.setSetting('privacy_mode', String(v))
-            }}
-          />
-        </SettingsRow>
+        {/* Privacy mode hidden — always off for internal testing */}
         <SettingsRow
           label="Context awareness"
-          description="Allow Anna to read surrounding text for more accurate results"
+          description="Allow Anna to read surrounding text near your cursor for more accurate, context-aware dictation results"
         >
           <Toggle
             value={contextAwareness}
@@ -81,50 +79,9 @@ export function PrivacyTab(): React.JSX.Element {
         </SettingsRow>
       </SettingsCard>
 
-      <SettingsCard title="Your Data">
-        <SettingsRow label="Cloud sync">
-          <div className="flex items-center gap-2">
-            <Toggle
-              value={cloudSyncEnabled}
-              onChange={(v) => {
-                if (v && !cloudSyncEnabled) {
-                  setShowConsentDialog(true)
-                } else if (!v) {
-                  setCloudSyncEnabled(false)
-                  window.annaAPI.disableConvexSync()
-                }
-              }}
-            />
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              cloudSyncEnabled
-                ? 'bg-success-bg text-success-text'
-                : 'bg-surface-alt text-ink-muted'
-            }`}>
-              {cloudSyncEnabled ? 'Active' : 'Off'}
-            </span>
-          </div>
-        </SettingsRow>
-        {!hasConvexUrl && (
-          <div className="px-5 pb-3">
-            <p className="text-xs text-pastel-peach-text">CONVEX_URL not set in .env — sync will not work until configured.</p>
-          </div>
-        )}
-        <SettingsRow label="Resync all data">
-          <button className="px-4 py-1.5 text-sm text-ink-secondary border border-border rounded-xl hover:bg-surface-alt transition-colors">
-            Sync
-          </button>
-        </SettingsRow>
-        <SettingsRow label="Erase all activity">
-          <button
-            onClick={() => setShowEraseDialog(true)}
-            className="px-4 py-1.5 text-sm text-error-text border border-error-text/30 rounded-xl hover:bg-error-bg transition-colors"
-          >
-            Erase
-          </button>
-        </SettingsRow>
-      </SettingsCard>
+      {/* "Your Data" section hidden for internal testing — cloud sync always on, privacy mode always off */}
 
-      {/* Consent Dialog */}
+      {/* Consent Dialog — kept for when Your Data section is re-enabled */}
       {showConsentDialog && (
         <div className="fixed inset-0 bg-ink/20 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-surface-raised rounded-2xl shadow-float max-w-md mx-4 p-6 modal-enter">
@@ -159,7 +116,7 @@ export function PrivacyTab(): React.JSX.Element {
         </div>
       )}
 
-      {/* Erase Confirmation Dialog */}
+      {/* Erase Confirmation Dialog — kept for when Your Data section is re-enabled */}
       {showEraseDialog && (
         <div className="fixed inset-0 bg-ink/20 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-surface-raised rounded-2xl shadow-float max-w-md mx-4 p-6 modal-enter">

@@ -2,14 +2,16 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, ArrowRight, X } from 'lucide-react'
+import { Check, ArrowRight, X, Infinity } from 'lucide-react'
 import { fadeInUp } from '@/lib/animations'
 import type { PricingTier } from '@/lib/constants'
+import { PLANS } from '@shared/pricing'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
 
 interface PricingCardProps {
   tier: PricingTier
   isAnnual: boolean
+  isLifetime: boolean
   index: number
 }
 
@@ -40,6 +42,15 @@ const accentStyles = {
   },
 }
 
+// Lifetime card accent
+const lifetimeStyles = {
+  card: 'bg-[#1B1B1B]',
+  check: 'text-[#F5E211]',
+  checkBg: 'bg-[#F5E211]/15',
+  button: 'bg-[#F5E211] text-[#1B1B1B] hover:bg-[#E8D60F] hover:shadow-[0_0_30px_rgba(245,226,17,0.3)]',
+  divider: 'border-white/10',
+}
+
 function ContactModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { onMouseMove } = usePlasmaHover()
   const [formState, setFormState] = useState({ name: '', company: '', email: '', teamSize: '' })
@@ -57,7 +68,6 @@ function ContactModal({ open, onClose }: { open: boolean; onClose: () => void })
       })
       setSubmitted(true)
     } catch {
-      // silently fail — we'll still show success
       setSubmitted(true)
     } finally {
       setSubmitting(false)
@@ -74,10 +84,7 @@ function ContactModal({ open, onClose }: { open: boolean; onClose: () => void })
           className="fixed inset-0 z-[100] flex items-center justify-center px-4"
           onClick={onClose}
         >
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -187,18 +194,112 @@ function ContactModal({ open, onClose }: { open: boolean; onClose: () => void })
   )
 }
 
-export function PricingCard({ tier, isAnnual }: PricingCardProps) {
+function LifetimeCardContent() {
+  const { onMouseMove } = usePlasmaHover()
+  const lifetime = PLANS.lifetime
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="relative flex flex-col rounded-[20px] p-6 md:p-7 h-full bg-[#1B1B1B] border border-[#F5E211]/20 shadow-[0_0_40px_rgba(245,226,17,0.08)]"
+    >
+      {/* Icon + Title */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="shrink-0 text-[#F5E211]">
+          <Infinity className="w-5 h-5" />
+        </div>
+        <h3 className="text-2xl font-bold text-white">{lifetime.name}</h3>
+        <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-[#F5E211] bg-[#F5E211]/10 px-2 py-0.5 rounded-full">
+          Limited Time
+        </span>
+      </div>
+
+      {/* Divider */}
+      <div className={`border-t ${lifetimeStyles.divider} mb-4`} />
+
+      {/* Tagline */}
+      <p className="text-sm text-white/60 mb-4">{lifetime.tagline}</p>
+
+      {/* Price */}
+      <div className="mb-5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[2.75rem] font-extrabold tracking-tight text-white leading-none">
+            $250
+          </span>
+          <span className="text-base text-white/40 font-medium">one-time</span>
+        </div>
+      </div>
+
+      {/* Features card */}
+      <div className="bg-white/5 rounded-2xl p-5 mb-5 flex-1">
+        <ul className="space-y-3">
+          {lifetime.features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2.5">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${lifetimeStyles.checkBg}`}>
+                <Check className={`w-3 h-3 ${lifetimeStyles.check}`} strokeWidth={3} />
+              </div>
+              <span className="text-[0.875rem] text-white/70 leading-snug">
+                {feature}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Bottom sentence */}
+      <p className="text-xs text-white/40 mb-4">{lifetime.description}</p>
+
+      {/* CTA Button */}
+      <a
+        href="#"
+        onMouseMove={onMouseMove}
+        className={`plasma-hover inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-[0.9rem] font-semibold transition-all duration-300 group ${lifetimeStyles.button}`}
+      >
+        <span className="relative z-[2]">{lifetime.cta}</span>
+        <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+      </a>
+    </motion.div>
+  )
+}
+
+export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardProps) {
   const { onMouseMove } = usePlasmaHover()
   const [contactOpen, setContactOpen] = useState(false)
   const price = tier.price ? (isAnnual ? tier.price.annual : tier.price.monthly) : null
   const styles = accentStyles[tier.accent]
   const isTeam = tier.price === null
+  const isMiddle = index === 1
+
+  // When lifetime is active: middle card becomes lifetime, others blur
+  if (isLifetime && isMiddle) {
+    return (
+      <AnimatePresence mode="wait">
+        <LifetimeCardContent key="lifetime" />
+      </AnimatePresence>
+    )
+  }
+
+  const isBlurred = isLifetime && !isMiddle
+
+  // Annual price annotation for Pro
+  const showAnnualNote = isAnnual && tier.price && tier.price.annual > 0
+  const annualTotal = PLANS.pro.prices.annual ? `$${PLANS.pro.prices.annual.usd / 100}/year` : null
 
   return (
     <>
       <motion.div
         variants={fadeInUp}
-        className={`relative flex flex-col rounded-[20px] p-6 md:p-7 transition-all duration-500 h-full ${styles.card}`}
+        animate={{
+          filter: isBlurred ? 'blur(8px)' : 'blur(0px)',
+          opacity: isBlurred ? 0.4 : 1,
+        }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        className={`relative flex flex-col rounded-[20px] p-6 md:p-7 transition-all duration-500 h-full ${styles.card} ${
+          isBlurred ? 'pointer-events-none select-none' : ''
+        }`}
       >
         {/* Icon + Title */}
         <div className="flex items-center gap-2 mb-4">
@@ -225,15 +326,26 @@ export function PricingCard({ tier, isAnnual }: PricingCardProps) {
         {/* Price */}
         <div className="mb-5">
           {price !== null ? (
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-[2.75rem] font-extrabold tracking-tight text-ink leading-none">
-                ${price}
-              </span>
-              {price > 0 && (
-                <span className="text-base text-ink-faint font-medium">/month</span>
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[2.75rem] font-extrabold tracking-tight text-ink leading-none">
+                  ${price}
+                </span>
+                {price > 0 && (
+                  <span className="text-base text-ink-faint font-medium">/month</span>
+                )}
+                {price === 0 && (
+                  <span className="text-base text-ink-faint font-medium">forever</span>
+                )}
+              </div>
+              {showAnnualNote && annualTotal && (
+                <p className="text-xs text-ink-muted mt-1">billed {annualTotal}</p>
               )}
-              {price === 0 && (
-                <span className="text-base text-ink-faint font-medium">forever</span>
+              {tier.highlighted && !isAnnual && (
+                <p className="text-xs text-primary font-medium mt-1">7-day free trial</p>
+              )}
+              {tier.highlighted && isAnnual && (
+                <p className="text-xs text-primary font-medium mt-1">7-day free trial</p>
               )}
             </div>
           ) : (

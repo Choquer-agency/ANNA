@@ -14,6 +14,7 @@ import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
 import type * as registrations from "../registrations.js";
 import type * as sessions from "../sessions.js";
+import type * as stripe from "../stripe.js";
 
 import type {
   ApiFromModules,
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   registrations: typeof registrations;
   sessions: typeof sessions;
+  stripe: typeof stripe;
 }>;
 
 /**

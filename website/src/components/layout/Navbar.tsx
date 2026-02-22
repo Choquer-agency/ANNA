@@ -9,6 +9,7 @@ import { usePlasmaHover } from '@/hooks/usePlasmaHover'
 const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '/pricing' },
+  { label: 'Blog', href: '/blog' },
 ]
 
 export function Navbar() {

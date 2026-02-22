@@ -114,7 +114,7 @@ export function LoginForm() {
               <label htmlFor="password" className="block text-sm font-medium text-ink">
                 Password
               </label>
-              <a href="#" className="text-sm text-ink-muted hover:text-ink transition-colors duration-200">
+              <a href={`/reset-password${isElectron ? '?electron_redirect=true' : ''}`} className="text-sm text-ink-muted hover:text-ink transition-colors duration-200">
                 Forgot?
               </a>
             </div>

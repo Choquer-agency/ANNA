@@ -4,7 +4,7 @@ import { join } from 'path'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { getActiveWindow } from './activeWindow'
 import { startRecording, stopRecording, getRecordingState, getRecordingDuration } from './audio'
-import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions } from './db'
+import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions, getStats } from './db'
 import { transcribe } from './transcribe'
 import { processTranscript } from './process'
 import { injectText } from './inject'
@@ -13,10 +13,14 @@ import {
   showRecordingIndicator,
   hideRecordingIndicator,
   repositionToActiveScreen,
-  setupRecordingIndicatorIPC
+  setupRecordingIndicatorIPC,
+  sendStateChange,
+  sendHotkeyInfo,
+  sendMicrophoneInfo
 } from './recordingIndicator'
 import { updateTrayRecordingState } from './tray'
 import { trackMainEvent } from './analytics'
+import { playDictationStart, playDictationStop } from './sounds'
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -36,7 +40,6 @@ function expandSnippets(text: string): string {
 function applyDictionaryReplacements(text: string): string {
   const entries = getDictionaryEntries()
   if (entries.length === 0) return text
-  // Sort by phrase length descending so longer matches take priority
   const sorted = [...entries].sort((a, b) => b.phrase.length - a.phrase.length)
   let result = text
   for (const e of sorted) {
@@ -80,9 +83,19 @@ let repositionInterval: ReturnType<typeof setInterval> | null = null
 let indicatorIPCSetup = false
 let cachedActiveWindow: Awaited<ReturnType<typeof getActiveWindow>> = null
 
+// Buffer held temporarily when user cancels (for undo)
+let cancelledWavBuffer: Buffer | null = null
+let cancelledActiveWindow: Awaited<ReturnType<typeof getActiveWindow>> = null
+let cancelledDurationMs = 0
+let cancelUndoTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Processing timeout (3 minutes)
+const PROCESSING_TIMEOUT_MS = 180_000
+// "Taking longer" notice threshold
+const SLOW_PROCESSING_MS = 15_000
+
 /**
  * Run transcription multiple times and pick the consensus result.
- * This adds ~1-2s but gives much more consistent output on retries.
  */
 async function verifiedTranscribe(
   wavBuffer: Buffer,
@@ -92,15 +105,12 @@ async function verifiedTranscribe(
   const first = await transcribe(wavBuffer, language, trace)
   const second = await transcribe(wavBuffer, language)
 
-  // If both passes agree, we're confident
   if (first.trim() === second.trim()) return first
 
-  // Disagreement — run a third pass and pick the majority result
   const third = await transcribe(wavBuffer, language)
   if (first.trim() === third.trim()) return first
   if (second.trim() === third.trim()) return second
 
-  // All three differ — return the longest (typically most complete)
   const candidates = [first, second, third]
   candidates.sort((a, b) => b.trim().length - a.trim().length)
   return candidates[0]
@@ -130,7 +140,6 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     updateSession(sessionId, { status: 'retrying', error: null })
     sendStatus('transcribing', { sessionId })
 
-    // Multi-pass transcription for consistency on retries
     const language = getSetting('language') ?? 'auto'
     const rawTranscript = await verifiedTranscribe(wavBuffer, language, trace)
     trace.update({ input: rawTranscript })
@@ -143,10 +152,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
       return
     }
 
-    // Expand snippets in raw transcript
     const expanded = expandSnippets(rawTranscript)
-
-    // Look up style profile
     const styleProfile = getStyleProfileForApp(session.app_name ?? null, session.app_bundle_id ?? null)
 
     sendStatus('processing', { sessionId })
@@ -155,7 +161,6 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
       windowTitle: session.window_title ?? undefined
     }, styleProfile?.prompt_addendum, trace, customPrompt, language)
 
-    // Apply dictionary replacements
     const final = applyDictionaryReplacements(processed)
     trace.update({ output: final })
     const wordCount = final.split(/\s+/).filter(Boolean).length
@@ -169,7 +174,6 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     trace.update({ metadata: { status: 'completed', wordCount } })
     sendComplete(sessionId)
 
-    // Sync to Convex (lazy-load to avoid eager module weight)
     const completedSession = getSessionById(sessionId)
     if (completedSession) {
       syncSession(completedSession).catch(() => {})
@@ -180,7 +184,6 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     updateSession(sessionId, { status: 'failed', error: errorMsg })
     sendError(errorMsg)
 
-    // Sync failed session to Convex too
     const failedSession = getSessionById(sessionId)
     if (failedSession) {
       syncSession(failedSession).catch(() => {})
@@ -190,67 +193,132 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
   await getLangfuse().flushAsync()
 }
 
-export async function handleHotkeyToggle(): Promise<void> {
-  if (getRecordingState()) {
-    // Stop recording and run pipeline
-    const t0 = performance.now()
+function cleanupRecordingState(): void {
+  updateTrayRecordingState(false)
+  if (repositionInterval) {
+    clearInterval(repositionInterval)
+    repositionInterval = null
+  }
+}
 
-    // Use active window captured at recording start (avoids 30s hang from
-    // calling getActiveWindow while the recording indicator overlay is up)
-    const activeWin = cachedActiveWindow
-    cachedActiveWindow = null
+/**
+ * Handle cancel: stop recording, discard, show cancelled state with undo option
+ */
+async function handleCancel(): Promise<void> {
+  if (!getRecordingState()) return
 
-    const durationMs = getRecordingDuration()
+  playDictationStop()
+  cleanupRecordingState()
+  sendStatus('idle')
 
+  console.time('[pipeline] stopRecording (cancel)')
+  const wavBuffer = await stopRecording()
+  console.timeEnd('[pipeline] stopRecording (cancel)')
+
+  // Hold buffer for undo
+  cancelledWavBuffer = wavBuffer
+  cancelledActiveWindow = cachedActiveWindow
+  cancelledDurationMs = getRecordingDuration()
+  cachedActiveWindow = null
+
+  // Show cancelled state in indicator
+  sendStateChange('cancelled')
+  trackMainEvent('dictation_cancelled', { reason: 'user_cancel' })
+  console.log('[pipeline] Recording cancelled (undo available)')
+
+  // Auto-dismiss after 6 seconds
+  if (cancelUndoTimeout) clearTimeout(cancelUndoTimeout)
+  cancelUndoTimeout = setTimeout(() => {
+    cancelledWavBuffer = null
+    cancelledActiveWindow = null
+    sendStateChange('idle')
+    cancelUndoTimeout = null
+  }, 6000)
+}
+
+/**
+ * Handle undo cancel: run the normal pipeline with the saved buffer
+ */
+async function handleUndoCancel(): Promise<void> {
+  if (!cancelledWavBuffer) return
+  if (cancelUndoTimeout) {
+    clearTimeout(cancelUndoTimeout)
+    cancelUndoTimeout = null
+  }
+
+  const wavBuffer = cancelledWavBuffer
+  const activeWin = cancelledActiveWindow
+  const durationMs = cancelledDurationMs
+  cancelledWavBuffer = null
+  cancelledActiveWindow = null
+
+  // Show processing state
+  sendStateChange('processing')
+  console.log('[pipeline] Undo cancel — processing recording')
+
+  await runPipeline(wavBuffer, activeWin, durationMs)
+}
+
+/**
+ * Core pipeline: transcribe, process, paste.
+ * Used by both normal stop and undo-cancel flows.
+ */
+async function runPipeline(
+  wavBuffer: Buffer,
+  activeWin: Awaited<ReturnType<typeof getActiveWindow>>,
+  durationMs: number
+): Promise<void> {
+  const t0 = performance.now()
+
+  // Check for empty recording
+  if (wavBuffer.length <= 44) {
+    console.log('[pipeline] Empty recording, skipping')
+    trackMainEvent('dictation_cancelled', { reason: 'empty_recording' })
+    sendStatus('idle')
     hideRecordingIndicator()
-    updateTrayRecordingState(false)
-    if (repositionInterval) {
-      clearInterval(repositionInterval)
-      repositionInterval = null
+    return
+  }
+
+  // Create session
+  const session = createSession({
+    app_name: activeWin?.appName ?? null,
+    app_bundle_id: activeWin?.bundleId ?? null,
+    window_title: activeWin?.title ?? null
+  })
+  updateSession(session.id, { duration_ms: durationMs })
+
+  // Save audio file
+  console.time('[pipeline] saveAudio')
+  const audioDir = join(app.getPath('userData'), 'audio')
+  mkdirSync(audioDir, { recursive: true })
+  const audioPath = join(audioDir, `${session.id}.wav`)
+  writeFileSync(audioPath, wavBuffer)
+  updateSession(session.id, { audio_path: audioPath })
+  console.timeEnd('[pipeline] saveAudio')
+
+  console.time('[pipeline] langfuseTrace')
+  const trace = getLangfuse().trace({
+    name: 'dictation-session',
+    sessionId: session.id,
+    metadata: {
+      appName: activeWin?.appName,
+      windowTitle: activeWin?.title,
+      durationMs
     }
-    sendStatus('stopping')
+  })
+  console.timeEnd('[pipeline] langfuseTrace')
 
-    console.time('[pipeline] stopRecording')
-    const wavBuffer = await stopRecording()
-    console.timeEnd('[pipeline] stopRecording')
+  // Start slow processing timer
+  let slowNoticeTimeout: ReturnType<typeof setTimeout> | null = null
+  const hideSlowNotice = getSetting('hide_slow_notice') === 'true'
+  if (!hideSlowNotice) {
+    slowNoticeTimeout = setTimeout(() => {
+      sendStateChange('slow')
+    }, SLOW_PROCESSING_MS)
+  }
 
-    // Check for empty recording (WAV header is 44 bytes)
-    if (wavBuffer.length <= 44) {
-      console.log('[pipeline] Empty recording, skipping')
-      trackMainEvent('dictation_cancelled', { reason: 'empty_recording' })
-      sendStatus('idle')
-      return
-    }
-
-    // Create session
-    const session = createSession({
-      app_name: activeWin?.appName ?? null,
-      app_bundle_id: activeWin?.bundleId ?? null,
-      window_title: activeWin?.title ?? null
-    })
-    updateSession(session.id, { duration_ms: durationMs })
-
-    // Save audio file
-    console.time('[pipeline] saveAudio')
-    const audioDir = join(app.getPath('userData'), 'audio')
-    mkdirSync(audioDir, { recursive: true })
-    const audioPath = join(audioDir, `${session.id}.wav`)
-    writeFileSync(audioPath, wavBuffer)
-    updateSession(session.id, { audio_path: audioPath })
-    console.timeEnd('[pipeline] saveAudio')
-
-    console.time('[pipeline] langfuseTrace')
-    const trace = getLangfuse().trace({
-      name: 'dictation-session',
-      sessionId: session.id,
-      metadata: {
-        appName: activeWin?.appName,
-        windowTitle: activeWin?.title,
-        durationMs
-      }
-    })
-    console.timeEnd('[pipeline] langfuseTrace')
-
+  // Wrap pipeline in a timeout
+  const pipelinePromise = (async () => {
     try {
       // Transcribe
       sendStatus('transcribing', { sessionId: session.id })
@@ -304,6 +372,9 @@ export async function handleHotkeyToggle(): Promise<void> {
       const currentPage = await getCurrentPage()
       console.timeEnd('[pipeline] getCurrentPage')
 
+      // Play sound alongside paste (fire-and-forget, no await)
+      playDictationStop()
+
       console.time('[pipeline] injectText')
       if (currentPage === 'notes' && mainWindowRef?.isFocused()) {
         mainWindowRef.webContents.send('dictation:append-to-note', final)
@@ -320,20 +391,18 @@ export async function handleHotkeyToggle(): Promise<void> {
       console.log(`[pipeline] TOTAL: ${(performance.now() - t0).toFixed(1)}ms`)
       console.log('[pipeline] Complete:', session.id)
 
-      // Analytics: dictation completed
+      // Analytics
       trackMainEvent('dictation_completed', {
         duration_ms: durationMs,
         word_count: wordCount,
         app_context: activeWin?.appName
       })
 
-      // Analytics: first dictation ever
       if (!getSetting('first_dictation_tracked')) {
         trackMainEvent('first_dictation_completed')
         setSetting('first_dictation_tracked', 'true')
       }
 
-      // Analytics: milestone check
       const totalSessions = getSessions().length
       const milestones = [10, 50, 100, 500, 1000]
       for (const m of milestones) {
@@ -343,7 +412,6 @@ export async function handleHotkeyToggle(): Promise<void> {
         }
       }
 
-      // Sync to Convex (lazy-load to avoid eager module weight)
       const completedSession = getSessionById(session.id)
       if (completedSession) {
         syncSession(completedSession).catch(() => {})
@@ -357,27 +425,124 @@ export async function handleHotkeyToggle(): Promise<void> {
       sendError(errorMsg)
       trackMainEvent('dictation_error', { error_type: errorMsg })
 
-      // Sync failed session to Convex too
       const failedSession = getSessionById(session.id)
       if (failedSession) {
         syncSession(failedSession).catch(() => {})
       }
     }
+  })()
 
+  // Timeout wrapper
+  const timeoutPromise = new Promise<void>((_, reject) => {
+    setTimeout(() => reject(new Error('Processing timed out')), PROCESSING_TIMEOUT_MS)
+  })
+
+  try {
+    await Promise.race([pipelinePromise, timeoutPromise])
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Processing timed out') {
+      console.error('[pipeline] Processing timed out after 3 minutes')
+      updateSession(session.id, { status: 'failed', error: 'Processing timed out — please retry' })
+      sendError('Processing timed out')
+      trackMainEvent('dictation_error', { error_type: 'timeout' })
+    }
+  } finally {
+    if (slowNoticeTimeout) clearTimeout(slowNoticeTimeout)
+    // Hide indicator immediately
+    hideRecordingIndicator()
     await getLangfuse().flushAsync()
+  }
+}
+
+export async function handleHotkeyToggle(): Promise<void> {
+  if (getRecordingState()) {
+    // Stop recording and run pipeline
+    const activeWin = cachedActiveWindow
+    cachedActiveWindow = null
+    const durationMs = getRecordingDuration()
+
+    cleanupRecordingState()
+
+    // Show processing state in indicator (keep visible)
+    sendStateChange('processing')
+    sendStatus('stopping')
+
+    console.time('[pipeline] stopRecording')
+    const wavBuffer = await stopRecording()
+    console.timeEnd('[pipeline] stopRecording')
+
+    await runPipeline(wavBuffer, activeWin, durationMs)
   } else {
-    // Start recording — capture active window now, before the indicator overlay appears
+    // Paywall check — block recording if free user exceeds weekly word limit
+    try {
+      const { getSubscriptionStatus } = require('./subscription')
+      const sub = getSubscriptionStatus()
+      if (sub.planId === 'free') {
+        const stats = getStats()
+        if (stats.totalWords >= 4000) {
+          console.log('[pipeline] Free tier word limit reached, showing paywall')
+          mainWindowRef?.webContents.send('paywall:limit-reached')
+          return
+        }
+      }
+    } catch (err) {
+      console.error('[pipeline] Paywall check error:', err)
+      // Don't block recording on check failure
+    }
+
+    // Start recording
     if (!indicatorIPCSetup) {
-      setupRecordingIndicatorIPC(() => handleHotkeyToggle())
+      setupRecordingIndicatorIPC(
+        () => handleHotkeyToggle(),
+        () => handleCancel(),
+        () => handleUndoCancel(),
+        () => setSetting('hide_slow_notice', 'true')
+      )
       indicatorIPCSetup = true
     }
     cachedActiveWindow = await getActiveWindow()
+
+    // Send hotkey info to indicator for tooltip display
+    const hotkey = getSetting('hotkey') || 'fn'
+    sendHotkeyInfo(hotkey)
+
+    // Send microphone info on first dictation, or "Dictating with Anna" on subsequent
+    const firstShown = getSetting('first_dictation_shown')
+    if (!firstShown) {
+      const micDevice = getSetting('microphone_device')
+      const micName = micDevice && micDevice !== 'default' ? micDevice : 'System Default'
+      sendMicrophoneInfo(micName)
+      setSetting('first_dictation_shown', 'true')
+    } else {
+      sendMicrophoneInfo('__dictating__')
+    }
+
+    playDictationStart()
     startRecording()
     showRecordingIndicator()
+    sendStateChange('recording')
     updateTrayRecordingState(true)
     repositionInterval = setInterval(repositionToActiveScreen, 500)
     sendStatus('recording')
     trackMainEvent('dictation_started', { trigger: 'hotkey' })
     console.log('[pipeline] Recording started')
+  }
+}
+
+/**
+ * Mark stale processing sessions as failed on app startup.
+ * Called once during app initialization.
+ */
+export function cleanupStaleSessions(): void {
+  const sessions = getSessions()
+  const fourMinutesAgo = Date.now() - 4 * 60 * 1000
+  for (const s of sessions) {
+    if (
+      (s.status === 'processing' || s.status === 'transcribing' || s.status === 'retrying') &&
+      new Date(s.created_at).getTime() < fourMinutesAgo
+    ) {
+      console.log(`[pipeline] Marking stale session ${s.id} as failed`)
+      updateSession(s.id, { status: 'failed', error: 'Processing timed out — please retry' })
+    }
   }
 }

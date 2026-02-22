@@ -64,6 +64,9 @@ declare global {
       openWebSignIn: () => Promise<void>
       openWeb: (path: string) => Promise<void>
       signOut: () => Promise<void>
+      updateProfileName: (name: string) => Promise<void>
+      updateProfileImage: (profileImageUrl: string) => Promise<void>
+      refreshProfile: () => Promise<{ name: string; email: string; profileImageUrl?: string } | null>
       onAuthChanged: (cb: (data: { isAuthenticated: boolean }) => void) => void
 
       // System: microphone + accessibility
@@ -71,6 +74,13 @@ declare global {
       checkMicrophone: () => Promise<string>
       openAccessibilitySettings: () => Promise<void>
       checkAccessibility: () => Promise<boolean>
+
+      // System: screen recording + system events + relaunch
+      checkScreenRecording: () => Promise<string>
+      triggerScreenRecording: () => Promise<void>
+      checkSystemEvents: () => Promise<boolean>
+      triggerSystemEvents: () => Promise<boolean>
+      relaunchApp: () => Promise<void>
 
       // Convex Cloud Sync
       getConvexStatus: () => Promise<{
@@ -87,6 +97,20 @@ declare global {
       removeGetCurrentPageListener: () => void
       onDictationToNote: (cb: (text: string) => void) => void
       removeDictationToNoteListener: () => void
+
+      // Subscription / Paywall
+      getSubscriptionStatus: () => Promise<{
+        planId: 'free' | 'pro' | 'lifetime'
+        status: string
+        billingInterval?: string
+        currentPeriodEnd?: string
+        cancelAtPeriodEnd?: boolean
+        trialEnd?: string
+      }>
+      openBillingPortal: () => Promise<void>
+      openUpgrade: () => Promise<void>
+      onPaywallLimitReached: (cb: () => void) => void
+      removePaywallListener: () => void
 
       // App version
       getAppVersion: () => Promise<string>

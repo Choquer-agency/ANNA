@@ -211,6 +211,14 @@ export const testimonials: Testimonial[] = [
   },
 ]
 
+// Re-export shared pricing as the single source of truth
+export { PLANS, TEAM_TIER, formatPrice, getMonthlyDisplayPrice, getAnnualDisplayPrice, getAnnualSavingsPercent } from '@shared/pricing'
+export type { PlanId, BillingInterval, PlanDefinition, PricePoint } from '@shared/pricing'
+
+// Legacy PricingTier interface — used by PricingCard and PricingToggle.
+// Built from the shared PLANS + TEAM_TIER so there's one source of truth.
+import { PLANS, TEAM_TIER } from '@shared/pricing'
+
 export interface PricingTier {
   name: string
   price: { monthly: number; annual: number } | null
@@ -224,55 +232,34 @@ export interface PricingTier {
 
 export const pricingTiers: PricingTier[] = [
   {
-    name: 'Free',
+    name: PLANS.free.name,
     price: { monthly: 0, annual: 0 },
-    tagline: 'Perfect for trying out voice dictation.',
-    description: 'Start speaking instead of typing — no commitment required.',
-    features: [
-      '4,000 words per week',
-      'Basic AI formatting',
-      '1 style profile',
-      'macOS app',
-      '90+ languages supported',
-      'Local on-device processing',
-      'Works in any app',
-    ],
-    cta: 'Get Started',
+    tagline: PLANS.free.tagline,
+    description: PLANS.free.description,
+    features: PLANS.free.features,
+    cta: PLANS.free.cta,
     accent: 'neutral',
   },
   {
-    name: 'Pro',
-    price: { monthly: 12, annual: 8 },
-    tagline: 'For professionals who rely on voice daily.',
-    description: 'Unlock your full potential with unlimited dictation.',
-    features: [
-      'Unlimited words',
-      'Advanced AI formatting',
-      'Unlimited style profiles',
-      'Custom dictionary',
-      'Priority support',
-      'Early access to new features',
-      'Advanced punctuation controls',
-    ],
-    cta: 'Start Free Trial',
-    highlighted: true,
+    name: PLANS.pro.name,
+    price: {
+      monthly: PLANS.pro.prices.monthly!.usd / 100,
+      annual: Math.round(PLANS.pro.prices.annual!.usd / 12) / 100,
+    },
+    tagline: PLANS.pro.tagline,
+    description: PLANS.pro.description,
+    features: PLANS.pro.features,
+    cta: PLANS.pro.cta,
+    highlighted: PLANS.pro.highlighted,
     accent: 'light-orange',
   },
   {
-    name: 'Team (5+)',
+    name: TEAM_TIER.name,
     price: null,
-    tagline: 'For companies with 5 or more employees.',
-    description: 'Better pricing, shared management, and dedicated onboarding.',
-    features: [
-      'Everything in Pro',
-      'Team management dashboard',
-      'Shared style profiles',
-      'Usage analytics',
-      'SSO integration',
-      'Dedicated support',
-      'Volume discounts',
-    ],
-    cta: 'Contact Us',
+    tagline: TEAM_TIER.tagline,
+    description: TEAM_TIER.description,
+    features: TEAM_TIER.features,
+    cta: TEAM_TIER.cta,
     accent: 'pink',
   },
 ]
@@ -289,9 +276,19 @@ export const faqs: FAQ[] = [
       'The free plan gives you 4,000 words per week of voice dictation. Your word count resets every Monday. No credit card required to get started.',
   },
   {
+    question: 'How does the free trial work?',
+    answer:
+      'Every Pro plan comes with a 7-day free trial. You\'ll need a credit card to start, but you won\'t be charged until the trial ends. Cancel anytime during the trial and you won\'t pay a thing.',
+  },
+  {
     question: 'Can I cancel my subscription anytime?',
     answer:
       'Yes, you can cancel your subscription at any time. You\'ll continue to have access to your plan until the end of your billing period.',
+  },
+  {
+    question: 'What is the lifetime plan?',
+    answer:
+      'The lifetime plan is a limited-time offer — one payment of $250 and you get unlimited Anna Pro forever. That includes all future features and updates as they\'re released. No subscriptions, no renewals.',
   },
   {
     question: 'Is my voice data private?',
@@ -311,6 +308,6 @@ export const faqs: FAQ[] = [
   {
     question: 'What\'s the difference between monthly and annual billing?',
     answer:
-      'Annual billing saves you about 33% compared to monthly. You\'re billed once per year instead of monthly.',
+      'Annual billing saves you about 22% compared to monthly — $7/month billed at $84/year vs $9/month. You can also grab the lifetime plan for a one-time payment of $250.',
   },
 ]

@@ -221,18 +221,57 @@ export async function registerUserInConvex(data: {
   console.log('[convex] User registered:', data.email)
 }
 
-export async function fetchRegistrationProfile(): Promise<{ name: string; email: string } | null> {
+export async function fetchRegistrationProfile(): Promise<{
+  name: string
+  email: string
+  profileImageUrl?: string
+} | null> {
   const c = ensureClient()
   try {
+    // Try the registration record first (has full profile data)
     const reg = await c.query(api.registrations.getRegistration, {})
-    if (reg && reg.name) {
-      return { name: reg.name, email: reg.email || '' }
+
+    // Always fetch the auth user profile for the real email/image from OAuth
+    let authProfile: { email: string; name: string; image: string } | null = null
+    try {
+      authProfile = await c.query(api.registrations.getAuthUserProfile, {})
+    } catch (err) {
+      console.error('[convex] Failed to fetch auth user profile:', err)
     }
+
+    if (reg && reg.name) {
+      return {
+        name: reg.name,
+        // Prefer auth user email (from Google/Apple) over registration email (may be placeholder)
+        email: authProfile?.email || reg.email || '',
+        profileImageUrl: reg.profileImageUrl || authProfile?.image || undefined,
+      }
+    }
+
+    // No registration record — return auth user profile if available
+    if (authProfile && (authProfile.email || authProfile.name)) {
+      return {
+        name: authProfile.name || '',
+        email: authProfile.email || '',
+        profileImageUrl: authProfile.image || undefined,
+      }
+    }
+
     return null
   } catch (err) {
     console.error('[convex] Failed to fetch registration profile:', err)
     return null
   }
+}
+
+export async function updateProfileNameInConvex(name: string): Promise<void> {
+  const c = ensureClient()
+  await c.mutation(api.registrations.updateName, { name })
+}
+
+export async function updateProfileImageInConvex(profileImageUrl: string): Promise<void> {
+  const c = ensureClient()
+  await c.mutation(api.registrations.updateProfileImage, { profileImageUrl })
 }
 
 export function getConvexStatus(): {

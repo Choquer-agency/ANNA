@@ -4,7 +4,7 @@ import { ArrowRight, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ease } from '@/lib/animations'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
-import { pricingTiers } from '@/lib/constants'
+import { PLANS, formatPrice } from '@shared/pricing'
 
 interface PlanStepProps {
   selectedPlan: string
@@ -12,10 +12,10 @@ interface PlanStepProps {
   onContinue: () => void
 }
 
+const tiers = [PLANS.free, PLANS.pro]
+
 export function PlanStep({ selectedPlan, onPlanChange, onContinue }: PlanStepProps) {
   const { onMouseMove } = usePlasmaHover()
-
-  const tiers = pricingTiers.filter((t) => t.price !== null) // Free and Pro only
 
   return (
     <motion.div
@@ -28,17 +28,18 @@ export function PlanStep({ selectedPlan, onPlanChange, onContinue }: PlanStepPro
         Choose your plan
       </h2>
       <p className="text-[0.9rem] text-ink-muted mb-8">
-        Start free, upgrade anytime. No credit card required.
+        Start free, upgrade anytime. No credit card required for the free plan.
       </p>
 
       <div className="space-y-3 mb-8">
         {tiers.map((tier) => {
-          const isSelected = selectedPlan === tier.name.toLowerCase()
+          const isSelected = selectedPlan === tier.id
+          const monthlyPrice = tier.prices.monthly ? tier.prices.monthly.usd / 100 : 0
           return (
             <button
-              key={tier.name}
+              key={tier.id}
               type="button"
-              onClick={() => onPlanChange(tier.name.toLowerCase())}
+              onClick={() => onPlanChange(tier.id)}
               className={`w-full text-left rounded-[20px] border-2 p-5 transition-all duration-200 cursor-pointer ${
                 isSelected
                   ? 'border-primary bg-primary/5 shadow-[0_0_20px_rgba(255,158,25,0.15)]'
@@ -58,15 +59,25 @@ export function PlanStep({ selectedPlan, onPlanChange, onContinue }: PlanStepPro
                   <p className="text-sm text-ink-muted mb-3">{tier.tagline}</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-bold text-ink">
-                      ${tier.price!.monthly}
+                      ${monthlyPrice}
                     </span>
-                    {tier.price!.monthly > 0 && (
+                    {monthlyPrice > 0 && (
                       <span className="text-sm text-ink-muted">/month</span>
                     )}
-                    {tier.price!.monthly === 0 && (
+                    {monthlyPrice === 0 && (
                       <span className="text-sm text-ink-muted">forever</span>
                     )}
                   </div>
+                  {tier.trial && (
+                    <p className="text-xs text-primary font-medium mt-1">
+                      {tier.trial.days}-day free trial
+                    </p>
+                  )}
+                  {tier.prices.annual && (
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      or {formatPrice(Math.round(tier.prices.annual.usd / 12))}/mo billed annually
+                    </p>
+                  )}
                 </div>
                 <div
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 transition-all duration-200 ${

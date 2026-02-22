@@ -20,18 +20,36 @@ function parseHotkeyParts(hk: string): string[] {
 export function GeneralTab(): React.JSX.Element {
   const [hotkey, setHotkey] = useState('fn')
   const [capturingHotkey, setCapturingHotkey] = useState(false)
-  const [customMode, setCustomMode] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedDevice, setSelectedDevice] = useState('default')
 
   const loadSettings = useCallback(async () => {
-    const hk = await window.annaAPI.getSetting('hotkey')
-    const resolved = hk || 'fn'
-    setHotkey(resolved)
-    setCustomMode(resolved !== 'fn')
+    const [hk, micDevice] = await Promise.all([
+      window.annaAPI.getSetting('hotkey'),
+      window.annaAPI.getSetting('microphone_device')
+    ])
+    setHotkey(hk || 'fn')
+    setSelectedDevice(micDevice || 'default')
     setLoaded(true)
   }, [])
 
   useEffect(() => { loadSettings() }, [loadSettings])
+
+  // Enumerate audio input devices
+  useEffect(() => {
+    async function loadDevices(): Promise<void> {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true })
+        const allDevices = await navigator.mediaDevices.enumerateDevices()
+        const audioInputs = allDevices.filter((d) => d.kind === 'audioinput')
+        setDevices(audioInputs)
+      } catch {
+        // Permission denied or no devices
+      }
+    }
+    loadDevices()
+  }, [])
 
   // Hotkey capture
   useEffect(() => {
@@ -80,79 +98,50 @@ export function GeneralTab(): React.JSX.Element {
 
   if (!loaded) return <div />
 
-  const isFnMode = !customMode
   const parts = parseHotkeyParts(hotkey)
 
-  function selectFnKey(): void {
-    setCustomMode(false)
-    setCapturingHotkey(false)
+  function resetToDefault(): void {
     setHotkey('fn')
+    setCapturingHotkey(false)
     window.annaAPI.setSetting('hotkey', 'fn')
-  }
-
-  function selectCustom(): void {
-    setCustomMode(true)
   }
 
   return (
     <div className="space-y-6">
       <SettingsCard title="Activation">
         <SettingsRow label="Activation shortcut">
-          <div className="flex flex-col gap-2 min-w-[200px]">
-            {/* Mode toggle pills */}
-            <div className="flex gap-1 p-0.5 bg-surface-alt border border-border rounded-xl">
-              <button
-                onClick={selectFnKey}
-                className={`flex-1 px-3 py-1.5 rounded-[10px] text-sm font-medium transition-all ${
-                  isFnMode
-                    ? 'bg-white shadow-sm text-ink border border-border/50'
-                    : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                🌐 Fn key
-              </button>
-              <button
-                onClick={selectCustom}
-                className={`flex-1 px-3 py-1.5 rounded-[10px] text-sm font-medium transition-all ${
-                  customMode
-                    ? 'bg-white shadow-sm text-ink border border-border/50'
-                    : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                Custom
-              </button>
+          <div className="flex flex-col gap-1.5 min-w-[200px]">
+            <div className="flex items-center gap-1 px-3 py-2 bg-white/60 border border-border rounded-xl">
+              {capturingHotkey ? (
+                <span className="text-sm text-ink-muted animate-pulse">Press keys...</span>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    {parts.map((part, i) => (
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 bg-surface-alt border border-border rounded-lg text-sm font-medium text-ink"
+                      >
+                        {part}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setCapturingHotkey(true)}
+                    className="ml-2 p-1 text-ink-muted hover:text-ink transition-colors rounded-md hover:bg-surface-alt"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </>
+              )}
             </div>
-
-            {/* Custom shortcut capture (only shown in custom mode) */}
-            {customMode && (
-              <div className="flex items-center gap-1 px-3 py-2 bg-white/60 border border-border rounded-xl">
-                {capturingHotkey ? (
-                  <span className="text-sm text-ink-muted animate-pulse">Press keys...</span>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-1.5 flex-1">
-                      {hotkey !== 'fn' ? (
-                        parts.map((part, i) => (
-                          <span
-                            key={i}
-                            className="px-2.5 py-1 bg-surface-alt border border-border rounded-lg text-sm font-medium text-ink"
-                          >
-                            {part}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-sm text-ink-muted">Click pencil to set shortcut</span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setCapturingHotkey(true)}
-                      className="ml-2 p-1 text-ink-muted hover:text-ink transition-colors rounded-md hover:bg-surface-alt"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                  </>
-                )}
-              </div>
+            {hotkey !== 'fn' && (
+              <button
+                onClick={resetToDefault}
+                className="text-xs text-primary hover:underline self-start ml-1"
+              >
+                Reset to default (Fn)
+              </button>
             )}
           </div>
         </SettingsRow>
@@ -161,10 +150,21 @@ export function GeneralTab(): React.JSX.Element {
       <SettingsCard title="Audio">
         <SettingsRow label="Microphone">
           <select
-            disabled
-            className="px-3 py-1.5 border border-border rounded-xl text-sm bg-white/60 text-ink-muted"
+            value={selectedDevice}
+            onChange={async (e) => {
+              setSelectedDevice(e.target.value)
+              await window.annaAPI.setSetting('microphone_device', e.target.value)
+            }}
+            className="px-3 py-1.5 border border-border rounded-xl text-sm bg-white/60 text-ink focus:outline-none focus:ring-2 focus:ring-primary-ring"
           >
-            <option>System Default</option>
+            <option value="default">System Default</option>
+            {devices
+              .filter((d) => d.deviceId !== 'default')
+              .map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Microphone (${d.deviceId.slice(0, 8)})`}
+                </option>
+              ))}
           </select>
         </SettingsRow>
       </SettingsCard>

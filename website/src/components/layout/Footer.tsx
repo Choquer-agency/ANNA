@@ -9,6 +9,7 @@ import { usePlasmaHover } from '@/hooks/usePlasmaHover'
 const footerLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '/pricing' },
+  { label: 'Blog', href: '/blog' },
 ]
 
 const legalLinks = [

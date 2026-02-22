@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
+import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'not-available' | 'downloaded'
 
 export function VersionTab(): React.JSX.Element {
+  const { onMouseMove } = usePlasmaHover()
   const [version, setVersion] = useState('')
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
+  const [newVersion, setNewVersion] = useState('')
 
   useEffect(() => {
     window.annaAPI.getAppVersion().then(setVersion).catch(() => {})
@@ -14,9 +17,15 @@ export function VersionTab(): React.JSX.Element {
 
   useEffect(() => {
     window.annaAPI.onUpdateChecking(() => setUpdateStatus('checking'))
-    window.annaAPI.onUpdateAvailable(() => setUpdateStatus('available'))
+    window.annaAPI.onUpdateAvailable((v: string) => {
+      setUpdateStatus('available')
+      if (v) setNewVersion(v)
+    })
     window.annaAPI.onUpdateNotAvailable(() => setUpdateStatus('not-available'))
-    window.annaAPI.onUpdateDownloaded(() => setUpdateStatus('downloaded'))
+    window.annaAPI.onUpdateDownloaded((v: string) => {
+      setUpdateStatus('downloaded')
+      if (v) setNewVersion(v)
+    })
 
     return () => {
       // Listeners are cleaned up globally via removeAllListeners
@@ -39,14 +48,7 @@ export function VersionTab(): React.JSX.Element {
       case 'available':
         return <span className="text-xs text-amber-600 font-medium">Update available</span>
       case 'downloaded':
-        return (
-          <button
-            onClick={handleInstallUpdate}
-            className="text-xs font-semibold text-white bg-primary hover:bg-primary/90 px-3 py-1 rounded-lg transition-colors cursor-pointer"
-          >
-            Update Now
-          </button>
-        )
+        return <span className="text-xs text-emerald-600 font-medium">Ready to install</span>
       case 'not-available':
         return <span className="text-xs text-emerald-600 font-medium">Latest version</span>
       default:
@@ -55,7 +57,7 @@ export function VersionTab(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SettingsCard>
         <SettingsRow label="Current Version" description={version ? `v${version}` : '—'}>
           {renderStatusBadge()}
@@ -70,6 +72,29 @@ export function VersionTab(): React.JSX.Element {
           </button>
         </SettingsRow>
       </SettingsCard>
+
+      {/* Update available card */}
+      {updateStatus === 'downloaded' && (
+        <div className="bg-surface-raised border-2 border-primary rounded-2xl p-5 shadow-float">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">
+                New version available{newVersion ? ` — v${newVersion}` : ''}
+              </h3>
+              <p className="text-xs text-ink-muted mt-0.5">
+                Download complete. Install and restart to update.
+              </p>
+            </div>
+            <button
+              onClick={handleInstallUpdate}
+              onMouseMove={onMouseMove}
+              className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all shrink-0 ml-4"
+            >
+              <span className="relative z-[2]">Install & Restart</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

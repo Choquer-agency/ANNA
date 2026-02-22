@@ -1,40 +1,141 @@
+import { useState, useEffect, useCallback } from 'react'
 import { SettingsCard } from '../SettingsCard'
-import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
+import { SettingsRow } from '../SettingsRow'
+
+interface SubStatus {
+  planId: 'free' | 'pro' | 'lifetime'
+  status: string
+  billingInterval?: string
+  currentPeriodEnd?: string
+  cancelAtPeriodEnd?: boolean
+  trialEnd?: string
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free',
+  pro: 'Anna Pro',
+  lifetime: 'Anna Lifetime',
+}
+
+const PRICE_LABELS: Record<string, Record<string, string>> = {
+  pro: { monthly: '$9/mo', annual: '$84/yr' },
+  lifetime: { lifetime: '$250 one-time' },
+  free: { monthly: '$0' },
+}
 
 export function SubscriptionTab(): React.JSX.Element {
-  const { onMouseMove } = usePlasmaHover()
+  const [sub, setSub] = useState<SubStatus | null>(null)
+  const [weeklyWords, setWeeklyWords] = useState(0)
+  const [loaded, setLoaded] = useState(false)
+
+  const loadData = useCallback(async () => {
+    const [status, stats] = await Promise.all([
+      window.annaAPI.getSubscriptionStatus(),
+      window.annaAPI.getStats(),
+    ])
+    setSub(status)
+    // Use total words as a rough proxy; weekly tracking would need
+    // a dedicated counter — for now we show total
+    setWeeklyWords(stats.totalWords || 0)
+    setLoaded(true)
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  function formatDate(dateStr: string | undefined): string {
+    if (!dateStr) return '—'
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    } catch {
+      return dateStr
+    }
+  }
+
+  if (!loaded || !sub) return <div />
+
+  const planLabel = PLAN_LABELS[sub.planId] || 'Free'
+  const priceLabel = PRICE_LABELS[sub.planId]?.[sub.billingInterval || 'monthly'] || '$0'
+  const isFree = sub.planId === 'free'
+  const isTrialing = sub.status === 'trialing'
+
   return (
     <div className="space-y-6">
       <SettingsCard title="Current Plan">
-        <div className="px-5 py-5">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-lg font-semibold text-ink">Anna Pro</span>
-            <span className="text-sm text-ink-muted">$XX/yr</span>
+        <SettingsRow label="Plan">
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-semibold text-ink">{planLabel}</span>
+            <span className="text-sm text-ink-muted">{priceLabel}</span>
+            {isTrialing && (
+              <span className="text-xs font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                Trial
+              </span>
+            )}
           </div>
-          <div className="flex gap-3 mt-4">
-            <button className="px-4 py-2 text-sm text-ink-secondary border border-border rounded-xl hover:bg-surface-alt transition-colors">
-              View features
-            </button>
-            <button onMouseMove={onMouseMove} className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
-              <span className="relative z-[2]">Manage subscription</span>
-            </button>
-          </div>
-        </div>
-      </SettingsCard>
+        </SettingsRow>
 
-      <SettingsCard title="Collaborate">
-        <div className="px-5 py-5">
-          <h3 className="text-sm font-medium text-ink mb-1">Use Anna with your team</h3>
-          <p className="text-xs text-ink-muted mb-4">Share dictionaries, snippets, and more</p>
-          <button onMouseMove={onMouseMove} className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all">
-            <span className="relative z-[2]">Invite team</span>
-          </button>
-        </div>
+        {isFree && (
+          <SettingsRow label="Words this week">
+            <div className="flex items-center gap-3">
+              <div className="w-32 h-2 rounded-full bg-surface-alt overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-500"
+                  style={{ width: `${Math.min((weeklyWords / 4000) * 100, 100)}%` }}
+                />
+              </div>
+              <span className="text-sm text-ink-muted">
+                {weeklyWords.toLocaleString()} / 4,000
+              </span>
+            </div>
+          </SettingsRow>
+        )}
+
+        {!isFree && sub.currentPeriodEnd && (
+          <SettingsRow label={sub.cancelAtPeriodEnd ? 'Access until' : 'Next renewal'}>
+            <span className="text-sm text-ink-secondary">
+              {formatDate(sub.currentPeriodEnd)}
+            </span>
+          </SettingsRow>
+        )}
+
+        {isTrialing && sub.trialEnd && (
+          <SettingsRow label="Trial ends">
+            <span className="text-sm text-ink-secondary">{formatDate(sub.trialEnd)}</span>
+          </SettingsRow>
+        )}
+
+        {sub.cancelAtPeriodEnd && (
+          <SettingsRow label="Status">
+            <span className="text-sm text-accent-red">Cancels at end of period</span>
+          </SettingsRow>
+        )}
       </SettingsCard>
 
       <div className="flex items-center justify-between px-1">
-        <button className="text-xs text-primary hover:underline">Subscription FAQ</button>
-        <button className="text-xs text-ink-muted hover:text-ink">Questions? Get in touch</button>
+        {isFree ? (
+          <button
+            onClick={() => window.annaAPI.openUpgrade()}
+            className="text-sm text-primary font-medium hover:underline"
+          >
+            Upgrade to Pro
+          </button>
+        ) : (
+          <button
+            onClick={() => window.annaAPI.openBillingPortal()}
+            className="text-sm text-primary hover:underline"
+          >
+            Manage subscription
+          </button>
+        )}
+        <button
+          onClick={() => window.annaAPI.openWeb('pricing')}
+          className="text-xs text-ink-muted hover:text-ink"
+        >
+          View pricing
+        </button>
       </div>
     </div>
   )
