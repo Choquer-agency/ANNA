@@ -95,42 +95,20 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 // ── Section ──
 
-export function LiveUsersSection() {
-  const VISIBLE_COUNT_DESKTOP = 14
-  const VISIBLE_COUNT_MOBILE = 8
+const VISIBLE_COUNT = 9
 
-  const [visibleCount, setVisibleCount] = useState(VISIBLE_COUNT_DESKTOP)
+export function LiveUsersSection() {
   const [visibleUsers, setVisibleUsers] = useState(() =>
-    shuffleArray(MOCK_USERS).slice(0, VISIBLE_COUNT_DESKTOP)
+    shuffleArray(MOCK_USERS).slice(0, VISIBLE_COUNT)
   )
   const [pool, setPool] = useState(() => {
-    const initial = shuffleArray(MOCK_USERS).slice(0, VISIBLE_COUNT_DESKTOP)
+    const initial = shuffleArray(MOCK_USERS).slice(0, VISIBLE_COUNT)
     const ids = new Set(initial.map((u) => u.id))
     return MOCK_USERS.filter((u) => !ids.has(u.id))
   })
-
-  // Responsive: detect mobile
-  useEffect(() => {
-    const mql = window.matchMedia('(min-width: 640px)')
-    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
-      setVisibleCount(e.matches ? VISIBLE_COUNT_DESKTOP : VISIBLE_COUNT_MOBILE)
-    }
-    handler(mql)
-    mql.addEventListener('change', handler)
-    return () => mql.removeEventListener('change', handler)
-  }, [])
-
-  // Trim visible list if screen shrinks
-  useEffect(() => {
-    setVisibleUsers((prev) => {
-      if (prev.length > visibleCount) {
-        const removed = prev.slice(visibleCount)
-        setPool((p) => [...p, ...removed])
-        return prev.slice(0, visibleCount)
-      }
-      return prev
-    })
-  }, [visibleCount])
+  const [extraCount, setExtraCount] = useState(
+    () => MOCK_USERS.length - VISIBLE_COUNT
+  )
 
   // Rotate one user every 2-4 seconds
   const rotateUser = useCallback(() => {
@@ -154,7 +132,25 @@ export function LiveUsersSection() {
     return () => clearInterval(interval)
   }, [rotateUser])
 
-  const remainingCount = MOCK_USERS.length - visibleUsers.length
+  // Fluctuate the "+X more" counter every 15-30 seconds
+  useEffect(() => {
+    const tick = () => {
+      setExtraCount((prev) => {
+        const delta = Math.random() > 0.5 ? 1 : -1
+        const next = prev + delta * (Math.floor(Math.random() * 3) + 1)
+        return Math.max(12, Math.min(45, next))
+      })
+    }
+    const schedule = () => {
+      const delay = 15000 + Math.random() * 15000
+      return setTimeout(() => {
+        tick()
+        timerRef = schedule()
+      }, delay)
+    }
+    let timerRef = schedule()
+    return () => clearTimeout(timerRef)
+  }, [])
 
   return (
     <section className="section-py-sm overflow-hidden">
@@ -177,9 +173,9 @@ export function LiveUsersSection() {
           </div>
         </FadeIn>
 
-        {/* Avatar grid */}
+        {/* Single row of 9 avatars */}
         <FadeIn delay={0.15}>
-          <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-6 max-w-[700px] mx-auto">
+          <div className="flex items-center justify-center gap-5 sm:gap-6">
             <AnimatePresence mode="popLayout">
               {visibleUsers.map((user) => (
                 <AvatarBubble key={user.id} user={user} />
@@ -189,13 +185,19 @@ export function LiveUsersSection() {
         </FadeIn>
 
         {/* Counter */}
-        {remainingCount > 0 && (
-          <FadeIn delay={0.3}>
-            <p className="text-center mt-8 text-ink-muted text-sm">
-              +{remainingCount} more using Anna right now
-            </p>
-          </FadeIn>
-        )}
+        <FadeIn delay={0.3}>
+          <p className="text-center mt-8 text-ink-muted text-sm">
+            <motion.span
+              key={extraCount}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              +{extraCount}
+            </motion.span>
+            {' '}more using Anna right now
+          </p>
+        </FadeIn>
       </div>
     </section>
   )
