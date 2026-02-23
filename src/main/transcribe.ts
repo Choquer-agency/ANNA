@@ -10,14 +10,22 @@ import type Langfuse from 'langfuse'
 // Load the platform-specific native whisper binary directly.
 // We bypass @fugood/whisper.node's binding.js because its dynamic import()
 // pattern fails to resolve inside Electron's asar archive.
-function loadWhisperNative(): { WhisperContext: new (opts: { filePath: string; useGpu?: boolean }) => WhisperContext } {
+//
+// Lazy-loaded to avoid crashing the app at startup on older macOS versions
+// where the native binary may be incompatible (e.g. libc++ symbol mismatches).
+type WhisperNative = { WhisperContext: new (opts: { filePath: string; useGpu?: boolean }) => WhisperContext }
+let _whisperNative: WhisperNative | null = null
+
+function loadWhisperNative(): WhisperNative {
+  if (_whisperNative) return _whisperNative
+
   const pkg = `@fugood/node-whisper-${process.platform}-${process.arch}`
 
   // 1. Standard require (works in development)
-  try { return require(pkg) } catch {}
+  try { _whisperNative = require(pkg); return _whisperNative! } catch {}
 
   // 2. Explicit .node file resolution
-  try { return require(require.resolve(`${pkg}/index.node`)) } catch {}
+  try { _whisperNative = require(require.resolve(`${pkg}/index.node`)); return _whisperNative! } catch {}
 
   // 3. Direct path to app.asar.unpacked (packaged app fallback)
   try {
@@ -26,15 +34,14 @@ function loadWhisperNative(): { WhisperContext: new (opts: { filePath: string; u
       'app.asar.unpacked', 'node_modules', '@fugood',
       `node-whisper-${process.platform}-${process.arch}`, 'index.node'
     )
-    return require(unpackedPath)
+    _whisperNative = require(unpackedPath)
+    return _whisperNative!
   } catch (err) {
     throw new Error(
       `Failed to load whisper native module for ${process.platform}-${process.arch}: ${err}`
     )
   }
 }
-
-const whisperNative = loadWhisperNative()
 
 const MODEL_NAME = 'ggml-base.bin'
 const MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_NAME}`
@@ -117,6 +124,8 @@ async function getContext(): Promise<WhisperContext> {
   const useGpu = process.arch === 'arm64'
   console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}, GPU: ${useGpu}`)
   console.log(`[transcribe] Loading whisper model from ${modelPath}...`)
+
+  const whisperNative = loadWhisperNative()
 
   // Init whisper with timeout — prevents indefinite hangs
   function initWithTimeout(opts: { filePath: string; useGpu: boolean }): Promise<WhisperContext> {

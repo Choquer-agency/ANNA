@@ -6,7 +6,7 @@
 
 set -e
 
-WHISPER_VERSION="1.0.16"
+WHISPER_VERSION="1.0.10"
 
 install_if_missing() {
   local pkg_name="$1"
