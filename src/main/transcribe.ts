@@ -11,6 +11,8 @@ const MODEL_NAME = 'ggml-base.bin'
 const MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_NAME}`
 const MODEL_MIN_SIZE = 147_000_000 // actual size is ~148MB, anything under is corrupt/partial
 
+const INIT_TIMEOUT_MS = 30_000
+
 let whisperContext: WhisperContext | null = null
 
 function getModelDir(): string {
@@ -87,9 +89,19 @@ async function getContext(): Promise<WhisperContext> {
   console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}, GPU: ${useGpu}`)
   console.log(`[transcribe] Loading whisper model from ${modelPath}...`)
 
+  // initWhisper with timeout — prevents indefinite hangs
+  function initWithTimeout(opts: { filePath: string; useGpu: boolean }): Promise<WhisperContext> {
+    return Promise.race([
+      initWhisper(opts),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Whisper initialization timed out after 30s')), INIT_TIMEOUT_MS)
+      )
+    ])
+  }
+
   // Try with GPU first, fall back to CPU if initialization fails
   try {
-    whisperContext = await initWhisper({
+    whisperContext = await initWithTimeout({
       filePath: modelPath,
       useGpu,
     })
@@ -99,7 +111,7 @@ async function getContext(): Promise<WhisperContext> {
     if (useGpu) {
       console.warn(`[transcribe] GPU init failed, retrying with CPU only:`, err)
       try {
-        whisperContext = await initWhisper({
+        whisperContext = await initWithTimeout({
           filePath: modelPath,
           useGpu: false,
         })

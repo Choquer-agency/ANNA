@@ -2,8 +2,33 @@
 process.stdout?.on('error', (err) => { if ((err as NodeJS.ErrnoException).code !== 'EPIPE') throw err })
 process.stderr?.on('error', (err) => { if ((err as NodeJS.ErrnoException).code !== 'EPIPE') throw err })
 
+// Global crash handlers — catch native module crashes and unhandled errors
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH] Uncaught exception:', err)
+  try {
+    const { appendFileSync } = require('fs')
+    const { join } = require('path')
+    const { app: elApp } = require('electron')
+    const crashPath = join(elApp.getPath('userData'), 'crash.log')
+    const entry = `${new Date().toISOString()} | uncaughtException | ${err.stack || err.message}\n`
+    appendFileSync(crashPath, entry)
+  } catch { /* best-effort logging */ }
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[CRASH] Unhandled rejection:', reason)
+  try {
+    const { appendFileSync } = require('fs')
+    const { join } = require('path')
+    const { app: elApp } = require('electron')
+    const crashPath = join(elApp.getPath('userData'), 'crash.log')
+    const entry = `${new Date().toISOString()} | unhandledRejection | ${reason}\n`
+    appendFileSync(crashPath, entry)
+  } catch { /* best-effort logging */ }
+})
+
 import { config } from 'dotenv'
-import { app, BrowserWindow, ipcMain, dialog, nativeImage, systemPreferences } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, systemPreferences, utilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { existsSync, unlinkSync, copyFileSync, readFileSync } from 'fs'
@@ -180,6 +205,15 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  // Log child/renderer process crashes
+  app.on('child-process-gone', (_event, details) => {
+    console.error('[CRASH] Child process gone:', details.type, details.reason)
+  })
+
+  app.on('render-process-gone', (_event, _webContents, details) => {
+    console.error('[CRASH] Render process gone:', details.reason)
+  })
+
   // Set dock icon in dev mode (production uses the bundled .icns from the app bundle)
   if (process.platform === 'darwin' && is.dev) {
     const iconPath = join(__dirname, '../../build/icon.icns')
@@ -195,6 +229,29 @@ app.whenReady().then(async () => {
   }
 
   initDB()
+
+  // Pre-validate whisper native module in a child process.
+  // If the native binary segfaults on this macOS version, the child dies
+  // and we warn the user instead of crashing on first dictation.
+  try {
+    const whisperCheck = utilityProcess.fork(join(__dirname, 'whisper-check.js'))
+    whisperCheck.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`[whisper-check] Native module validation failed (exit code ${code})`)
+        dialog.showMessageBox({
+          type: 'warning',
+          title: 'Compatibility Notice',
+          message: 'Anna may not work correctly on this macOS version.',
+          detail: `Voice dictation requires a compatible macOS version. Please update to the latest macOS for the best experience.\n\nCurrent: macOS ${process.getSystemVersion()}`,
+          buttons: ['OK']
+        })
+      } else {
+        console.log('[whisper-check] Native module validation passed')
+      }
+    })
+  } catch (err) {
+    console.error('[whisper-check] Failed to spawn validation process:', err)
+  }
 
   // Generate device_id for anonymous analytics tracking before auth
   if (!getSetting('device_id')) {

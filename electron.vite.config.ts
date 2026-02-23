@@ -10,6 +10,14 @@ config({ path: resolve(__dirname, '.env') })
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          'whisper-check': resolve(__dirname, 'src/main/whisper-check.ts')
+        }
+      }
+    },
     define: {
       'process.env.CONVEX_URL': JSON.stringify(process.env.CONVEX_URL),
       'process.env.ANTHROPIC_API_KEY': JSON.stringify(process.env.ANTHROPIC_API_KEY),

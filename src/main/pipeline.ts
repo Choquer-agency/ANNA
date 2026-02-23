@@ -445,6 +445,12 @@ async function runPipeline(
       updateSession(session.id, { status: 'failed', error: 'Processing timed out — please retry' })
       sendError('Processing timed out')
       trackMainEvent('dictation_error', { error_type: 'timeout' })
+    } else {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      console.error('[pipeline] Unexpected error:', errorMsg)
+      updateSession(session.id, { status: 'failed', error: errorMsg })
+      sendError(errorMsg)
+      trackMainEvent('dictation_error', { error_type: errorMsg })
     }
   } finally {
     if (slowNoticeTimeout) clearTimeout(slowNoticeTimeout)
