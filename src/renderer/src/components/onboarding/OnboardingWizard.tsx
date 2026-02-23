@@ -11,7 +11,6 @@ const TOTAL_STEPS = 2
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps): React.JSX.Element {
   const [step, setStep] = useState(0)
-  const [needsRestart, setNeedsRestart] = useState(false)
   const tracked = useRef(false)
 
   useEffect(() => {
@@ -21,8 +20,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): React.J
     track('onboarding_step_viewed', { step: 'permissions', step_number: 0 })
   }, [])
 
-  function handlePermissionsNext(screenRecordingNewlyGranted: boolean): void {
-    setNeedsRestart(screenRecordingNewlyGranted)
+  function handlePermissionsNext(): void {
     setStep((s) => {
       const nextStep = Math.min(s + 1, TOTAL_STEPS - 1)
       const stepNames = ['permissions', 'test_dictation']
@@ -31,22 +29,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps): React.J
     })
   }
 
-  function handleFinalComplete(): void {
-    // onboarding_completed is already set by TestDictationStep before this fires
-    if (needsRestart) {
-      track('app_restarted_for_screen_recording')
-      window.annaAPI.relaunchApp()
-    } else {
-      onComplete()
-    }
-  }
-
   function renderStep(): React.JSX.Element {
     switch (step) {
       case 0:
         return <PermissionsStep onNext={handlePermissionsNext} />
       case 1:
-        return <TestDictationStep onComplete={handleFinalComplete} needsRestart={needsRestart} />
+        return <TestDictationStep onComplete={onComplete} />
       default:
         return <PermissionsStep onNext={handlePermissionsNext} />
     }

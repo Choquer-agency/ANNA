@@ -54,7 +54,6 @@ import { createRecordingIndicatorWindow, destroyRecordingIndicator, sendHotkeyIn
 import { shutdownLangfuse } from './langfuse'
 import { trackMainEvent, shutdownPostHog } from './analytics'
 import { probeAccessibility } from './accessibilityProbe'
-import { getActiveWindow } from './activeWindow'
 import { createTray, destroyTray } from './tray'
 import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex } from './convex'
 import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
@@ -631,46 +630,7 @@ app.whenReady().then(async () => {
     return granted
   })
 
-  // System: screen recording
-  ipcMain.handle('system:check-screen-recording', () => {
-    return systemPreferences.getMediaAccessStatus('screen')
-  })
-
-  ipcMain.handle('system:trigger-screen-recording', async () => {
-    try {
-      await getActiveWindow()
-    } catch {
-      const { shell } = require('electron')
-      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
-    }
-  })
-
-  // System: System Events automation (for pasting via osascript)
-  ipcMain.handle('system:check-system-events', async () => {
-    const { execFile } = require('child_process')
-    const { promisify } = require('util')
-    const execFileAsync = promisify(execFile)
-    try {
-      await execFileAsync('osascript', ['-e', 'tell application "System Events" to return ""'], { timeout: 3000 })
-      return true
-    } catch {
-      return false
-    }
-  })
-
-  ipcMain.handle('system:trigger-system-events', async () => {
-    const { execFile } = require('child_process')
-    const { promisify } = require('util')
-    const execFileAsync = promisify(execFile)
-    try {
-      await execFileAsync('osascript', ['-e', 'tell application "System Events" to return ""'], { timeout: 10000 })
-      return true
-    } catch {
-      return false
-    }
-  })
-
-  // App relaunch (for permission changes that require restart)
+  // App relaunch
   ipcMain.handle('system:relaunch-app', () => {
     app.relaunch()
     app.exit(0)

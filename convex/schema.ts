@@ -66,6 +66,7 @@ export default defineSchema({
   // ─── Stripe / Subscriptions ────────────────────────────────────────────
   subscriptions: defineTable({
     userId: v.string(),
+    email: v.optional(v.string()),
     stripeCustomerId: v.string(),
     stripeSubscriptionId: v.optional(v.string()), // null for lifetime (one-time payment)
     stripePriceId: v.string(),

@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Mic, RotateCcw, MousePointerClick, RefreshCw } from 'lucide-react'
+import { Mic, RotateCcw, MousePointerClick } from 'lucide-react'
 import type { PipelineStatus } from '../../types'
 import { usePlasmaHover } from '../../hooks/usePlasmaHover'
 import { track } from '../../lib/analytics'
 
 interface TestDictationStepProps {
   onComplete: () => void
-  needsRestart?: boolean
 }
 
 function parseHotkeyLabel(hk: string): string {
@@ -23,7 +22,7 @@ function parseHotkeyLabel(hk: string): string {
   }).join(' ')
 }
 
-export function TestDictationStep({ onComplete, needsRestart }: TestDictationStepProps): React.JSX.Element {
+export function TestDictationStep({ onComplete }: TestDictationStepProps): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
   const [status, setStatus] = useState<string>('idle')
   const [result, setResult] = useState<string | null>(null)
@@ -93,16 +92,6 @@ export function TestDictationStep({ onComplete, needsRestart }: TestDictationSte
       <p className="text-ink-muted text-sm mb-5">
         Let&apos;s try it out! Follow the steps below.
       </p>
-
-      {/* Restart notice */}
-      {needsRestart && (
-        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-5">
-          <RefreshCw size={16} className="text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700 leading-relaxed">
-            Anna will restart after setup to activate Screen Recording.
-          </p>
-        </div>
-      )}
 
       {/* Tip: click where you want text to go */}
       <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/15 mb-5">
@@ -211,9 +200,7 @@ export function TestDictationStep({ onComplete, needsRestart }: TestDictationSte
           onMouseMove={onMouseMove}
           className="plasma-hover-light flex-1 bg-primary text-white font-semibold py-3 rounded-full transition-colors cursor-pointer shadow-soft"
         >
-          <span className="relative z-[2]">
-            {needsRestart ? 'Restart & Start Using Anna' : 'Start Using Anna'}
-          </span>
+          <span className="relative z-[2]">Start Using Anna</span>
         </button>
       </div>
     </div>

@@ -339,6 +339,29 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes lifetime-border-rotate {
+  0% { --lifetime-angle: 0deg; }
+  100% { --lifetime-angle: 360deg; }
+}
+
+@property --lifetime-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.lifetime-gradient-border {
+  animation: lifetime-border-rotate 4s linear infinite;
+  background: conic-gradient(
+    from var(--lifetime-angle),
+    #FF9E19 0%,
+    #FFEBD0 25%,
+    #EBC1FF 50%,
+    #FFEBD0 75%,
+    #FF9E19 100%
+  );
+}
+
 /* ─── Plasma hover effect ─── */
 .plasma-hover {
   position: relative;

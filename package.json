@@ -12,7 +12,8 @@
     "rebuild": "npx @electron/rebuild -f -w better-sqlite3",
     "build:fn-helper": "bash scripts/build-fn-helper.sh",
     "build:accessibility-probe": "bash scripts/build-accessibility-probe.sh",
-    "build:natives": "npm run build:fn-helper && npm run build:accessibility-probe",
+    "build:anna-helper": "bash scripts/build-anna-helper.sh",
+    "build:natives": "npm run build:fn-helper && npm run build:accessibility-probe && npm run build:anna-helper",
     "install:cross-arch": "bash scripts/install-cross-arch.sh",
     "build:mac": "npm run install:cross-arch && npm run build:natives && electron-vite build && electron-builder --mac --config",
     "build:mac:signed": "npm run install:cross-arch && npm run build:natives && electron-vite build && electron-builder --mac --config",
@@ -88,6 +89,10 @@
         "to": "accessibility-probe"
       },
       {
+        "from": "resources/anna-helper",
+        "to": "anna-helper"
+      },
+      {
         "from": "resources/sounds",
         "to": "sounds"
       }
@@ -103,7 +108,6 @@
     "@auth/core": "^0.37.4",
     "@convex-dev/auth": "^0.0.90",
     "@fugood/whisper.node": "^1.0.16",
-    "active-win": "^8.1.0",
     "better-sqlite3": "^11.0.0",
     "convex": "^1.31.7",
     "dotenv": "^16.4.0",

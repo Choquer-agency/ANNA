@@ -67,11 +67,7 @@ contextBridge.exposeInMainWorld('annaAPI', {
   openAccessibilitySettings: (): Promise<void> => ipcRenderer.invoke('system:open-accessibility-settings'),
   checkAccessibility: (): Promise<boolean> => ipcRenderer.invoke('system:check-accessibility'),
 
-  // System: screen recording + system events + relaunch
-  checkScreenRecording: (): Promise<string> => ipcRenderer.invoke('system:check-screen-recording'),
-  triggerScreenRecording: (): Promise<void> => ipcRenderer.invoke('system:trigger-screen-recording'),
-  checkSystemEvents: (): Promise<boolean> => ipcRenderer.invoke('system:check-system-events'),
-  triggerSystemEvents: (): Promise<boolean> => ipcRenderer.invoke('system:trigger-system-events'),
+  // System: relaunch
   relaunchApp: (): Promise<void> => ipcRenderer.invoke('system:relaunch-app'),
 
   // Convex Cloud Sync

@@ -75,11 +75,7 @@ declare global {
       openAccessibilitySettings: () => Promise<void>
       checkAccessibility: () => Promise<boolean>
 
-      // System: screen recording + system events + relaunch
-      checkScreenRecording: () => Promise<string>
-      triggerScreenRecording: () => Promise<void>
-      checkSystemEvents: () => Promise<boolean>
-      triggerSystemEvents: () => Promise<boolean>
+      // System: relaunch
       relaunchApp: () => Promise<void>
 
       // Convex Cloud Sync

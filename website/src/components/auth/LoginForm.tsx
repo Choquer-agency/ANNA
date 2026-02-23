@@ -25,10 +25,14 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingCheckout, setLoadingCheckout] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const redirectParam = searchParams.get('redirect')
 
   const getRedirectTo = () => {
     if (isElectron) return '/electron-callback'
+    if (redirectParam) return redirectParam
     return '/dashboard'
   }
 
@@ -38,21 +42,36 @@ export function LoginForm() {
     setError(null)
 
     try {
+      const pending = sessionStorage.getItem('pendingCheckout')
       const redirectTo = getRedirectTo()
-      const result = await signIn('password', {
+
+      await signIn('password', {
         email,
         password,
         flow: 'signIn',
         redirectTo,
       })
 
-      if (result?.redirect) {
-        window.location.href = result.redirect.toString()
-      } else if (result?.signingIn) {
-        window.location.href = redirectTo
-      } else {
-        window.location.href = redirectTo
+      // If there's a pending checkout, go straight to Stripe
+      if (pending) {
+        sessionStorage.removeItem('pendingCheckout')
+        const { plan, interval } = JSON.parse(pending)
+        setLoading(false)
+        setLoadingCheckout(true)
+
+        const res = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan, interval, email }),
+        })
+        const data = await res.json()
+        if (data.url) {
+          window.location.href = data.url
+          return
+        }
       }
+
+      window.location.href = redirectTo
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed. Please check your credentials.')
       setLoading(false)
@@ -135,7 +154,7 @@ export function LoginForm() {
             onMouseMove={onMouseMove}
             className="w-full inline-flex items-center justify-center gap-2 bg-primary text-white py-3.5 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_20px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 cursor-pointer group disabled:opacity-60 mt-2"
           >
-            <span className="relative z-[2]">{loading ? 'Signing in...' : 'Sign in'}</span>
+            <span className="relative z-[2]">{loadingCheckout ? 'Redirecting to checkout...' : loading ? 'Signing in...' : 'Sign in'}</span>
             {!loading && <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />}
           </button>
         </form>
@@ -177,7 +196,7 @@ export function LoginForm() {
 
         <p className="mt-8 text-center text-sm text-ink-muted">
           Don&apos;t have an account?{' '}
-          <a href={`/signup${isElectron ? '?electron_redirect=true' : ''}`} className="text-primary font-semibold hover:underline transition-colors duration-300">
+          <a href={`/signup${isElectron ? '?electron_redirect=true' : redirectParam ? `?redirect=${encodeURIComponent(redirectParam)}` : ''}`} className="text-primary font-semibold hover:underline transition-colors duration-300">
             Sign up
           </a>
         </p>

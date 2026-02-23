@@ -3,9 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ArrowRight, X, Infinity } from 'lucide-react'
-import { useAction } from 'convex/react'
 import { useConvexAuth } from 'convex/react'
-import { api } from '@convex/_generated/api'
 import { fadeInUp } from '@/lib/animations'
 import type { PricingTier } from '@/lib/constants'
 import { PLANS } from '@shared/pricing'
@@ -200,25 +198,24 @@ function ContactModal({ open, onClose }: { open: boolean; onClose: () => void })
 function LifetimeCardContent() {
   const { onMouseMove } = usePlasmaHover()
   const { isAuthenticated } = useConvexAuth()
-  const createCheckout = useAction(api.stripe.createCheckoutSession)
   const [loading, setLoading] = useState(false)
   const lifetime = PLANS.lifetime
 
   async function handleCheckout() {
     if (!isAuthenticated) {
       sessionStorage.setItem('pendingCheckout', JSON.stringify({ plan: 'lifetime', interval: 'lifetime' }))
-      window.location.href = '/signup?redirect=/pricing'
+      window.location.href = '/signup?redirect=/checkout'
       return
     }
     setLoading(true)
     try {
-      const result = await createCheckout({
-        priceId: lifetime.stripePriceIds!.lifetime!,
-        successUrl: `${window.location.origin}/pricing?success=true`,
-        cancelUrl: `${window.location.origin}/pricing`,
-        isLifetime: true,
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'lifetime', interval: 'lifetime' }),
       })
-      if (result.url) window.location.href = result.url
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
     } catch (err) {
       console.error('Checkout failed:', err)
     } finally {
@@ -232,36 +229,9 @@ function LifetimeCardContent() {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-      className="relative flex flex-col rounded-[20px] h-full bg-white border border-white shadow-[0_0_40px_rgba(255,158,25,0.08)] overflow-hidden"
+      className="lifetime-gradient-border rounded-[22px] p-[2px] h-full"
     >
-      {/* Blob background — layered ovals like the reference image */}
-      {/* Top orange blob — 90% width, half off the card */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 -top-[40px] w-[90%] h-[100px] rounded-[50%] pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at center, #FF9E19 0%, rgba(255,158,25,0.4) 60%, transparent 100%)' }}
-      />
-      {/* Larger white blob behind */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 -top-[20px] w-[110%] h-[140px] rounded-[50%] pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 50%, transparent 100%)' }}
-      />
-      {/* Big pink blob below */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 top-[30px] w-[120%] h-[180px] rounded-[50%] pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(252,234,255,0.7) 0%, rgba(252,234,255,0.3) 50%, transparent 100%)' }}
-      />
-      {/* Smaller orange blob — left */}
-      <div
-        className="absolute -left-[10%] top-[60px] w-[50%] h-[100px] rounded-[50%] pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(255,158,25,0.35) 0%, transparent 70%)' }}
-      />
-      {/* Smaller orange blob — right */}
-      <div
-        className="absolute -right-[10%] top-[60px] w-[50%] h-[100px] rounded-[50%] pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(255,158,25,0.35) 0%, transparent 70%)' }}
-      />
-
-      <div className="relative z-10 flex flex-col h-full p-6 md:p-7">
+      <div className="flex flex-col rounded-[20px] h-full bg-white p-6 md:p-7">
         {/* Icon + Title + Limited badge */}
         <div className="flex items-center gap-2 mb-3">
           <div className="shrink-0 text-primary">
@@ -289,8 +259,8 @@ function LifetimeCardContent() {
           </div>
         </div>
 
-        {/* Features — no card wrapper, transparent so blobs show through */}
-        <ul className="space-y-3 mb-4 flex-1">
+        {/* Features */}
+        <ul className="space-y-3 mb-4">
           {lifetime.features.map((feature) => (
             <li key={feature} className="flex items-start gap-2.5">
               <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${lifetimeStyles.checkBg}`}>
@@ -305,6 +275,9 @@ function LifetimeCardContent() {
 
         {/* Bottom sentence */}
         <p className="text-xs text-ink-muted mb-3">{lifetime.description}</p>
+
+        {/* Spacer to push button to bottom */}
+        <div className="flex-1" />
 
         {/* CTA Button */}
         <button
@@ -324,7 +297,6 @@ function LifetimeCardContent() {
 export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardProps) {
   const { onMouseMove } = usePlasmaHover()
   const { isAuthenticated } = useConvexAuth()
-  const createCheckout = useAction(api.stripe.createCheckoutSession)
   const [contactOpen, setContactOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const price = tier.price ? (isAnnual ? tier.price.annual : tier.price.monthly) : null
@@ -334,22 +306,21 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
   const isPro = tier.highlighted
 
   async function handleProCheckout() {
+    const interval = isAnnual ? 'annual' : 'monthly'
     if (!isAuthenticated) {
-      sessionStorage.setItem('pendingCheckout', JSON.stringify({ plan: 'pro', interval: isAnnual ? 'annual' : 'monthly' }))
-      window.location.href = '/signup?redirect=/pricing'
+      sessionStorage.setItem('pendingCheckout', JSON.stringify({ plan: 'pro', interval }))
+      window.location.href = '/signup?redirect=/checkout'
       return
     }
     setLoading(true)
     try {
-      const priceId = isAnnual
-        ? PLANS.pro.stripePriceIds!.annual!
-        : PLANS.pro.stripePriceIds!.monthly!
-      const result = await createCheckout({
-        priceId,
-        successUrl: `${window.location.origin}/pricing?success=true`,
-        cancelUrl: `${window.location.origin}/pricing`,
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'pro', interval }),
       })
-      if (result.url) window.location.href = result.url
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
     } catch (err) {
       console.error('Checkout failed:', err)
     } finally {
@@ -360,9 +331,7 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
   // When lifetime is active: middle card becomes lifetime, others blur
   if (isLifetime && isMiddle) {
     return (
-      <AnimatePresence mode="wait">
-        <LifetimeCardContent key="lifetime" />
-      </AnimatePresence>
+      <LifetimeCardContent />
     )
   }
 

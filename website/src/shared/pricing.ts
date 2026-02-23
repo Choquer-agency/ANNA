@@ -1,7 +1,6 @@
 // ─── Shared Pricing Config ─────────────────────────────────────────────────
-// Single source of truth for all Anna pricing data.
-// Imported by both the Electron app and the Next.js website.
-// Website alias: @shared/pricing (configured in website/tsconfig.json + next.config.ts)
+// Vercel build fallback — canonical source is /src/shared/pricing.ts
+// Keep in sync with the root version.
 
 export type PlanId = 'free' | 'pro' | 'lifetime'
 export type BillingInterval = 'monthly' | 'annual' | 'lifetime'

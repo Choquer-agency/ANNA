@@ -49,7 +49,7 @@ export async function refreshSubscription(): Promise<SubscriptionStatus> {
 
   try {
     const client = ensureClient()
-    const sub = await client.query(api.stripe.getSubscription, {})
+    const sub = await client.query(api.subscriptions.getSubscription, {})
 
     cachedStatus = {
       planId: (sub.planId || 'free') as SubscriptionStatus['planId'],
