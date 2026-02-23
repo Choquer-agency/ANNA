@@ -234,36 +234,53 @@ function LifetimeCardContent() {
       transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
       className="relative flex flex-col rounded-[20px] h-full bg-white border border-white shadow-[0_0_40px_rgba(255,158,25,0.08)] overflow-hidden"
     >
-      {/* Top gradient band — orange → white → pink → white fade */}
+      {/* Blob background — layered ovals like the reference image */}
+      {/* Top orange blob — 90% width, half off the card */}
       <div
-        className="absolute inset-x-0 top-0 h-[38%] pointer-events-none"
-        style={{
-          background: 'linear-gradient(180deg, #FF9E19 0%, #FFEBD0 30%, #FFFFFF 50%, #FCEAFF 65%, #FFFFFF 100%)',
-        }}
+        className="absolute left-1/2 -translate-x-1/2 -top-[40px] w-[90%] h-[100px] rounded-[50%] pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, #FF9E19 0%, rgba(255,158,25,0.4) 60%, transparent 100%)' }}
+      />
+      {/* Larger white blob behind */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 -top-[20px] w-[110%] h-[140px] rounded-[50%] pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 50%, transparent 100%)' }}
+      />
+      {/* Big pink blob below */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 top-[30px] w-[120%] h-[180px] rounded-[50%] pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(252,234,255,0.7) 0%, rgba(252,234,255,0.3) 50%, transparent 100%)' }}
+      />
+      {/* Smaller orange blob — left */}
+      <div
+        className="absolute -left-[10%] top-[60px] w-[50%] h-[100px] rounded-[50%] pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(255,158,25,0.35) 0%, transparent 70%)' }}
+      />
+      {/* Smaller orange blob — right */}
+      <div
+        className="absolute -right-[10%] top-[60px] w-[50%] h-[100px] rounded-[50%] pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(255,158,25,0.35) 0%, transparent 70%)' }}
       />
 
       <div className="relative z-10 flex flex-col h-full p-6 md:p-7">
-        {/* "Limited" label above title */}
-        <span className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-primary mb-3">
-          Limited
-        </span>
-
-        {/* Icon + Title */}
-        <div className="flex items-center gap-2 mb-4">
+        {/* Icon + Title + Limited badge */}
+        <div className="flex items-center gap-2 mb-3">
           <div className="shrink-0 text-primary">
             <Infinity className="w-5 h-5" />
           </div>
           <h3 className="text-2xl font-bold text-ink">{lifetime.name}</h3>
+          <span className="text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-primary bg-primary-soft px-2 py-0.5 rounded-full">
+            Limited
+          </span>
         </div>
 
         {/* Divider */}
-        <div className={`border-t ${lifetimeStyles.divider} mb-4`} />
+        <div className={`border-t ${lifetimeStyles.divider} mb-3`} />
 
         {/* Tagline */}
-        <p className="text-sm text-ink-muted mb-4">{lifetime.tagline}</p>
+        <p className="text-sm text-ink-muted mb-3">{lifetime.tagline}</p>
 
         {/* Price */}
-        <div className="mb-5">
+        <div className="mb-4">
           <div className="flex items-baseline gap-1.5">
             <span className="text-[2.75rem] font-extrabold tracking-tight text-ink leading-none">
               $250
@@ -272,24 +289,22 @@ function LifetimeCardContent() {
           </div>
         </div>
 
-        {/* Features card */}
-        <div className="bg-surface-alt/60 rounded-2xl p-5 mb-5 flex-1">
-          <ul className="space-y-3">
-            {lifetime.features.map((feature) => (
-              <li key={feature} className="flex items-start gap-2.5">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${lifetimeStyles.checkBg}`}>
-                  <Check className={`w-3 h-3 ${lifetimeStyles.check}`} strokeWidth={3} />
-                </div>
-                <span className="text-[0.875rem] text-ink-secondary leading-snug">
-                  {feature}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {/* Features — no card wrapper, transparent so blobs show through */}
+        <ul className="space-y-3 mb-4 flex-1">
+          {lifetime.features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2.5">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${lifetimeStyles.checkBg}`}>
+                <Check className={`w-3 h-3 ${lifetimeStyles.check}`} strokeWidth={3} />
+              </div>
+              <span className="text-[0.875rem] text-ink-secondary leading-snug">
+                {feature}
+              </span>
+            </li>
+          ))}
+        </ul>
 
         {/* Bottom sentence */}
-        <p className="text-xs text-ink-muted mb-4">{lifetime.description}</p>
+        <p className="text-xs text-ink-muted mb-3">{lifetime.description}</p>
 
         {/* CTA Button */}
         <button
