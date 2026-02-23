@@ -7,12 +7,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { api } from '@convex/_generated/api'
 import { AnnaLogo } from '@/components/ui/AnnaLogo'
 import { NameStep } from './NameStep'
-import { PlanStep } from './PlanStep'
 import { DownloadStep } from './DownloadStep'
 import { ease } from '@/lib/animations'
 
-const ALL_STEPS = ['name', 'plan', 'download'] as const
-const ELECTRON_STEPS = ['name', 'plan'] as const
+const ALL_STEPS = ['name', 'download'] as const
+const ELECTRON_STEPS = ['name'] as const
 type Step = (typeof ALL_STEPS)[number]
 
 export function OnboardingFlow() {
@@ -27,7 +26,6 @@ export function OnboardingFlow() {
   const [step, setStep] = useState<Step>('name')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [selectedPlan, setSelectedPlan] = useState('free')
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -61,7 +59,7 @@ export function OnboardingFlow() {
         consentedAt: new Date().toISOString(),
         registeredAt: new Date().toISOString(),
         platform: 'web',
-        selectedPlan,
+        selectedPlan: 'free',
       })
     } catch {
       // Registration may already exist, continue anyway
@@ -150,14 +148,6 @@ export function OnboardingFlow() {
                 key="name"
                 name={name}
                 onNameChange={setName}
-                onContinue={() => setStep('plan')}
-              />
-            )}
-            {step === 'plan' && (
-              <PlanStep
-                key="plan"
-                selectedPlan={selectedPlan}
-                onPlanChange={setSelectedPlan}
                 onContinue={isElectron ? handleComplete : () => setStep('download')}
               />
             )}
