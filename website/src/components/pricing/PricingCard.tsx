@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ArrowRight, X, Infinity } from 'lucide-react'
+import { useAction } from 'convex/react'
+import { useConvexAuth } from 'convex/react'
+import { api } from '@convex/_generated/api'
 import { fadeInUp } from '@/lib/animations'
 import type { PricingTier } from '@/lib/constants'
 import { PLANS } from '@shared/pricing'
@@ -44,11 +47,11 @@ const accentStyles = {
 
 // Lifetime card accent
 const lifetimeStyles = {
-  card: 'bg-[#1B1B1B]',
-  check: 'text-[#F5E211]',
-  checkBg: 'bg-[#F5E211]/15',
-  button: 'bg-[#F5E211] text-[#1B1B1B] hover:bg-[#E8D60F] hover:shadow-[0_0_30px_rgba(245,226,17,0.3)]',
-  divider: 'border-white/10',
+  card: 'bg-white',
+  check: 'text-primary',
+  checkBg: 'bg-primary-soft',
+  button: 'bg-primary text-white hover:bg-primary-hover hover:shadow-[0_0_24px_rgba(255,158,25,0.35)]',
+  divider: 'border-border',
 }
 
 function ContactModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -196,7 +199,32 @@ function ContactModal({ open, onClose }: { open: boolean; onClose: () => void })
 
 function LifetimeCardContent() {
   const { onMouseMove } = usePlasmaHover()
+  const { isAuthenticated } = useConvexAuth()
+  const createCheckout = useAction(api.stripe.createCheckoutSession)
+  const [loading, setLoading] = useState(false)
   const lifetime = PLANS.lifetime
+
+  async function handleCheckout() {
+    if (!isAuthenticated) {
+      sessionStorage.setItem('pendingCheckout', JSON.stringify({ plan: 'lifetime', interval: 'lifetime' }))
+      window.location.href = '/signup?redirect=/pricing'
+      return
+    }
+    setLoading(true)
+    try {
+      const result = await createCheckout({
+        priceId: lifetime.stripePriceIds!.lifetime!,
+        successUrl: `${window.location.origin}/pricing?success=true`,
+        cancelUrl: `${window.location.origin}/pricing`,
+        isLifetime: true,
+      })
+      if (result.url) window.location.href = result.url
+    } catch (err) {
+      console.error('Checkout failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <motion.div
@@ -204,74 +232,115 @@ function LifetimeCardContent() {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-      className="relative flex flex-col rounded-[20px] p-6 md:p-7 h-full bg-[#1B1B1B] border border-[#F5E211]/20 shadow-[0_0_40px_rgba(245,226,17,0.08)]"
+      className="relative flex flex-col rounded-[20px] h-full bg-white border border-white shadow-[0_0_40px_rgba(255,158,25,0.08)] overflow-hidden"
     >
-      {/* Icon + Title */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="shrink-0 text-[#F5E211]">
-          <Infinity className="w-5 h-5" />
-        </div>
-        <h3 className="text-2xl font-bold text-white">{lifetime.name}</h3>
-        <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-[#F5E211] bg-[#F5E211]/10 px-2 py-0.5 rounded-full">
-          Limited Time
+      {/* Top gradient band — orange → white → pink → white fade */}
+      <div
+        className="absolute inset-x-0 top-0 h-[38%] pointer-events-none"
+        style={{
+          background: 'linear-gradient(180deg, #FF9E19 0%, #FFEBD0 30%, #FFFFFF 50%, #FCEAFF 65%, #FFFFFF 100%)',
+        }}
+      />
+
+      <div className="relative z-10 flex flex-col h-full p-6 md:p-7">
+        {/* "Limited" label above title */}
+        <span className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-primary mb-3">
+          Limited
         </span>
-      </div>
 
-      {/* Divider */}
-      <div className={`border-t ${lifetimeStyles.divider} mb-4`} />
-
-      {/* Tagline */}
-      <p className="text-sm text-white/60 mb-4">{lifetime.tagline}</p>
-
-      {/* Price */}
-      <div className="mb-5">
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-[2.75rem] font-extrabold tracking-tight text-white leading-none">
-            $250
-          </span>
-          <span className="text-base text-white/40 font-medium">one-time</span>
+        {/* Icon + Title */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="shrink-0 text-primary">
+            <Infinity className="w-5 h-5" />
+          </div>
+          <h3 className="text-2xl font-bold text-ink">{lifetime.name}</h3>
         </div>
+
+        {/* Divider */}
+        <div className={`border-t ${lifetimeStyles.divider} mb-4`} />
+
+        {/* Tagline */}
+        <p className="text-sm text-ink-muted mb-4">{lifetime.tagline}</p>
+
+        {/* Price */}
+        <div className="mb-5">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[2.75rem] font-extrabold tracking-tight text-ink leading-none">
+              $250
+            </span>
+            <span className="text-base text-ink-faint font-medium">one-time</span>
+          </div>
+        </div>
+
+        {/* Features card */}
+        <div className="bg-surface-alt/60 rounded-2xl p-5 mb-5 flex-1">
+          <ul className="space-y-3">
+            {lifetime.features.map((feature) => (
+              <li key={feature} className="flex items-start gap-2.5">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${lifetimeStyles.checkBg}`}>
+                  <Check className={`w-3 h-3 ${lifetimeStyles.check}`} strokeWidth={3} />
+                </div>
+                <span className="text-[0.875rem] text-ink-secondary leading-snug">
+                  {feature}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Bottom sentence */}
+        <p className="text-xs text-ink-muted mb-4">{lifetime.description}</p>
+
+        {/* CTA Button */}
+        <button
+          onClick={handleCheckout}
+          disabled={loading}
+          onMouseMove={onMouseMove}
+          className={`plasma-hover inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-[0.9rem] font-semibold transition-all duration-300 group cursor-pointer disabled:opacity-60 ${lifetimeStyles.button}`}
+        >
+          <span className="relative z-[2]">{loading ? 'Loading...' : lifetime.cta}</span>
+          {!loading && <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />}
+        </button>
       </div>
-
-      {/* Features card */}
-      <div className="bg-white/5 rounded-2xl p-5 mb-5 flex-1">
-        <ul className="space-y-3">
-          {lifetime.features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2.5">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${lifetimeStyles.checkBg}`}>
-                <Check className={`w-3 h-3 ${lifetimeStyles.check}`} strokeWidth={3} />
-              </div>
-              <span className="text-[0.875rem] text-white/70 leading-snug">
-                {feature}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Bottom sentence */}
-      <p className="text-xs text-white/40 mb-4">{lifetime.description}</p>
-
-      {/* CTA Button */}
-      <a
-        href="#"
-        onMouseMove={onMouseMove}
-        className={`plasma-hover inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-[0.9rem] font-semibold transition-all duration-300 group ${lifetimeStyles.button}`}
-      >
-        <span className="relative z-[2]">{lifetime.cta}</span>
-        <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-      </a>
     </motion.div>
   )
 }
 
 export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardProps) {
   const { onMouseMove } = usePlasmaHover()
+  const { isAuthenticated } = useConvexAuth()
+  const createCheckout = useAction(api.stripe.createCheckoutSession)
   const [contactOpen, setContactOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const price = tier.price ? (isAnnual ? tier.price.annual : tier.price.monthly) : null
   const styles = accentStyles[tier.accent]
   const isTeam = tier.price === null
   const isMiddle = index === 1
+  const isPro = tier.highlighted
+
+  async function handleProCheckout() {
+    if (!isAuthenticated) {
+      sessionStorage.setItem('pendingCheckout', JSON.stringify({ plan: 'pro', interval: isAnnual ? 'annual' : 'monthly' }))
+      window.location.href = '/signup?redirect=/pricing'
+      return
+    }
+    setLoading(true)
+    try {
+      const priceId = isAnnual
+        ? PLANS.pro.stripePriceIds!.annual!
+        : PLANS.pro.stripePriceIds!.monthly!
+      const result = await createCheckout({
+        priceId,
+        successUrl: `${window.location.origin}/pricing?success=true`,
+        cancelUrl: `${window.location.origin}/pricing`,
+      })
+      if (result.url) window.location.href = result.url
+    } catch (err) {
+      console.error('Checkout failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // When lifetime is active: middle card becomes lifetime, others blur
   if (isLifetime && isMiddle) {
@@ -387,9 +456,19 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
             <span className="relative z-[2]">{tier.cta}</span>
             <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
           </button>
+        ) : isPro ? (
+          <button
+            onClick={handleProCheckout}
+            disabled={loading}
+            onMouseMove={onMouseMove}
+            className={`plasma-hover inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-[0.9rem] font-semibold transition-all duration-300 group cursor-pointer disabled:opacity-60 ${styles.button}`}
+          >
+            <span className="relative z-[2]">{loading ? 'Loading...' : tier.cta}</span>
+            {!loading && <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />}
+          </button>
         ) : (
           <a
-            href="#"
+            href="/download/mac"
             onMouseMove={onMouseMove}
             className={`plasma-hover inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-[0.9rem] font-semibold transition-all duration-300 group ${styles.button}`}
           >
