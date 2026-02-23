@@ -5,24 +5,30 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { FadeIn } from '@/components/ui/FadeIn'
 
-// ── Mock user pool (40 users, cycling 14 avatars) ──
+// ── Mock user pool (63 unique headshots — never repeat) ──
 
-const AVATARS = [
-  'sarah', 'emily', 'jake', 'priya', 'aisha', 'tomas', 'lena',
-  'daniel', 'rachel', 'ben', 'sofia', 'andres', 'marcus', 'bryce',
-]
-
-const MOCK_USERS = [
+const NAMES = [
   'Sarah K.', 'Emily R.', 'Jake T.', 'Priya M.', 'Aisha L.', 'Tomas G.', 'Lena W.',
   'Daniel P.', 'Rachel S.', 'Ben C.', 'Sofia H.', 'Andres V.', 'Marcus D.', 'Bryce Q.',
   'Olivia N.', 'Ethan B.', 'Maya J.', 'Lucas F.', 'Zoe A.', 'Noah R.', 'Isla M.',
   'Leo H.', 'Chloe T.', 'Kai S.', 'Ava P.', 'Finn D.', 'Mia L.', 'Oscar W.',
   'Luna G.', 'Felix K.', 'Ella V.', 'Max C.', 'Ruby N.', 'Sam B.', 'Iris J.',
-  'Alex F.', 'Jade A.', 'Cole R.', 'Nina M.', 'Ryan H.',
-].map((name, i) => ({
+  'Alex F.', 'Jade A.', 'Cole R.', 'Nina M.', 'Ryan H.', 'Clara S.', 'James W.',
+  'Amara T.', 'Diego L.', 'Harper B.', 'Yuki N.', 'Sasha R.', 'Omar K.', 'Freya D.',
+  'Mateo V.', 'Noor A.', 'Liam G.', 'Aria P.', 'Ravi M.', 'Zara H.', 'Theo C.',
+  'Elise F.', 'Jordan Q.', 'Mika J.', 'Stella E.', 'Dante R.', 'Ivy L.', 'Rowan S.',
+]
+
+// Image filenames: Image.png, Image-2.png through Image-62.png
+const HEADSHOT_FILES = [
+  'Image.png',
+  ...Array.from({ length: 62 }, (_, i) => `Image-${i + 2}.png`),
+]
+
+const MOCK_USERS = HEADSHOT_FILES.map((file, i) => ({
   id: i,
-  name,
-  avatar: `/images/avatars/${AVATARS[i % AVATARS.length]}.jpg`,
+  name: NAMES[i % NAMES.length],
+  avatar: `/images/headshots/${file}`,
 }))
 
 const WAVE_GRADIENT =
