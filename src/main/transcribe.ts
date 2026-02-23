@@ -1,4 +1,4 @@
-import { initWhisper, type WhisperContext } from '@fugood/whisper.node'
+import type { WhisperContext } from '@fugood/whisper.node'
 import { writeFileSync, unlinkSync, existsSync, createWriteStream, mkdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -6,6 +6,35 @@ import { randomUUID } from 'crypto'
 import { app } from 'electron'
 import { get } from 'https'
 import type Langfuse from 'langfuse'
+
+// Load the platform-specific native whisper binary directly.
+// We bypass @fugood/whisper.node's binding.js because its dynamic import()
+// pattern fails to resolve inside Electron's asar archive.
+function loadWhisperNative(): { WhisperContext: new (opts: { filePath: string; useGpu?: boolean }) => WhisperContext } {
+  const pkg = `@fugood/node-whisper-${process.platform}-${process.arch}`
+
+  // 1. Standard require (works in development)
+  try { return require(pkg) } catch {}
+
+  // 2. Explicit .node file resolution
+  try { return require(require.resolve(`${pkg}/index.node`)) } catch {}
+
+  // 3. Direct path to app.asar.unpacked (packaged app fallback)
+  try {
+    const unpackedPath = join(
+      process.resourcesPath ?? '',
+      'app.asar.unpacked', 'node_modules', '@fugood',
+      `node-whisper-${process.platform}-${process.arch}`, 'index.node'
+    )
+    return require(unpackedPath)
+  } catch (err) {
+    throw new Error(
+      `Failed to load whisper native module for ${process.platform}-${process.arch}: ${err}`
+    )
+  }
+}
+
+const whisperNative = loadWhisperNative()
 
 const MODEL_NAME = 'ggml-base.bin'
 const MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_NAME}`
@@ -89,10 +118,10 @@ async function getContext(): Promise<WhisperContext> {
   console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}, GPU: ${useGpu}`)
   console.log(`[transcribe] Loading whisper model from ${modelPath}...`)
 
-  // initWhisper with timeout — prevents indefinite hangs
+  // Init whisper with timeout — prevents indefinite hangs
   function initWithTimeout(opts: { filePath: string; useGpu: boolean }): Promise<WhisperContext> {
     return Promise.race([
-      initWhisper(opts),
+      Promise.resolve(new whisperNative.WhisperContext(opts)),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Whisper initialization timed out after 30s')), INIT_TIMEOUT_MS)
       )
