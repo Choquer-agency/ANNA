@@ -1,0 +1,13 @@
+# Electron app files (not needed for website deploy)
+/node_modules
+/out
+/dist
+/src
+/resources
+/scripts
+/build
+/.github
+/convex
+*.dmg
+*.zip
+*.node

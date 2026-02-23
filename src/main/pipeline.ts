@@ -4,7 +4,8 @@ import { join } from 'path'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { getActiveWindow } from './activeWindow'
 import { startRecording, stopRecording, getRecordingState, getRecordingDuration } from './audio'
-import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions, getStats } from './db'
+import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions, getStats, getWeeklyStats } from './db'
+import { syncWordCount } from './convex'
 import { transcribe } from './transcribe'
 import { processTranscript } from './process'
 import { injectText } from './inject'
@@ -375,13 +376,16 @@ async function runPipeline(
       // Play sound alongside paste (fire-and-forget, no await)
       playDictationStop()
 
+      // Hide indicator BEFORE paste so Anna is not the frontmost app
+      hideRecordingIndicator()
+
       console.time('[pipeline] injectText')
       if (currentPage === 'notes' && mainWindowRef?.isFocused()) {
         mainWindowRef.webContents.send('dictation:append-to-note', final)
       } else {
         const autoPaste = getSetting('auto_paste')
         if (autoPaste !== 'false') {
-          await injectText(final)
+          await injectText(final, activeWin?.bundleId)
         }
       }
       console.timeEnd('[pipeline] injectText')
@@ -410,6 +414,42 @@ async function runPipeline(
           trackMainEvent('milestone_reached', { milestone: String(m) })
           break
         }
+      }
+
+      // Sync word count to Convex (fire-and-forget)
+      syncWordCount(wordCount).catch(() => {})
+
+      // Check if user just crossed a limit threshold (post-dictation)
+      try {
+        const { getSubscriptionStatus } = require('./subscription')
+        const sub = getSubscriptionStatus()
+        if (sub.planId === 'free') {
+          const weekly = getWeeklyStats()
+          if (weekly.isLimitReached) {
+            // User just crossed the limit — next dictation will be blocked
+            mainWindowRef?.webContents.send('paywall:limit-reached-next', {
+              wordCount: weekly.weeklyWords,
+              wordLimit: weekly.wordLimit,
+              periodResetsAt: weekly.periodResetsAt,
+            })
+          } else if (weekly.wordsRemaining <= weekly.wordLimit * 0.05) {
+            mainWindowRef?.webContents.send('paywall:almost-done', {
+              wordCount: weekly.weeklyWords,
+              wordLimit: weekly.wordLimit,
+              wordsRemaining: weekly.wordsRemaining,
+              periodResetsAt: weekly.periodResetsAt,
+            })
+          } else if (weekly.wordsRemaining <= weekly.wordLimit * 0.2) {
+            mainWindowRef?.webContents.send('paywall:approaching-limit', {
+              wordCount: weekly.weeklyWords,
+              wordLimit: weekly.wordLimit,
+              wordsRemaining: weekly.wordsRemaining,
+              periodResetsAt: weekly.periodResetsAt,
+            })
+          }
+        }
+      } catch {
+        // Non-critical — don't fail the pipeline
       }
 
       const completedSession = getSessionById(session.id)
@@ -484,11 +524,33 @@ export async function handleHotkeyToggle(): Promise<void> {
       const { getSubscriptionStatus } = require('./subscription')
       const sub = getSubscriptionStatus()
       if (sub.planId === 'free') {
-        const stats = getStats()
-        if (stats.totalWords >= 4000) {
-          console.log('[pipeline] Free tier word limit reached, showing paywall')
-          mainWindowRef?.webContents.send('paywall:limit-reached')
+        const weekly = getWeeklyStats()
+        if (weekly.isLimitReached) {
+          console.log('[pipeline] Free tier weekly word limit reached, showing paywall')
+          mainWindowRef?.webContents.send('paywall:limit-reached', {
+            wordCount: weekly.weeklyWords,
+            wordLimit: weekly.wordLimit,
+            periodResetsAt: weekly.periodResetsAt,
+          })
           return
+        }
+        // Warn at 95% — "about one dictation left"
+        if (weekly.wordsRemaining <= weekly.wordLimit * 0.05) {
+          mainWindowRef?.webContents.send('paywall:almost-done', {
+            wordCount: weekly.weeklyWords,
+            wordLimit: weekly.wordLimit,
+            wordsRemaining: weekly.wordsRemaining,
+            periodResetsAt: weekly.periodResetsAt,
+          })
+        }
+        // Warn at 80%
+        else if (weekly.wordsRemaining <= weekly.wordLimit * 0.2) {
+          mainWindowRef?.webContents.send('paywall:approaching-limit', {
+            wordCount: weekly.weeklyWords,
+            wordLimit: weekly.wordLimit,
+            wordsRemaining: weekly.wordsRemaining,
+            periodResetsAt: weekly.periodResetsAt,
+          })
         }
       }
     } catch (err) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
+import { PLANS } from '../../../../../shared/pricing'
 
 interface SubStatus {
   planId: 'free' | 'pro' | 'lifetime'
@@ -29,14 +30,12 @@ export function SubscriptionTab(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   const loadData = useCallback(async () => {
-    const [status, stats] = await Promise.all([
+    const [status, usage] = await Promise.all([
       window.annaAPI.getSubscriptionStatus(),
-      window.annaAPI.getStats(),
+      window.annaAPI.getWeeklyUsage(),
     ])
     setSub(status)
-    // Use total words as a rough proxy; weekly tracking would need
-    // a dedicated counter — for now we show total
-    setWeeklyWords(stats.totalWords || 0)
+    setWeeklyWords((usage as any)?.weeklyWords ?? 0)
     setLoaded(true)
   }, [])
 
@@ -83,11 +82,11 @@ export function SubscriptionTab(): React.JSX.Element {
               <div className="w-32 h-2 rounded-full bg-surface-alt overflow-hidden">
                 <div
                   className="h-full rounded-full bg-primary transition-all duration-500"
-                  style={{ width: `${Math.min((weeklyWords / 4000) * 100, 100)}%` }}
+                  style={{ width: `${Math.min((weeklyWords / (PLANS.free.wordLimit ?? 2000)) * 100, 100)}%` }}
                 />
               </div>
               <span className="text-sm text-ink-muted">
-                {weeklyWords.toLocaleString()} / 4,000
+                {weeklyWords.toLocaleString()} / {(PLANS.free.wordLimit ?? 2000).toLocaleString()}
               </span>
             </div>
           </SettingsRow>

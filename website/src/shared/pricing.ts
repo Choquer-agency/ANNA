@@ -34,6 +34,8 @@ export interface PlanDefinition {
   wordLimit: number | null
   /** Word limit reset period */
   wordLimitPeriod?: 'week'
+  /** Day of week the limit resets (e.g. 'monday') */
+  resetDay?: 'monday'
   trial?: TrialConfig
   /** Stripe Price IDs — fill after creating products in Stripe Dashboard */
   stripePriceIds?: {
@@ -50,7 +52,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     tagline: 'Perfect for trying out voice dictation.',
     description: 'Start speaking instead of typing — no commitment required.',
     features: [
-      '4,000 words per week',
+      '2,000 words per week',
       'Basic AI formatting',
       '1 style profile',
       'macOS app',
@@ -62,8 +64,9 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     prices: {
       monthly: { usd: 0, cad: 0 },
     },
-    wordLimit: 4000,
+    wordLimit: 2000,
     wordLimitPeriod: 'week',
+    resetDay: 'monday',
   },
   pro: {
     id: 'pro',

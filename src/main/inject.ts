@@ -17,24 +17,38 @@ function getHelperPath(): string {
   return join(process.resourcesPath, 'anna-helper')
 }
 
-export async function injectText(text: string): Promise<void> {
-  // Save current clipboard
+async function fallbackPaste(): Promise<void> {
+  console.log('[inject] Falling back to AppleScript paste')
+  await execFileAsync(
+    'osascript',
+    ['-e', 'tell application "System Events" to keystroke "v" using command down'],
+    { timeout: 5000 }
+  )
+}
+
+export async function injectText(text: string, targetBundleId?: string): Promise<void> {
   const saved = clipboard.readText()
 
   try {
-    // Write processed text to clipboard
     clipboard.writeText(text)
     await sleep(50)
 
-    // Simulate Cmd+V via CGEvent (only needs Accessibility, not Automation)
-    await execFileAsync(getHelperPath(), ['paste'])
+    const args: string[] = targetBundleId
+      ? ['paste-to', targetBundleId]
+      : ['paste']
+
+    console.log(`[inject] Pasting via anna-helper ${args.join(' ')}`)
+
+    try {
+      await execFileAsync(getHelperPath(), args, { timeout: 5000 })
+    } catch (helperErr) {
+      console.error('[inject] anna-helper failed, trying AppleScript fallback:', helperErr)
+      await fallbackPaste()
+    }
 
     // Wait for the target app to read the clipboard before restoring.
-    // 200ms was too short — some apps read the clipboard asynchronously
-    // after processing the Cmd+V keystroke event.
     await sleep(500)
   } finally {
-    // Restore original clipboard
     clipboard.writeText(saved)
   }
 }

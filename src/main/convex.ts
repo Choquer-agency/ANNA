@@ -274,6 +274,37 @@ export async function updateProfileImageInConvex(profileImageUrl: string): Promi
   await c.mutation(api.registrations.updateProfileImage, { profileImageUrl })
 }
 
+// ─── Word Usage Sync ──────────────────────────────────────────────────────
+
+export async function syncWordCount(wordCount: number): Promise<void> {
+  if (!client) return
+
+  try {
+    await client.mutation(api.wordUsage.incrementWordCount, { wordCount })
+    console.log('[convex] Synced word count:', wordCount)
+  } catch (err) {
+    console.error('[convex] Word count sync failed:', err)
+  }
+}
+
+export async function fetchWordUsage(): Promise<{
+  wordCount: number
+  wordLimit: number
+  wordsRemaining: number
+  periodStart: string
+  periodResetsAt: string
+  isLimitReached: boolean
+} | null> {
+  if (!client) return null
+
+  try {
+    return await client.query(api.wordUsage.getUsage, {})
+  } catch (err) {
+    console.error('[convex] Failed to fetch word usage:', err)
+    return null
+  }
+}
+
 export function getConvexStatus(): {
   syncEnabled: boolean
   consentedAt: string | undefined

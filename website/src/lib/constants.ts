@@ -84,7 +84,7 @@ export interface Stat {
 }
 
 export const stats: Stat[] = [
-  { value: 4000, suffix: '+', label: 'Words/week free' },
+  { value: 2000, suffix: '+', label: 'Words/week free' },
   { value: 99.2, suffix: '%', label: 'Accuracy' },
   { value: 50, suffix: 'ms', label: 'Latency' },
   { value: 100, suffix: '%', label: 'Local processing' },
@@ -273,7 +273,12 @@ export const faqs: FAQ[] = [
   {
     question: 'How does the free plan work?',
     answer:
-      'The free plan gives you 4,000 words per week of voice dictation. Your word count resets every Monday. No credit card required to get started.',
+      'You get 2,000 words per week, resetting every Monday. That\'s enough for about 15\u201320 dictations per day. When you hit the limit, upgrade to Pro for unlimited dictation. No credit card required to get started.',
+  },
+  {
+    question: 'When does my free limit reset?',
+    answer:
+      'Every Monday at midnight UTC. Your counter goes back to zero automatically \u2014 no action needed.',
   },
   {
     question: 'How does the free trial work?',

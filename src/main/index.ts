@@ -40,7 +40,7 @@ if (is.dev) {
   config({ path: join(__dirname, '../../.env') })
 }
 import {
-  initDB, closeDB, getSessions, getSessionById, deleteSession, deleteAllSessions, toggleSessionFlag, getStats,
+  initDB, closeDB, getSessions, getSessionById, deleteSession, deleteAllSessions, toggleSessionFlag, getStats, getWeeklyStats, getWeeklyWordCount, setConvexWeeklyOffset,
   getDictionaryEntries, addDictionaryEntry, updateDictionaryEntry, deleteDictionaryEntry,
   getSnippets, addSnippet, updateSnippet, deleteSnippet,
   getStyleProfiles, addStyleProfile, updateStyleProfile, deleteStyleProfile,
@@ -55,7 +55,7 @@ import { shutdownLangfuse } from './langfuse'
 import { trackMainEvent, shutdownPostHog } from './analytics'
 import { probeAccessibility } from './accessibilityProbe'
 import { createTray, destroyTray } from './tray'
-import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex } from './convex'
+import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex, fetchWordUsage } from './convex'
 import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
 import { anyApi } from 'convex/server'
 
@@ -68,6 +68,22 @@ if (process.defaultApp) {
   }
 } else {
   app.setAsDefaultProtocolClient('anna')
+}
+
+// Reconcile word usage from Convex for multi-device tracking
+async function reconcileWordUsage(): Promise<void> {
+  try {
+    const usage = await fetchWordUsage()
+    if (!usage) return
+    const localWords = getWeeklyWordCount()
+    if (usage.wordCount > localWords) {
+      const offset = usage.wordCount - localWords
+      setConvexWeeklyOffset(offset, usage.periodStart)
+      console.log(`[convex] Word usage reconciled: Convex=${usage.wordCount}, local=${localWords}, offset=${offset}`)
+    }
+  } catch (err) {
+    console.error('[convex] Word usage reconciliation failed:', err)
+  }
 }
 
 // Migrate legacy UUID data to authenticated user
@@ -114,6 +130,8 @@ function handleDeepLink(url: string): void {
         refreshClientAuth()
         // Enable sync automatically on auth
         enableSync()
+        // Reconcile word usage from Convex (multi-device sync)
+        reconcileWordUsage()
         // Notify renderer
         mainWindow?.webContents.send('auth:changed', { isAuthenticated: true })
         console.log('[auth] Token received and stored via deep link')
@@ -431,6 +449,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('stats:get', () => getStats())
+  ipcMain.handle('wordUsage:get', () => getWeeklyStats())
 
   // Dictionary
   ipcMain.handle('dictionary:get-all', () => getDictionaryEntries())
@@ -638,6 +657,11 @@ app.whenReady().then(async () => {
 
   // Initialize Convex cloud sync
   initConvex()
+
+  // Reconcile word usage from Convex if already authenticated
+  if (isAuthValid()) {
+    reconcileWordUsage()
+  }
 
   // Start subscription status refresh
   const { startSubscriptionRefresh } = require('./subscription')

@@ -18,7 +18,16 @@ export interface Session {
 export interface Stats {
   weeksSinceFirst: number
   totalWords: number
+  weeklyWords: number
   averageWPM: number
+}
+
+export interface WeeklyStats {
+  weeklyWords: number
+  wordLimit: number
+  wordsRemaining: number
+  isLimitReached: boolean
+  periodResetsAt: string
 }
 
 export interface Snippet {

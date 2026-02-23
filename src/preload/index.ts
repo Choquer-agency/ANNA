@@ -89,11 +89,24 @@ contextBridge.exposeInMainWorld('annaAPI', {
   getSubscriptionStatus: (): Promise<unknown> => ipcRenderer.invoke('subscription:get-status'),
   openBillingPortal: (): Promise<void> => ipcRenderer.invoke('subscription:open-billing'),
   openUpgrade: (): Promise<void> => ipcRenderer.invoke('subscription:open-upgrade'),
-  onPaywallLimitReached: (callback: () => void): void => {
-    ipcRenderer.on('paywall:limit-reached', () => callback())
+  getWeeklyUsage: (): Promise<unknown> => ipcRenderer.invoke('wordUsage:get'),
+  onPaywallLimitReached: (callback: (data: { wordCount: number; wordLimit: number; periodResetsAt: string }) => void): void => {
+    ipcRenderer.on('paywall:limit-reached', (_event, data) => callback(data))
   },
-  removePaywallListener: (): void => {
+  onPaywallApproachingLimit: (callback: (data: { wordCount: number; wordLimit: number; wordsRemaining: number; periodResetsAt: string }) => void): void => {
+    ipcRenderer.on('paywall:approaching-limit', (_event, data) => callback(data))
+  },
+  onPaywallAlmostDone: (callback: (data: { wordCount: number; wordLimit: number; wordsRemaining: number; periodResetsAt: string }) => void): void => {
+    ipcRenderer.on('paywall:almost-done', (_event, data) => callback(data))
+  },
+  onPaywallLimitReachedNext: (callback: (data: { wordCount: number; wordLimit: number; periodResetsAt: string }) => void): void => {
+    ipcRenderer.on('paywall:limit-reached-next', (_event, data) => callback(data))
+  },
+  removePaywallListeners: (): void => {
     ipcRenderer.removeAllListeners('paywall:limit-reached')
+    ipcRenderer.removeAllListeners('paywall:approaching-limit')
+    ipcRenderer.removeAllListeners('paywall:almost-done')
+    ipcRenderer.removeAllListeners('paywall:limit-reached-next')
   },
 
   // Page query + dictation to note
@@ -161,5 +174,8 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.removeAllListeners('update:not-available')
     ipcRenderer.removeAllListeners('auth:changed')
     ipcRenderer.removeAllListeners('paywall:limit-reached')
+    ipcRenderer.removeAllListeners('paywall:approaching-limit')
+    ipcRenderer.removeAllListeners('paywall:almost-done')
+    ipcRenderer.removeAllListeners('paywall:limit-reached-next')
   }
 })

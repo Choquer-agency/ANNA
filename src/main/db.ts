@@ -2,7 +2,8 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import type { Session, Setting, Stats, DictionaryEntry, Snippet, StyleProfile, Note } from '../shared/types'
+import type { Session, Setting, Stats, WeeklyStats, DictionaryEntry, Snippet, StyleProfile, Note } from '../shared/types'
+import { PLANS } from '../shared/pricing'
 
 let db: Database.Database
 
@@ -198,6 +199,69 @@ export function setSetting(key: string, value: string): void {
 
 // --- Stats ---
 
+/** Returns the ISO datetime string of the most recent Monday at 00:00 UTC. */
+function getLastMondayUTC(): string {
+  const now = new Date()
+  const day = now.getUTCDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const diff = day === 0 ? 6 : day - 1
+  const monday = new Date(now)
+  monday.setUTCDate(now.getUTCDate() - diff)
+  monday.setUTCHours(0, 0, 0, 0)
+  return monday.toISOString().replace('T', ' ').slice(0, 19)
+}
+
+/** Returns the ISO datetime string of the next Monday at 00:00 UTC (when the period resets). */
+function getNextMondayUTC(): string {
+  const now = new Date()
+  const day = now.getUTCDay()
+  const diff = day === 0 ? 6 : day - 1
+  const monday = new Date(now)
+  monday.setUTCDate(now.getUTCDate() - diff + 7)
+  monday.setUTCHours(0, 0, 0, 0)
+  return monday.toISOString()
+}
+
+/** Word count of completed sessions since last Monday UTC. */
+export function getWeeklyWordCount(): number {
+  const mondayStr = getLastMondayUTC()
+  const row = db
+    .prepare(
+      "SELECT COALESCE(SUM(word_count), 0) as weekly_words FROM sessions WHERE status = 'completed' AND created_at >= ?"
+    )
+    .get(mondayStr) as { weekly_words: number }
+  return row.weekly_words
+}
+
+/** Convex offset — words tracked on other devices not reflected in local DB. */
+let convexWeeklyOffset = 0
+let convexOffsetPeriod = ''
+
+export function setConvexWeeklyOffset(offset: number, periodStart: string): void {
+  convexWeeklyOffset = offset
+  convexOffsetPeriod = periodStart
+}
+
+/** Returns current weekly usage stats for the free tier, including Convex offset. */
+export function getWeeklyStats(): WeeklyStats {
+  const wordLimit = PLANS.free.wordLimit ?? 2000
+  const localWords = getWeeklyWordCount()
+
+  // Only apply offset if it's for the current period
+  const mondayDate = getLastMondayUTC().split(' ')[0]
+  const offset = convexOffsetPeriod === mondayDate ? convexWeeklyOffset : 0
+  const weeklyWords = localWords + offset
+
+  const wordsRemaining = Math.max(0, wordLimit - weeklyWords)
+
+  return {
+    weeklyWords,
+    wordLimit,
+    wordsRemaining,
+    isLimitReached: weeklyWords >= wordLimit,
+    periodResetsAt: getNextMondayUTC(),
+  }
+}
+
 export function getStats(): Stats {
   const firstRow = db
     .prepare("SELECT MIN(created_at) as first_date, SUM(word_count) as total_words FROM sessions WHERE status = 'completed'")
@@ -217,6 +281,7 @@ export function getStats(): Stats {
   return {
     weeksSinceFirst,
     totalWords: firstRow?.total_words ?? 0,
+    weeklyWords: getWeeklyWordCount(),
     averageWPM: Math.round(wpmRow?.avg_wpm ?? 0)
   }
 }

@@ -4,7 +4,9 @@ import type { Session, Stats } from '../types'
 import { StatsBar } from './StatsBar'
 import { PromoCard } from './PromoCard'
 import { SessionList } from './SessionList'
+import { UsageBar } from './UsageBar'
 import { track } from '../lib/analytics'
+import type { WeeklyStats } from '../../../shared/types'
 
 interface HomePageProps {
   sessions: Session[]
@@ -37,6 +39,20 @@ export function HomePage({
   const [hotkey, setHotkey] = useState('Ctrl+Space')
   const [permissionsMissing, setPermissionsMissing] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null)
+  const [isFreeUser, setIsFreeUser] = useState(false)
+
+  // Load weekly usage for free users
+  useEffect(() => {
+    window.annaAPI.getSubscriptionStatus().then((sub: any) => {
+      if (sub?.planId === 'free') {
+        setIsFreeUser(true)
+        window.annaAPI.getWeeklyUsage().then((usage: any) => {
+          if (usage) setWeeklyStats(usage)
+        })
+      }
+    })
+  }, [stats]) // Re-fetch when stats change (after dictation completes)
 
   useEffect(() => {
     window.annaAPI.getSetting('hotkey').then((val) => {
@@ -114,6 +130,15 @@ export function HomePage({
         </h1>
         <StatsBar stats={stats} />
       </div>
+
+      {/* Usage Bar (free users only) */}
+      {isFreeUser && weeklyStats && (
+        <UsageBar
+          weeklyWords={weeklyStats.weeklyWords}
+          wordLimit={weeklyStats.wordLimit}
+          periodResetsAt={weeklyStats.periodResetsAt}
+        />
+      )}
 
       {/* Promo Card */}
       <div className="mb-4">

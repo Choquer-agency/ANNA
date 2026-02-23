@@ -147,10 +147,17 @@ export function SessionRow({
           <p className="text-sm text-ink-faint italic">Empty transcription</p>
         )}
 
-        {/* App context badge */}
-        {session.app_name && (
-          <span className="text-xs text-ink-faint mt-1 inline-block">{session.app_name}</span>
-        )}
+        {/* App context + word count */}
+        <div className="flex items-center gap-2 mt-1">
+          {session.app_name && (
+            <span className="text-xs text-ink-faint">{session.app_name}</span>
+          )}
+          {session.word_count != null && session.word_count > 0 && (
+            <span className="text-xs text-ink-faint">
+              {session.app_name ? '·' : ''} {session.word_count} words
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Hover action icons */}

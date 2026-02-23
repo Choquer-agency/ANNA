@@ -16,6 +16,8 @@ import { ToastContainer } from './components/Toast'
 import { FeedbackModal } from './components/FeedbackModal'
 import { SignInGate } from './components/SignInGate'
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
+import { PaywallPrompt } from './components/PaywallPrompt'
+import { track } from './lib/analytics'
 
 function App(): React.JSX.Element {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
@@ -105,6 +107,64 @@ function App(): React.JSX.Element {
     window.annaAPI.onGetCurrentPage(() => currentPage)
     return () => { window.annaAPI.removeGetCurrentPageListener() }
   }, [currentPage])
+
+  // Paywall state
+  const [paywallData, setPaywallData] = useState<{
+    wordCount: number
+    wordLimit: number
+    periodResetsAt: string
+  } | null>(null)
+
+  // Listen for paywall events
+  useEffect(() => {
+    window.annaAPI.onPaywallLimitReached((data) => {
+      track('free_limit_upgrade_shown', { wordCount: data.wordCount, periodStart: '' })
+      setPaywallData(data)
+    })
+
+    window.annaAPI.onPaywallApproachingLimit((data) => {
+      const storageKey = `paywall_80_${data.periodResetsAt}`
+      if (!localStorage.getItem(storageKey)) {
+        localStorage.setItem(storageKey, 'true')
+        track('free_limit_warning_80', {
+          wordCount: data.wordCount,
+          wordsRemaining: data.wordsRemaining,
+        })
+        // Show as toast via the existing toast system — dispatch custom event
+        window.dispatchEvent(new CustomEvent('anna:paywall-toast', {
+          detail: {
+            message: `You've used ${data.wordCount.toLocaleString()} of ${data.wordLimit.toLocaleString()} free words this week. Upgrade for unlimited.`,
+            type: 'warning',
+          }
+        }))
+      }
+    })
+
+    window.annaAPI.onPaywallAlmostDone((data) => {
+      const storageKey = `paywall_95_${data.periodResetsAt}`
+      if (!localStorage.getItem(storageKey)) {
+        localStorage.setItem(storageKey, 'true')
+        track('free_limit_warning_95', {
+          wordCount: data.wordCount,
+          wordsRemaining: data.wordsRemaining,
+        })
+        window.dispatchEvent(new CustomEvent('anna:paywall-toast', {
+          detail: {
+            message: 'You have about one dictation left this week. Upgrade for unlimited.',
+            type: 'warning',
+          }
+        }))
+      }
+    })
+
+    window.annaAPI.onPaywallLimitReachedNext((data) => {
+      track('free_limit_reached', { wordCount: data.wordCount })
+    })
+
+    return () => {
+      window.annaAPI.removePaywallListeners()
+    }
+  }, [])
 
   // Auto-update notification
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
@@ -224,6 +284,15 @@ function App(): React.JSX.Element {
         <FeedbackModal
           sessionId={feedbackSessionId}
           onClose={() => setFeedbackSessionId(null)}
+        />
+      )}
+
+      {paywallData && (
+        <PaywallPrompt
+          wordCount={paywallData.wordCount}
+          wordLimit={paywallData.wordLimit}
+          periodResetsAt={paywallData.periodResetsAt}
+          onClose={() => setPaywallData(null)}
         />
       )}
 

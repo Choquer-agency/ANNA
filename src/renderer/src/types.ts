@@ -1,6 +1,6 @@
-import type { Session, Stats, DictionaryEntry, Snippet, StyleProfile, Note } from '../../shared/types'
+import type { Session, Stats, WeeklyStats, DictionaryEntry, Snippet, StyleProfile, Note } from '../../shared/types'
 
-export type { Session, Stats, DictionaryEntry, Snippet, StyleProfile, Note }
+export type { Session, Stats, WeeklyStats, DictionaryEntry, Snippet, StyleProfile, Note }
 
 export interface PipelineStatus {
   status: string
@@ -105,8 +105,12 @@ declare global {
       }>
       openBillingPortal: () => Promise<void>
       openUpgrade: () => Promise<void>
-      onPaywallLimitReached: (cb: () => void) => void
-      removePaywallListener: () => void
+      getWeeklyUsage: () => Promise<WeeklyStats>
+      onPaywallLimitReached: (cb: (data: { wordCount: number; wordLimit: number; periodResetsAt: string }) => void) => void
+      onPaywallApproachingLimit: (cb: (data: { wordCount: number; wordLimit: number; wordsRemaining: number; periodResetsAt: string }) => void) => void
+      onPaywallAlmostDone: (cb: (data: { wordCount: number; wordLimit: number; wordsRemaining: number; periodResetsAt: string }) => void) => void
+      onPaywallLimitReachedNext: (cb: (data: { wordCount: number; wordLimit: number; periodResetsAt: string }) => void) => void
+      removePaywallListeners: () => void
 
       // App version
       getAppVersion: () => Promise<string>
