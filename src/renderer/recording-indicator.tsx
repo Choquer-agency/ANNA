@@ -30,7 +30,7 @@ const loadingMultipliers = [0.5, 1.0, 1.0, 0.5]
 let currentLevel = 0
 let smoothLevel = 0
 let currentState = 'idle'
-let hotkeyDisplay = 'fn'
+let hotkeyDisplay = '\u2303 \u2423'
 
 function parseHotkeyForDisplay(hk: string): string {
   if (hk === 'fn') return 'fn'
@@ -302,7 +302,7 @@ container.innerHTML = `
   <div class="glow-wrap" id="glow-wrap">
     <div class="ambient-glow" id="ambient-glow"></div>
     <div class="snake-border" id="snake-border">
-      <div class="idle-tooltip" id="idle-tooltip">Press <span id="hotkey-label">fn</span> to dictate</div>
+      <div class="idle-tooltip" id="idle-tooltip">Press <span id="hotkey-label">\u2303 \u2423</span> to dictate</div>
       <div class="pill" id="pill">
         <!-- Recording state: colored waveform bars -->
         <div class="recording-content hidden" id="recording-content">

@@ -279,7 +279,7 @@ app.whenReady().then(async () => {
   createWindow()
 
   // Send hotkey info to idle indicator tooltip
-  const currentHotkey = getSetting('hotkey') || 'fn'
+  const currentHotkey = getSetting('hotkey') || 'Ctrl+Space'
   // Small delay to ensure renderer is loaded
   setTimeout(() => sendHotkeyInfo(currentHotkey), 1000)
 
@@ -293,7 +293,7 @@ app.whenReady().then(async () => {
 
   // Register hotkey — use stored setting or default to fn
   const storedHotkey = getSetting('hotkey')
-  await registerHotkey(handleHotkeyToggle, storedHotkey || 'fn')
+  await registerHotkey(handleHotkeyToggle, storedHotkey || 'Ctrl+Space')
 
   // Apply launch at login setting
   const launchSetting = getSetting('launch_at_login')

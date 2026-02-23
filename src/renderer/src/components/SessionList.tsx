@@ -42,7 +42,7 @@ export function SessionList({
   onDownload,
   onDelete,
   onFlag,
-  hotkey = 'fn'
+  hotkey = 'Ctrl+Space'
 }: SessionListProps): React.JSX.Element {
   if (sessions.length === 0) {
     return <FirstDictationGuide hotkey={hotkey} />

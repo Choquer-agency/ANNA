@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Keyboard, Mic, Wand2, Type } from 'lucide-react'
 
 export function HelpPage(): React.JSX.Element {
-  const [hotkey, setHotkey] = useState('fn')
+  const [hotkey, setHotkey] = useState('Ctrl+Space')
 
   useEffect(() => {
     window.annaAPI.getSetting('hotkey').then((val) => {

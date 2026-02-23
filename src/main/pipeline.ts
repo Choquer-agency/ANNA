@@ -509,7 +509,7 @@ export async function handleHotkeyToggle(): Promise<void> {
     cachedActiveWindow = await getActiveWindow()
 
     // Send hotkey info to indicator for tooltip display
-    const hotkey = getSetting('hotkey') || 'fn'
+    const hotkey = getSetting('hotkey') || 'Ctrl+Space'
     sendHotkeyInfo(hotkey)
 
     // Send microphone info on first dictation, or "Dictating with Anna" on subsequent

@@ -5,7 +5,7 @@ import { setSetting } from './db'
 let onToggle: (() => void) | null = null
 let usingFnKey = false
 
-export async function registerHotkey(callback: () => void, accelerator: string = 'fn'): Promise<boolean> {
+export async function registerHotkey(callback: () => void, accelerator: string = 'Ctrl+Space'): Promise<boolean> {
   onToggle = callback
 
   if (accelerator === 'fn') {

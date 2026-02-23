@@ -18,7 +18,7 @@ function parseHotkeyParts(hk: string): string[] {
 }
 
 export function GeneralTab(): React.JSX.Element {
-  const [hotkey, setHotkey] = useState('fn')
+  const [hotkey, setHotkey] = useState('Ctrl+Space')
   const [capturingHotkey, setCapturingHotkey] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
@@ -29,7 +29,7 @@ export function GeneralTab(): React.JSX.Element {
       window.annaAPI.getSetting('hotkey'),
       window.annaAPI.getSetting('microphone_device')
     ])
-    setHotkey(hk || 'fn')
+    setHotkey(hk || 'Ctrl+Space')
     setSelectedDevice(micDevice || 'default')
     setLoaded(true)
   }, [])
@@ -101,9 +101,9 @@ export function GeneralTab(): React.JSX.Element {
   const parts = parseHotkeyParts(hotkey)
 
   function resetToDefault(): void {
-    setHotkey('fn')
+    setHotkey('Ctrl+Space')
     setCapturingHotkey(false)
-    window.annaAPI.setSetting('hotkey', 'fn')
+    window.annaAPI.setSetting('hotkey', 'Ctrl+Space')
   }
 
   return (
@@ -135,12 +135,12 @@ export function GeneralTab(): React.JSX.Element {
                 </>
               )}
             </div>
-            {hotkey !== 'fn' && (
+            {hotkey !== 'Ctrl+Space' && (
               <button
                 onClick={resetToDefault}
                 className="text-xs text-primary hover:underline self-start ml-1"
               >
-                Reset to default (Fn)
+                Reset to default (⌃ Space)
               </button>
             )}
           </div>

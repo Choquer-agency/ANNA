@@ -9,13 +9,34 @@ interface TestDictationStepProps {
   needsRestart?: boolean
 }
 
+function parseHotkeyLabel(hk: string): string {
+  if (hk === 'fn') return 'fn'
+  return hk.split('+').map((part) => {
+    const map: Record<string, string> = {
+      'CommandOrControl': '\u2318',
+      'Alt': '\u2325',
+      'Shift': '\u21E7',
+      'Ctrl': '\u2303',
+      'Space': 'Space'
+    }
+    return map[part] || part
+  }).join(' ')
+}
+
 export function TestDictationStep({ onComplete, needsRestart }: TestDictationStepProps): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
   const [status, setStatus] = useState<string>('idle')
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [hotkeyLabel, setHotkeyLabel] = useState('\u2303 Space')
   const attemptTracked = useRef(false)
   const completionTracked = useRef(false)
+
+  useEffect(() => {
+    window.annaAPI.getSetting('hotkey').then((val) => {
+      if (val) setHotkeyLabel(parseHotkeyLabel(val))
+    })
+  }, [])
 
   useEffect(() => {
     window.annaAPI.onPipelineStatus((data: PipelineStatus) => {
@@ -102,7 +123,7 @@ export function TestDictationStep({ onComplete, needsRestart }: TestDictationSte
           </span>
           <div>
             <p className={`text-sm font-semibold ${status === 'idle' ? 'text-ink' : 'text-ink-faint'}`}>
-              Press <kbd className="px-1.5 py-0.5 bg-surface-alt border border-border rounded-md text-xs font-mono">fn</kbd> to start recording
+              Press <kbd className="px-1.5 py-0.5 bg-surface-alt border border-border rounded-md text-xs font-mono">{hotkeyLabel}</kbd> to start recording
             </p>
           </div>
         </div>
@@ -141,7 +162,7 @@ export function TestDictationStep({ onComplete, needsRestart }: TestDictationSte
           </span>
           <div>
             <p className={`text-sm font-semibold ${isRecording ? 'text-ink' : (isProcessing || status === 'completed') ? 'text-ink-faint' : 'text-ink-muted'}`}>
-              Press <kbd className="px-1.5 py-0.5 bg-surface-alt border border-border rounded-md text-xs font-mono">fn</kbd> again to stop
+              Press <kbd className="px-1.5 py-0.5 bg-surface-alt border border-border rounded-md text-xs font-mono">{hotkeyLabel}</kbd> again to stop
             </p>
           </div>
         </div>

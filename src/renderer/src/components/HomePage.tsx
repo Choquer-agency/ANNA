@@ -34,7 +34,7 @@ export function HomePage({
   onNavigateToStyle
 }: HomePageProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
-  const [hotkey, setHotkey] = useState('fn')
+  const [hotkey, setHotkey] = useState('Ctrl+Space')
   const [permissionsMissing, setPermissionsMissing] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
