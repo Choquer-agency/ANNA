@@ -164,7 +164,14 @@ contextBridge.exposeInMainWorld('annaAPI', {
   onUpdateNotAvailable: (callback: () => void): void => {
     ipcRenderer.on('update:not-available', () => callback())
   },
+  onUpdateProgress: (callback: (percent: number) => void): void => {
+    ipcRenderer.on('update:download-progress', (_event, percent: number) => callback(percent))
+  },
+  onUpdateError: (callback: (message: string) => void): void => {
+    ipcRenderer.on('update:error', (_event, message: string) => callback(message))
+  },
   checkForUpdates: (): Promise<void> => ipcRenderer.invoke('update:check'),
+  downloadUpdate: (): Promise<void> => ipcRenderer.invoke('update:download'),
   installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
 
   removePipelineListeners: (): void => {
@@ -183,6 +190,8 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.removeAllListeners('update:checking')
     ipcRenderer.removeAllListeners('update:available')
     ipcRenderer.removeAllListeners('update:not-available')
+    ipcRenderer.removeAllListeners('update:download-progress')
+    ipcRenderer.removeAllListeners('update:error')
     ipcRenderer.removeAllListeners('auth:changed')
     ipcRenderer.removeAllListeners('paywall:limit-reached')
     ipcRenderer.removeAllListeners('paywall:approaching-limit')

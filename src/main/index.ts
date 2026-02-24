@@ -741,7 +741,7 @@ app.whenReady().then(async () => {
 
   // Auto-updater (skip in dev)
   if (!is.dev) {
-    autoUpdater.autoDownload = true
+    autoUpdater.autoDownload = false
     autoUpdater.autoInstallOnAppQuit = true
 
     // Private repo: provide token for GitHub Releases access
@@ -761,6 +761,10 @@ app.whenReady().then(async () => {
       mainWindow?.webContents.send('update:not-available')
     })
 
+    autoUpdater.on('download-progress', (progress) => {
+      mainWindow?.webContents.send('update:download-progress', progress.percent)
+    })
+
     autoUpdater.on('update-downloaded', (info) => {
       console.log('[updater] Update downloaded:', info.version)
       mainWindow?.webContents.send('update:downloaded', info.version)
@@ -770,13 +774,18 @@ app.whenReady().then(async () => {
       })
     })
 
-    autoUpdater.checkForUpdatesAndNotify().catch((err) =>
+    autoUpdater.on('error', (err) => {
+      console.error('[updater] Error:', err.message)
+      mainWindow?.webContents.send('update:error', err.message)
+    })
+
+    autoUpdater.checkForUpdates().catch((err) =>
       console.error('[updater] Check failed:', err)
     )
 
     // Check for updates every 4 hours
     setInterval(() => {
-      autoUpdater.checkForUpdatesAndNotify().catch((err) =>
+      autoUpdater.checkForUpdates().catch((err) =>
         console.error('[updater] Check failed:', err)
       )
     }, 4 * 60 * 60 * 1000)
@@ -788,9 +797,14 @@ app.whenReady().then(async () => {
   // Manual update check
   ipcMain.handle('update:check', async () => {
     if (is.dev) return
-    autoUpdater.checkForUpdatesAndNotify().catch((err) =>
+    autoUpdater.checkForUpdates().catch((err) =>
       console.error('[updater] Manual check failed:', err)
     )
+  })
+
+  // Download update (user-initiated)
+  ipcMain.handle('update:download', () => {
+    autoUpdater.downloadUpdate()
   })
 
   ipcMain.handle('update:install', () => {
