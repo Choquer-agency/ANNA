@@ -70,10 +70,10 @@ export function SettingsSidebar({
             </div>
           </div>
         ))}
-        {version && (
-          <div className="text-[10px] text-ink-faint px-3 mt-3">v{version}</div>
-        )}
       </div>
+      {version && (
+        <div className="text-[10px] text-ink-faint px-3 pb-2">v{version}</div>
+      )}
     </div>
   )
 }
