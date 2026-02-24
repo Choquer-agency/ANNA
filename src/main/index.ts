@@ -69,6 +69,41 @@ import { anyApi } from 'convex/server'
 
 let mainWindow: BrowserWindow | null = null
 
+// Direct HTTP fallback for update checks when electron-updater hangs
+function fetchLatestVersionFromGitHub(): Promise<string> {
+  const https = require('https')
+  return new Promise((resolve, reject) => {
+    const url = 'https://github.com/Choquer-agency/ANNA/releases/download/v1.0.24/latest-mac.yml'
+    // First, find the latest release tag via the redirect
+    https.get('https://github.com/Choquer-agency/ANNA/releases/latest', { timeout: 8000 }, (res: any) => {
+      if (res.statusCode === 302 || res.statusCode === 301) {
+        const location: string = res.headers.location || ''
+        // Location looks like: https://github.com/Choquer-agency/ANNA/releases/tag/v1.0.24
+        const match = location.match(/\/tag\/v?(.+)$/)
+        if (match) {
+          resolve(match[1])
+        } else {
+          reject(new Error('Could not parse version from redirect: ' + location))
+        }
+      } else if (res.statusCode === 200) {
+        // Some redirects are transparent; parse the final URL or body
+        let data = ''
+        res.on('data', (chunk: string) => { data += chunk })
+        res.on('end', () => {
+          const match = data.match(/\/releases\/tag\/v?([0-9][0-9.]+)/)
+          if (match) {
+            resolve(match[1])
+          } else {
+            reject(new Error('Could not find version in response'))
+          }
+        })
+      } else {
+        reject(new Error('Unexpected status: ' + res.statusCode))
+      }
+    }).on('error', reject).on('timeout', () => reject(new Error('HTTP request timed out')))
+  })
+}
+
 // Register anna:// deep link protocol
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -750,14 +785,17 @@ app.whenReady().then(async () => {
     }
 
     autoUpdater.on('checking-for-update', () => {
+      console.log('[updater] Event: checking-for-update')
       mainWindow?.webContents.send('update:checking')
     })
 
     autoUpdater.on('update-available', (info) => {
+      console.log('[updater] Event: update-available', info.version)
       mainWindow?.webContents.send('update:available', info.version)
     })
 
-    autoUpdater.on('update-not-available', () => {
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('[updater] Event: update-not-available', info.version)
       mainWindow?.webContents.send('update:not-available')
     })
 
@@ -780,16 +818,27 @@ app.whenReady().then(async () => {
     })
 
     setTimeout(() => {
-      autoUpdater.checkForUpdates().catch((err) => {
-        console.error('[updater] Check failed:', err)
+      console.log('[updater] Startup check starting')
+      Promise.race([
+        autoUpdater.checkForUpdates(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Startup update check timed out')), 10000)
+        )
+      ]).catch((err) => {
+        console.error('[updater] Startup check failed:', err)
         mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
       })
     }, 5000)
 
     // Check for updates every 4 hours
     setInterval(() => {
-      autoUpdater.checkForUpdates().catch((err) => {
-        console.error('[updater] Check failed:', err)
+      Promise.race([
+        autoUpdater.checkForUpdates(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Periodic update check timed out')), 10000)
+        )
+      ]).catch((err) => {
+        console.error('[updater] Periodic check failed:', err)
         mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
       })
     }, 4 * 60 * 60 * 1000)
@@ -798,17 +847,42 @@ app.whenReady().then(async () => {
   // App version
   ipcMain.handle('app:get-version', () => app.getVersion())
 
-  // Manual update check
+  // Manual update check — try electron-updater first, fall back to direct HTTP check
   ipcMain.handle('update:check', async () => {
     if (is.dev) {
       mainWindow?.webContents.send('update:not-available')
       return
     }
     try {
-      await autoUpdater.checkForUpdates()
+      console.log('[updater] Manual check starting, mainWindow exists:', !!mainWindow)
+      const result = await Promise.race([
+        autoUpdater.checkForUpdates(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('__timeout__')), 10000)
+        )
+      ])
+      console.log('[updater] Check resolved:', result?.updateInfo?.version)
     } catch (err: any) {
-      console.error('[updater] Manual check failed:', err)
-      mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
+      console.error('[updater] Primary check failed:', err?.message)
+      // If electron-updater timed out or failed, try direct HTTP fallback
+      if (err?.message === '__timeout__' || err?.message?.includes('timed out')) {
+        console.log('[updater] Trying direct HTTP fallback...')
+        try {
+          const latestVersion = await fetchLatestVersionFromGitHub()
+          const currentVersion = app.getVersion()
+          console.log('[updater] Fallback result: current=%s latest=%s', currentVersion, latestVersion)
+          if (latestVersion && latestVersion !== currentVersion) {
+            mainWindow?.webContents.send('update:available', latestVersion)
+          } else {
+            mainWindow?.webContents.send('update:not-available')
+          }
+        } catch (fallbackErr: any) {
+          console.error('[updater] Fallback also failed:', fallbackErr?.message)
+          mainWindow?.webContents.send('update:error', 'Update check failed. Please check your internet connection.')
+        }
+      } else {
+        mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
+      }
     }
   })
 
