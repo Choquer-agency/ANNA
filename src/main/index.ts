@@ -36,7 +36,7 @@ process.on('unhandledRejection', (reason) => {
 })
 
 import { config } from 'dotenv'
-import { app, BrowserWindow, ipcMain, dialog, nativeImage, systemPreferences, utilityProcess } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, net, systemPreferences, utilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { existsSync, unlinkSync, copyFileSync, readFileSync } from 'fs'
@@ -69,40 +69,6 @@ import { anyApi } from 'convex/server'
 
 let mainWindow: BrowserWindow | null = null
 
-// Direct HTTP fallback for update checks when electron-updater hangs
-function fetchLatestVersionFromGitHub(): Promise<string> {
-  const https = require('https')
-  return new Promise((resolve, reject) => {
-    const url = 'https://github.com/Choquer-agency/ANNA/releases/download/v1.0.24/latest-mac.yml'
-    // First, find the latest release tag via the redirect
-    https.get('https://github.com/Choquer-agency/ANNA/releases/latest', { timeout: 8000 }, (res: any) => {
-      if (res.statusCode === 302 || res.statusCode === 301) {
-        const location: string = res.headers.location || ''
-        // Location looks like: https://github.com/Choquer-agency/ANNA/releases/tag/v1.0.24
-        const match = location.match(/\/tag\/v?(.+)$/)
-        if (match) {
-          resolve(match[1])
-        } else {
-          reject(new Error('Could not parse version from redirect: ' + location))
-        }
-      } else if (res.statusCode === 200) {
-        // Some redirects are transparent; parse the final URL or body
-        let data = ''
-        res.on('data', (chunk: string) => { data += chunk })
-        res.on('end', () => {
-          const match = data.match(/\/releases\/tag\/v?([0-9][0-9.]+)/)
-          if (match) {
-            resolve(match[1])
-          } else {
-            reject(new Error('Could not find version in response'))
-          }
-        })
-      } else {
-        reject(new Error('Unexpected status: ' + res.statusCode))
-      }
-    }).on('error', reject).on('timeout', () => reject(new Error('HTTP request timed out')))
-  })
-}
 
 // Register anna:// deep link protocol
 if (process.defaultApp) {
@@ -817,75 +783,35 @@ app.whenReady().then(async () => {
       mainWindow?.webContents.send('update:error', err.message)
     })
 
-    setTimeout(() => {
-      console.log('[updater] Startup check starting')
-      Promise.race([
-        autoUpdater.checkForUpdates(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Startup update check timed out')), 10000)
-        )
-      ]).catch((err) => {
-        console.error('[updater] Startup check failed:', err)
-        mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
-      })
-    }, 5000)
-
-    // Check for updates every 4 hours
-    setInterval(() => {
-      Promise.race([
-        autoUpdater.checkForUpdates(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Periodic update check timed out')), 10000)
-        )
-      ]).catch((err) => {
-        console.error('[updater] Periodic check failed:', err)
-        mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
-      })
-    }, 4 * 60 * 60 * 1000)
+    // Note: autoUpdater.checkForUpdates() hangs in production builds,
+    // so we don't call it on startup. Manual checks use net.fetch instead.
+    // autoUpdater is still used for download + install once an update is found.
   }
 
   // App version
   ipcMain.handle('app:get-version', () => app.getVersion())
 
-  // Manual update check — returns result via IPC invoke (not events, which are unreliable)
-  ipcMain.handle('update:check', async (): Promise<{ state: string; version?: string; message?: string }> => {
-    if (is.dev) {
-      return { state: 'not-available', version: app.getVersion() }
-    }
+  // Manual update check — uses net.fetch to check GitHub releases directly
+  // (electron-updater's checkForUpdates() hangs in production builds)
+  ipcMain.handle('update:check', async () => {
+    const current = app.getVersion()
     try {
-      console.log('[updater] Manual check starting')
-      const result = await Promise.race([
-        autoUpdater.checkForUpdates(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('__timeout__')), 8000)
-        )
-      ])
-      if (result && result.updateInfo) {
-        const latest = result.updateInfo.version
-        const current = app.getVersion()
-        console.log('[updater] electron-updater result: current=%s latest=%s', current, latest)
-        if (latest !== current) {
-          return { state: 'available', version: latest }
-        }
-        return { state: 'not-available', version: current }
+      const resp = await net.fetch(
+        'https://api.github.com/repos/Choquer-agency/ANNA/releases/latest',
+        { headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Anna-Updater' } }
+      )
+      if (!resp.ok) {
+        return { state: 'error', message: `GitHub API returned ${resp.status}` }
       }
-      return { state: 'not-available', version: app.getVersion() }
+      const data = await resp.json() as { tag_name?: string }
+      const latest = data.tag_name?.replace(/^v/, '') || current
+      if (latest !== current) {
+        return { state: 'available', version: latest }
+      }
+      return { state: 'not-available', version: current }
     } catch (err: any) {
-      console.error('[updater] Primary check failed:', err?.message)
-      // If electron-updater timed out or failed, try direct HTTP fallback
-      try {
-        console.log('[updater] Trying direct HTTP fallback...')
-        const latestVersion = await fetchLatestVersionFromGitHub()
-        const currentVersion = app.getVersion()
-        console.log('[updater] Fallback result: current=%s latest=%s', currentVersion, latestVersion)
-        if (latestVersion && latestVersion !== currentVersion) {
-          return { state: 'available', version: latestVersion }
-        }
-        return { state: 'not-available', version: currentVersion }
-      } catch (fallbackErr: any) {
-        console.error('[updater] Fallback also failed:', fallbackErr?.message)
-        return { state: 'error', message: 'Update check failed. Please check your internet connection.' }
-      }
+      console.error('[updater] Check failed:', err)
+      return { state: 'error', message: err?.message || 'Update check failed' }
     }
   })
 
