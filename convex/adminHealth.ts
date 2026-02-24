@@ -1,24 +1,28 @@
 import { internalMutation } from './_generated/server'
 
 /**
- * Calculate health scores for all users with subscriptions.
+ * Calculate health scores for all users with activity.
  * Designed to run as a cron job every 6 hours.
+ *
+ * Sources users from: auth users table + unique session userIds + registrations
  *
  * Score = weighted sum of factors (0-100):
  * - Activity recency (30%): Days since last session
  * - Session frequency (25%): Sessions per week over last 30 days
  * - Payment status (25%): Subscription status
- * - Tenure (10%): Months since registration
+ * - Tenure (10%): Time since first seen
  * - Feature engagement (10%): AI formatting usage + app diversity
  */
 export const calculateHealthScores = internalMutation({
   args: {},
   handler: async (ctx) => {
+    const authUsers = await ctx.db.query('users').collect()
     const registrations = await ctx.db.query('registrations').collect()
     const subscriptions = await ctx.db.query('subscriptions').collect()
     const sessions = await ctx.db.query('sessions').collect()
 
     const subMap = new Map(subscriptions.map((s) => [s.userId, s]))
+    const regMap = new Map(registrations.map((r) => [r.userId, r]))
     const now = Date.now()
     const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
 
@@ -30,9 +34,32 @@ export const calculateHealthScores = internalMutation({
       sessionsByUser.set(session.userId, list)
     }
 
-    for (const reg of registrations) {
-      const sub = subMap.get(reg.userId)
-      const userSessions = sessionsByUser.get(reg.userId) || []
+    // Collect all unique user IDs
+    const allUserIds = new Set<string>()
+    for (const user of authUsers) allUserIds.add(user._id as string)
+    for (const reg of registrations) allUserIds.add(reg.userId)
+    for (const session of sessions) allUserIds.add(session.userId)
+
+    for (const userId of allUserIds) {
+      const reg = regMap.get(userId)
+      const sub = subMap.get(userId)
+      const userSessions = sessionsByUser.get(userId) || []
+
+      // Determine first seen date
+      let firstSeen: number | null = null
+      if (reg?.registeredAt) {
+        firstSeen = new Date(reg.registeredAt).getTime()
+      } else {
+        // Try auth user creation time
+        const authUser = authUsers.find((u) => (u._id as string) === userId)
+        if (authUser && (authUser as any)._creationTime) {
+          firstSeen = (authUser as any)._creationTime
+        } else if (userSessions.length > 0) {
+          // Earliest session
+          const earliest = [...userSessions].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+          firstSeen = new Date(earliest[0].createdAt).getTime()
+        }
+      }
 
       // --- Activity Recency (30 points) ---
       const sortedSessions = [...userSessions].sort((a, b) =>
@@ -70,17 +97,18 @@ export const calculateHealthScores = internalMutation({
         else if (sub.status === 'past_due') paymentScore = 5
         else if (sub.status === 'canceled') paymentScore = 0
       } else {
-        // Free user — neutral
-        paymentScore = 10
+        paymentScore = 10 // Free user — neutral
       }
 
       // --- Tenure (10 points) ---
-      const tenureDays = (now - new Date(reg.registeredAt).getTime()) / (24 * 60 * 60 * 1000)
-      let tenureScore = 0
-      if (tenureDays > 180) tenureScore = 10
-      else if (tenureDays > 60) tenureScore = 8
-      else if (tenureDays > 14) tenureScore = 5
-      else tenureScore = 3
+      let tenureScore = 3
+      if (firstSeen) {
+        const tenureDays = (now - firstSeen) / (24 * 60 * 60 * 1000)
+        if (tenureDays > 180) tenureScore = 10
+        else if (tenureDays > 60) tenureScore = 8
+        else if (tenureDays > 14) tenureScore = 5
+        else tenureScore = 3
+      }
 
       // --- Feature Engagement (10 points) ---
       let engagementScore = 0
@@ -107,7 +135,7 @@ export const calculateHealthScores = internalMutation({
       // Upsert health score
       const existing = await ctx.db
         .query('user_health_scores')
-        .withIndex('by_user', (q) => q.eq('userId', reg.userId))
+        .withIndex('by_user', (q) => q.eq('userId', userId))
         .first()
 
       if (existing) {
@@ -118,7 +146,7 @@ export const calculateHealthScores = internalMutation({
         })
       } else {
         await ctx.db.insert('user_health_scores', {
-          userId: reg.userId,
+          userId,
           score: totalScore,
           factors,
           calculatedAt: new Date().toISOString(),

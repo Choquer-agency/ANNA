@@ -8,14 +8,23 @@
  * @module
  */
 
+import type * as adminActions from "../adminActions.js";
+import type * as adminHealth from "../adminHealth.js";
+import type * as adminLib from "../adminLib.js";
+import type * as adminMutations from "../adminMutations.js";
+import type * as adminQueries from "../adminQueries.js";
 import type * as auth from "../auth.js";
+import type * as churn from "../churn.js";
+import type * as crons from "../crons.js";
 import type * as feedback from "../feedback.js";
 import type * as http from "../http.js";
+import type * as lib_periods from "../lib/periods.js";
 import type * as migrations from "../migrations.js";
 import type * as registrations from "../registrations.js";
 import type * as sessions from "../sessions.js";
 import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as wordUsage from "../wordUsage.js";
 
 import type {
   ApiFromModules,
@@ -24,14 +33,23 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  adminActions: typeof adminActions;
+  adminHealth: typeof adminHealth;
+  adminLib: typeof adminLib;
+  adminMutations: typeof adminMutations;
+  adminQueries: typeof adminQueries;
   auth: typeof auth;
+  churn: typeof churn;
+  crons: typeof crons;
   feedback: typeof feedback;
   http: typeof http;
+  "lib/periods": typeof lib_periods;
   migrations: typeof migrations;
   registrations: typeof registrations;
   sessions: typeof sessions;
   stripe: typeof stripe;
   subscriptions: typeof subscriptions;
+  wordUsage: typeof wordUsage;
 }>;
 
 /**

@@ -83,12 +83,23 @@ contextBridge.exposeInMainWorld('annaAPI', {
   // Settings
   getSetting: (key: string): Promise<string | undefined> => ipcRenderer.invoke('settings:get', key),
   setSetting: (key: string, value: string): Promise<void> => ipcRenderer.invoke('settings:set', key, value),
+
+  // Hotkey capture (for detecting fn key in settings UI)
+  startHotkeyCapture: (): Promise<boolean> => ipcRenderer.invoke('hotkey:start-capture'),
+  stopHotkeyCapture: (): Promise<void> => ipcRenderer.invoke('hotkey:stop-capture'),
+  onFnKeyCaptured: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('hotkey:fn-captured', handler)
+    return () => ipcRenderer.removeListener('hotkey:fn-captured', handler)
+  },
   getEnvStatus: (): Promise<{ hasOpenAI: boolean; hasAnthropic: boolean }> => ipcRenderer.invoke('settings:get-env'),
 
   // Subscription / Paywall
   getSubscriptionStatus: (): Promise<unknown> => ipcRenderer.invoke('subscription:get-status'),
   openBillingPortal: (): Promise<void> => ipcRenderer.invoke('subscription:open-billing'),
   openUpgrade: (): Promise<void> => ipcRenderer.invoke('subscription:open-upgrade'),
+  submitChurnSurvey: (reason: string, details?: string): Promise<void> =>
+    ipcRenderer.invoke('churn:submit-survey', reason, details),
   getWeeklyUsage: (): Promise<unknown> => ipcRenderer.invoke('wordUsage:get'),
   onPaywallLimitReached: (callback: (data: { wordCount: number; wordLimit: number; periodResetsAt: string }) => void): void => {
     ipcRenderer.on('paywall:limit-reached', (_event, data) => callback(data))

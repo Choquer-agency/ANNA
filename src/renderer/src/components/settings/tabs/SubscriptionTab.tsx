@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
+import { ChurnSurvey } from '../ChurnSurvey'
 import { PLANS } from '../../../../../shared/pricing'
 
 interface SubStatus {
@@ -28,6 +29,7 @@ export function SubscriptionTab(): React.JSX.Element {
   const [sub, setSub] = useState<SubStatus | null>(null)
   const [weeklyWords, setWeeklyWords] = useState(0)
   const [loaded, setLoaded] = useState(false)
+  const [showChurnSurvey, setShowChurnSurvey] = useState(false)
 
   const loadData = useCallback(async () => {
     const [status, usage] = await Promise.all([
@@ -122,12 +124,22 @@ export function SubscriptionTab(): React.JSX.Element {
             Upgrade to Pro
           </button>
         ) : (
-          <button
-            onClick={() => window.annaAPI.openBillingPortal()}
-            className="text-sm text-primary hover:underline"
-          >
-            Manage subscription
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.annaAPI.openBillingPortal()}
+              className="text-sm text-primary hover:underline"
+            >
+              Manage subscription
+            </button>
+            {!sub.cancelAtPeriodEnd && sub.planId !== 'lifetime' && (
+              <button
+                onClick={() => setShowChurnSurvey(true)}
+                className="text-xs text-ink-muted hover:text-accent-red"
+              >
+                Cancel subscription
+              </button>
+            )}
+          </div>
         )}
         <button
           onClick={() => window.annaAPI.openWeb('pricing')}
@@ -136,6 +148,26 @@ export function SubscriptionTab(): React.JSX.Element {
           View pricing
         </button>
       </div>
+
+      {showChurnSurvey && (
+        <ChurnSurvey
+          billingInterval={sub.billingInterval}
+          onSubmit={async (reason, details) => {
+            try {
+              await window.annaAPI.submitChurnSurvey(reason, details)
+            } catch {
+              // Still proceed to billing portal even if survey fails
+            }
+            setShowChurnSurvey(false)
+            window.annaAPI.openBillingPortal()
+          }}
+          onSwitchToAnnual={() => {
+            setShowChurnSurvey(false)
+            window.annaAPI.openUpgrade()
+          }}
+          onCancel={() => setShowChurnSurvey(false)}
+        />
+      )}
     </div>
   )
 }

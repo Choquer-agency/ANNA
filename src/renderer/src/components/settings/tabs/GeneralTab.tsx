@@ -54,6 +54,16 @@ export function GeneralTab(): React.JSX.Element {
   // Hotkey capture
   useEffect(() => {
     if (!capturingHotkey) return
+
+    // Start fn key monitor in main process so we can detect it
+    window.annaAPI.startHotkeyCapture()
+
+    const removeFnListener = window.annaAPI.onFnKeyCaptured(() => {
+      setHotkey('fn')
+      setCapturingHotkey(false)
+      window.annaAPI.setSetting('hotkey', 'fn')
+    })
+
     function onKeyDown(e: KeyboardEvent): void {
       e.preventDefault()
       e.stopPropagation()
@@ -93,6 +103,8 @@ export function GeneralTab(): React.JSX.Element {
     return () => {
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('keyup', onEscape, true)
+      removeFnListener()
+      window.annaAPI.stopHotkeyCapture()
     }
   }, [capturingHotkey])
 

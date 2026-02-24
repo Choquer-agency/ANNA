@@ -19,15 +19,18 @@ import { Download, Search, ArrowUpDown } from 'lucide-react'
 
 interface Customer {
   userId: string
-  name: string
-  email: string
-  registeredAt: string
+  name: string | null
+  email: string | null
+  registeredAt: string | null
   planId: string
   billingInterval: string | null
   status: string
   cancelAtPeriodEnd: boolean
   currentPeriodEnd: string | null
   healthScore: number | null
+  sessionCount?: number
+  totalWords?: number
+  lastActive?: string | null
 }
 
 interface CustomerTableProps {
@@ -88,7 +91,9 @@ export function CustomerTable({ customers, loading }: CustomerTableProps) {
     if (search) {
       const q = search.toLowerCase()
       result = result.filter(
-        (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+        (c) => (c.name ?? '').toLowerCase().includes(q) ||
+               (c.email ?? '').toLowerCase().includes(q) ||
+               c.userId.toLowerCase().includes(q)
       )
     }
 
@@ -216,13 +221,13 @@ export function CustomerTable({ customers, loading }: CustomerTableProps) {
               <TableRow key={customer.userId} className="hover:bg-surface-hover">
                 <TableCell>
                   <Link
-                    href={`/customers/${customer.userId}`}
+                    href={`/customers/${encodeURIComponent(customer.userId)}`}
                     className="text-sm font-medium text-ink hover:text-primary"
                   >
-                    {customer.name}
+                    {customer.name ?? customer.userId.substring(0, 12) + '...'}
                   </Link>
                 </TableCell>
-                <TableCell className="text-sm text-ink-secondary">{customer.email}</TableCell>
+                <TableCell className="text-sm text-ink-secondary">{customer.email ?? '—'}</TableCell>
                 <TableCell>
                   <Badge
                     variant={planBadgeVariant(customer.planId)}

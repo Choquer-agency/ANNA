@@ -9,13 +9,13 @@ if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
   process.env.NEXT_PUBLIC_CONVEX_URL = CONVEX_URL
 }
 
-const isPublicRoute = createRouteMatcher(['/login'])
+const isPublicRoute = createRouteMatcher(['/login', '/api/auth(.*)'])
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
   if (!isPublicRoute(request) && !(await convexAuth.isAuthenticated())) {
     return nextjsMiddlewareRedirect(request, '/login')
   }
-}, { convexUrl: CONVEX_URL })
+}, { convexUrl: CONVEX_URL, verbose: true })
 
 export const config = {
   matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],

@@ -3,6 +3,167 @@ import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { assertAdmin } from './adminLib'
 
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+// Build a unified customer list from all data sources:
+// 1. Auth `users` table (has email, name)
+// 2. Unique session userIds (some may be UUID-based from pre-auth)
+// 3. Subscriptions, health scores, etc.
+async function buildCustomerMap(ctx: any) {
+  const [authUsers, sessions, subscriptions, healthScores, registrations] = await Promise.all([
+    ctx.db.query('users').collect(),
+    ctx.db.query('sessions').collect(),
+    ctx.db.query('subscriptions').collect(),
+    ctx.db.query('user_health_scores').collect(),
+    ctx.db.query('registrations').collect(),
+  ])
+
+  const customers = new Map<string, {
+    userId: string
+    name: string | null
+    email: string | null
+    profileImageUrl: string | null
+    firstSeen: string | null
+    lastActive: string | null
+    sessionCount: number
+    totalWords: number
+    planId: string
+    billingInterval: string | null
+    status: string
+    cancelAtPeriodEnd: boolean
+    currentPeriodEnd: string | null
+    healthScore: number | null
+    healthFactors: string | null
+    source: 'auth' | 'session' | 'registration'
+  }>()
+
+  // Start with registrations (most complete data)
+  for (const reg of registrations) {
+    customers.set(reg.userId, {
+      userId: reg.userId,
+      name: reg.name,
+      email: reg.email,
+      profileImageUrl: reg.profileImageUrl ?? null,
+      firstSeen: reg.registeredAt,
+      lastActive: null,
+      sessionCount: 0,
+      totalWords: 0,
+      planId: 'free',
+      billingInterval: null,
+      status: 'free',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+      healthScore: null,
+      healthFactors: null,
+      source: 'registration',
+    })
+  }
+
+  // Add auth users (may overlap with registrations)
+  for (const user of authUsers) {
+    const id = user._id as string
+    if (!customers.has(id)) {
+      customers.set(id, {
+        userId: id,
+        name: (user as any).name ?? null,
+        email: (user as any).email ?? null,
+        profileImageUrl: (user as any).image ?? null,
+        firstSeen: (user as any)._creationTime
+          ? new Date((user as any)._creationTime).toISOString()
+          : null,
+        lastActive: null,
+        sessionCount: 0,
+        totalWords: 0,
+        planId: 'free',
+        billingInterval: null,
+        status: 'free',
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        healthScore: null,
+        healthFactors: null,
+        source: 'auth',
+      })
+    } else {
+      // Enrich existing with auth data
+      const existing = customers.get(id)!
+      if (!existing.name && (user as any).name) existing.name = (user as any).name
+      if (!existing.email && (user as any).email) existing.email = (user as any).email
+      if (!existing.profileImageUrl && (user as any).image) existing.profileImageUrl = (user as any).image
+    }
+  }
+
+  // Add session-only users (UUID userIds from before auth)
+  const sessionsByUser = new Map<string, typeof sessions>()
+  for (const session of sessions) {
+    if (!sessionsByUser.has(session.userId)) {
+      sessionsByUser.set(session.userId, [])
+    }
+    sessionsByUser.get(session.userId)!.push(session)
+  }
+
+  for (const [userId, userSessions] of sessionsByUser) {
+    const sorted = userSessions.sort((a: any, b: any) =>
+      a.createdAt.localeCompare(b.createdAt)
+    )
+    const firstSeen = sorted[0]?.createdAt ?? null
+    const lastActive = sorted[sorted.length - 1]?.createdAt ?? null
+    const totalWords = userSessions.reduce((sum: number, s: any) => sum + (s.wordCount ?? 0), 0)
+
+    if (customers.has(userId)) {
+      const existing = customers.get(userId)!
+      existing.sessionCount = userSessions.length
+      existing.totalWords = totalWords
+      existing.lastActive = lastActive
+      if (!existing.firstSeen || (firstSeen && firstSeen < existing.firstSeen)) {
+        existing.firstSeen = firstSeen
+      }
+    } else {
+      customers.set(userId, {
+        userId,
+        name: null,
+        email: null,
+        profileImageUrl: null,
+        firstSeen,
+        lastActive,
+        sessionCount: userSessions.length,
+        totalWords,
+        planId: 'free',
+        billingInterval: null,
+        status: 'free',
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+        healthScore: null,
+        healthFactors: null,
+        source: 'session',
+      })
+    }
+  }
+
+  // Enrich with subscription data
+  for (const sub of subscriptions) {
+    const customer = customers.get(sub.userId)
+    if (customer) {
+      customer.planId = sub.planId
+      customer.billingInterval = sub.billingInterval ?? null
+      customer.status = sub.status
+      customer.cancelAtPeriodEnd = sub.cancelAtPeriodEnd ?? false
+      customer.currentPeriodEnd = sub.currentPeriodEnd ?? null
+      if (!customer.email && sub.email) customer.email = sub.email
+    }
+  }
+
+  // Enrich with health scores
+  for (const health of healthScores) {
+    const customer = customers.get(health.userId)
+    if (customer) {
+      customer.healthScore = health.score
+      customer.healthFactors = health.factors
+    }
+  }
+
+  return { customers, sessions, subscriptions, authUsers }
+}
+
 // ─── Auth ───────────────────────────────────────────────────────────────
 
 export const isAdmin = query({
@@ -35,12 +196,14 @@ export const getOverviewMetrics = query({
   handler: async (ctx) => {
     await assertAdmin(ctx)
 
-    const allRegistrations = await ctx.db.query('registrations').collect()
-    const allSubscriptions = await ctx.db.query('subscriptions').collect()
+    const { customers, sessions, subscriptions } = await buildCustomerMap(ctx)
 
-    const totalUsers = allRegistrations.length
-    const activeSubscriptions = allSubscriptions.filter(
-      (s) => (s.planId === 'pro' || s.planId === 'lifetime') &&
+    // Filter out admin/test accounts — only count real users
+    const allCustomers = [...customers.values()]
+    const totalUsers = allCustomers.length
+
+    const activeSubscriptions = subscriptions.filter(
+      (s: any) => (s.planId === 'pro' || s.planId === 'lifetime') &&
              (s.status === 'active' || s.status === 'trialing')
     )
     const paidUsers = activeSubscriptions.length
@@ -50,25 +213,23 @@ export const getOverviewMetrics = query({
     let mrrCents = 0
     for (const sub of activeSubscriptions) {
       if (sub.billingInterval === 'monthly') {
-        mrrCents += 900 // $9/month
+        mrrCents += 900
       } else if (sub.billingInterval === 'annual') {
-        mrrCents += 700 // $84/12 = $7/month
+        mrrCents += 700
       }
-      // lifetime = $0 MRR
     }
 
     const conversionRate = totalUsers > 0 ? (paidUsers / totalUsers) * 100 : 0
 
-    // 30-day signups
+    // 30-day stats
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-    const recentSignups = allRegistrations.filter(
-      (r) => r.registeredAt > thirtyDaysAgo
+
+    const recentSignups = allCustomers.filter(
+      (c) => c.firstSeen && c.firstSeen > thirtyDaysAgo
     ).length
 
-    // 30-day sessions
-    const allSessions = await ctx.db.query('sessions').collect()
-    const recentSessions = allSessions.filter(
-      (s) => s.createdAt > thirtyDaysAgo
+    const recentSessions = sessions.filter(
+      (s: any) => s.createdAt > thirtyDaysAgo
     ).length
 
     return {
@@ -90,29 +251,26 @@ export const getUserGrowthTimeSeries = query({
 
     const days = args.days ?? 90
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-    const registrations = await ctx.db.query('registrations').collect()
+    const { customers, subscriptions } = await buildCustomerMap(ctx)
 
     const dailyCounts: Record<string, { free: number; paid: number }> = {}
-
-    // Initialize all dates
     for (let i = 0; i < days; i++) {
       const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000)
       const key = date.toISOString().slice(0, 10)
       dailyCounts[key] = { free: 0, paid: 0 }
     }
 
-    // Look up subscriptions for paid status
-    const subscriptions = await ctx.db.query('subscriptions').collect()
     const paidUserIds = new Set(
       subscriptions
-        .filter((s) => s.planId !== 'free' && (s.status === 'active' || s.status === 'trialing'))
-        .map((s) => s.userId)
+        .filter((s: any) => s.planId !== 'free' && (s.status === 'active' || s.status === 'trialing'))
+        .map((s: any) => s.userId)
     )
 
-    for (const reg of registrations) {
-      const key = reg.registeredAt.slice(0, 10)
+    for (const customer of customers.values()) {
+      if (!customer.firstSeen) continue
+      const key = customer.firstSeen.slice(0, 10)
       if (dailyCounts[key] !== undefined) {
-        if (paidUserIds.has(reg.userId)) {
+        if (paidUserIds.has(customer.userId)) {
           dailyCounts[key].paid++
         } else {
           dailyCounts[key].free++
@@ -159,29 +317,20 @@ export const getRecentSignups = query({
   handler: async (ctx) => {
     await assertAdmin(ctx)
 
-    const registrations = await ctx.db.query('registrations').collect()
-    const sorted = registrations.sort((a, b) => b.registeredAt.localeCompare(a.registeredAt))
-    const recent = sorted.slice(0, 20)
+    const { customers, subscriptions } = await buildCustomerMap(ctx)
+    const sorted = [...customers.values()]
+      .filter((c) => c.firstSeen)
+      .sort((a, b) => (b.firstSeen ?? '').localeCompare(a.firstSeen ?? ''))
+      .slice(0, 20)
 
-    // Enrich with subscription data
-    const result = []
-    for (const reg of recent) {
-      const sub = await ctx.db
-        .query('subscriptions')
-        .withIndex('by_user', (q) => q.eq('userId', reg.userId))
-        .first()
-
-      result.push({
-        userId: reg.userId,
-        name: reg.name,
-        email: reg.email,
-        registeredAt: reg.registeredAt,
-        plan: sub?.planId ?? 'free',
-        status: sub?.status ?? 'free',
-      })
-    }
-
-    return result
+    return sorted.map((c) => ({
+      userId: c.userId,
+      name: c.name ?? 'Unknown',
+      email: c.email ?? 'Unknown',
+      registeredAt: c.firstSeen ?? '',
+      plan: c.planId,
+      status: c.status,
+    }))
   },
 })
 
@@ -196,15 +345,33 @@ export const getRecentSubscriptionChanges = query({
 
     const result = []
     for (const sub of recent) {
+      // Try registration first, then auth user
+      let name = 'Unknown'
+      let email = sub.email ?? 'Unknown'
+
       const reg = await ctx.db
         .query('registrations')
         .withIndex('by_user', (q) => q.eq('userId', sub.userId))
         .first()
 
+      if (reg) {
+        name = reg.name
+        email = reg.email
+      } else {
+        // Try auth user
+        try {
+          const user = await ctx.db.get(sub.userId as any)
+          if (user) {
+            name = (user as any).name ?? 'Unknown'
+            email = (user as any).email ?? email
+          }
+        } catch { /* userId might not be a valid doc ID */ }
+      }
+
       result.push({
         userId: sub.userId,
-        name: reg?.name ?? 'Unknown',
-        email: sub.email ?? reg?.email ?? 'Unknown',
+        name,
+        email,
         planId: sub.planId,
         billingInterval: sub.billingInterval,
         status: sub.status,
@@ -223,32 +390,25 @@ export const listAllCustomers = query({
   handler: async (ctx) => {
     await assertAdmin(ctx)
 
-    const registrations = await ctx.db.query('registrations').collect()
-    const subscriptions = await ctx.db.query('subscriptions').collect()
-    const healthScores = await ctx.db.query('user_health_scores').collect()
+    const { customers } = await buildCustomerMap(ctx)
 
-    const subMap = new Map(subscriptions.map((s) => [s.userId, s]))
-    const healthMap = new Map(healthScores.map((h) => [h.userId, h]))
-
-    return registrations.map((reg) => {
-      const sub = subMap.get(reg.userId)
-      const health = healthMap.get(reg.userId)
-
-      return {
-        userId: reg.userId,
-        name: reg.name,
-        email: reg.email,
-        registeredAt: reg.registeredAt,
-        profileImageUrl: reg.profileImageUrl,
-        planId: sub?.planId ?? 'free',
-        billingInterval: sub?.billingInterval ?? null,
-        status: sub?.status ?? 'free',
-        cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
-        currentPeriodEnd: sub?.currentPeriodEnd ?? null,
-        healthScore: health?.score ?? null,
-        healthFactors: health?.factors ?? null,
-      }
-    })
+    return [...customers.values()].map((c) => ({
+      userId: c.userId,
+      name: c.name,
+      email: c.email,
+      registeredAt: c.firstSeen,
+      profileImageUrl: c.profileImageUrl,
+      planId: c.planId,
+      billingInterval: c.billingInterval,
+      status: c.status,
+      cancelAtPeriodEnd: c.cancelAtPeriodEnd,
+      currentPeriodEnd: c.currentPeriodEnd,
+      healthScore: c.healthScore,
+      healthFactors: c.healthFactors,
+      sessionCount: c.sessionCount,
+      totalWords: c.totalWords,
+      lastActive: c.lastActive,
+    }))
   },
 })
 
@@ -257,10 +417,50 @@ export const getCustomerDetail = query({
   handler: async (ctx, args) => {
     await assertAdmin(ctx)
 
+    // Try to get user info from multiple sources
+    let name: string | null = null
+    let email: string | null = null
+    let profileImageUrl: string | null = null
+    let platform: string | null = null
+    let deviceName: string | null = null
+    let registeredAt: string | null = null
+
+    // Check registrations first
     const reg = await ctx.db
       .query('registrations')
       .withIndex('by_user', (q) => q.eq('userId', args.userId))
       .first()
+
+    if (reg) {
+      name = reg.name
+      email = reg.email
+      profileImageUrl = reg.profileImageUrl ?? null
+      platform = reg.platform ?? null
+      deviceName = reg.deviceName ?? null
+      registeredAt = reg.registeredAt
+    }
+
+    // Try auth user (Convex auth IDs)
+    try {
+      const user = await ctx.db.get(args.userId as any)
+      if (user) {
+        name = name ?? (user as any).name ?? null
+        email = email ?? (user as any).email ?? null
+        profileImageUrl = profileImageUrl ?? (user as any).image ?? null
+        if (!registeredAt && (user as any)._creationTime) {
+          registeredAt = new Date((user as any)._creationTime).toISOString()
+        }
+      }
+    } catch { /* userId might not be a valid doc ID */ }
+
+    // Check user profile
+    const profile = await ctx.db
+      .query('userProfiles')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
+      .first()
+    if (profile) {
+      deviceName = deviceName ?? profile.deviceName ?? null
+    }
 
     const sub = await ctx.db
       .query('subscriptions')
@@ -280,7 +480,7 @@ export const getCustomerDetail = query({
 
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
-    const thisMonth = now.toISOString().slice(0, 7) // YYYY-MM
+    const thisMonth = now.toISOString().slice(0, 7)
 
     const sessionsLast30d = sessions.filter((s) => s.createdAt > thirtyDaysAgo)
     const sessionsThisMonth = sessions.filter((s) => s.createdAt.startsWith(thisMonth))
@@ -318,20 +518,24 @@ export const getCustomerDetail = query({
 
     // Last active
     const sortedSessions = [...sessions].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    const lastActive = sortedSessions[0]?.createdAt ?? reg?.registeredAt ?? null
+    const lastActive = sortedSessions[0]?.createdAt ?? registeredAt
+
+    // First seen (from sessions if no registration)
+    if (!registeredAt && sessions.length > 0) {
+      const earliest = [...sessions].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      registeredAt = earliest[0]?.createdAt ?? null
+    }
 
     return {
-      registration: reg
-        ? {
-            userId: reg.userId,
-            name: reg.name,
-            email: reg.email,
-            registeredAt: reg.registeredAt,
-            profileImageUrl: reg.profileImageUrl,
-            platform: reg.platform,
-            deviceName: reg.deviceName,
-          }
-        : null,
+      registration: {
+        userId: args.userId,
+        name: name ?? 'Unknown',
+        email: email ?? 'Unknown',
+        registeredAt: registeredAt ?? '',
+        profileImageUrl,
+        platform,
+        deviceName,
+      },
       subscription: sub
         ? {
             planId: sub.planId,
@@ -392,7 +596,6 @@ export const getChurnMetrics = query({
 
     const churnRate = paidAtStart > 0 ? (eventsThisMonth.length / paidAtStart) * 100 : 0
 
-    // Reason breakdown
     const reasons: Record<string, number> = {}
     for (const event of churnEvents) {
       reasons[event.reason] = (reasons[event.reason] || 0) + 1
@@ -421,15 +624,31 @@ export const getRecentChurnEvents = query({
 
     const result = []
     for (const event of recent) {
+      let name = 'Unknown'
+      let userEmail = event.email ?? 'Unknown'
+
       const reg = await ctx.db
         .query('registrations')
         .withIndex('by_user', (q) => q.eq('userId', event.userId))
         .first()
 
+      if (reg) {
+        name = reg.name
+        userEmail = reg.email
+      } else {
+        try {
+          const user = await ctx.db.get(event.userId as any)
+          if (user) {
+            name = (user as any).name ?? 'Unknown'
+            userEmail = (user as any).email ?? userEmail
+          }
+        } catch { /* userId might not be a valid doc ID */ }
+      }
+
       result.push({
         ...event,
-        name: reg?.name ?? 'Unknown',
-        userEmail: reg?.email ?? event.email ?? 'Unknown',
+        name,
+        userEmail,
       })
     }
 
@@ -468,10 +687,26 @@ export const getAtRiskUsers = query({
 
     const result = []
     for (const score of atRisk.slice(0, 50)) {
+      let name = 'Unknown'
+      let email = 'Unknown'
+
       const reg = await ctx.db
         .query('registrations')
         .withIndex('by_user', (q) => q.eq('userId', score.userId))
         .first()
+
+      if (reg) {
+        name = reg.name
+        email = reg.email
+      } else {
+        try {
+          const user = await ctx.db.get(score.userId as any)
+          if (user) {
+            name = (user as any).name ?? 'Unknown'
+            email = (user as any).email ?? 'Unknown'
+          }
+        } catch { /* userId might not be a valid doc ID */ }
+      }
 
       const sub = await ctx.db
         .query('subscriptions')
@@ -480,8 +715,8 @@ export const getAtRiskUsers = query({
 
       result.push({
         userId: score.userId,
-        name: reg?.name ?? 'Unknown',
-        email: reg?.email ?? 'Unknown',
+        name,
+        email,
         score: score.score,
         factors: score.factors,
         calculatedAt: score.calculatedAt,
@@ -551,15 +786,28 @@ export const getAvgDaysToPaid = query({
     const daysToPaid: number[] = []
 
     for (const sub of paidSubs) {
+      // Try registration first
       const reg = await ctx.db
         .query('registrations')
         .withIndex('by_user', (q) => q.eq('userId', sub.userId))
         .first()
 
-      if (reg?.registeredAt && sub.createdAt) {
-        const regDate = new Date(reg.registeredAt).getTime()
+      let firstSeenDate: number | null = null
+      if (reg?.registeredAt) {
+        firstSeenDate = new Date(reg.registeredAt).getTime()
+      } else {
+        // Try auth user creation time
+        try {
+          const user = await ctx.db.get(sub.userId as any)
+          if (user && (user as any)._creationTime) {
+            firstSeenDate = (user as any)._creationTime
+          }
+        } catch { /* userId might not be a valid doc ID */ }
+      }
+
+      if (firstSeenDate && sub.createdAt) {
         const subDate = new Date(sub.createdAt).getTime()
-        const days = Math.max(0, Math.round((subDate - regDate) / (24 * 60 * 60 * 1000)))
+        const days = Math.max(0, Math.round((subDate - firstSeenDate) / (24 * 60 * 60 * 1000)))
         daysToPaid.push(days)
       }
     }
