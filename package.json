@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "ANNA - Voice Dictation for macOS",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",

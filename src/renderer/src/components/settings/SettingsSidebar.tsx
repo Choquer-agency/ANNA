@@ -42,7 +42,7 @@ export function SettingsSidebar({
   }, [])
 
   return (
-    <div className="w-48 border-r py-6 px-3 shrink-0 flex flex-col" style={{ backgroundColor: '#FFFAF4', borderColor: '#FFEBD0' }}>
+    <div className="w-48 h-full border-r py-6 px-3 shrink-0 flex flex-col" style={{ backgroundColor: '#FFFAF4', borderColor: '#FFEBD0' }}>
       <div className="flex-1">
         {groups.map((group) => (
           <div key={group.label} className="mb-5">
@@ -72,7 +72,7 @@ export function SettingsSidebar({
         ))}
       </div>
       {version && (
-        <div className="text-[10px] text-ink-faint px-3 pt-1">v{version}</div>
+        <div className="text-[10px] text-ink-faint px-3 mt-auto pt-2">v{version}</div>
       )}
     </div>
   )
