@@ -329,30 +329,13 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
 
   const isBlurred = isLifetime && !isMiddle
 
-  // When lifetime is active: middle card becomes lifetime, others blur
-  if (isLifetime && isMiddle) {
-    return (
-      <LifetimeCardContent />
-    )
-  }
-
   // Annual price annotation for Pro
   const showAnnualNote = isAnnual && tier.price && tier.price.annual > 0
   const annualTotal = PLANS.pro.prices.annual ? `$${PLANS.pro.prices.annual.usd / 100}/year` : null
 
-  return (
-    <>
-      <motion.div
-        variants={fadeInUp}
-        animate={{
-          filter: isBlurred ? 'blur(8px)' : 'blur(0px)',
-          opacity: isBlurred ? 0.4 : 1,
-        }}
-        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-        className={`relative flex flex-col rounded-[20px] p-6 md:p-7 transition-all duration-500 ${styles.card} ${
-          isBlurred ? 'pointer-events-none select-none' : ''
-        }`}
-      >
+  function cardInner() {
+    return (
+      <>
         {/* Icon + Title */}
         <div className="flex items-center gap-2 mb-4">
           <div className={`shrink-0 ${styles.icon}`}>
@@ -393,10 +376,7 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
               {showAnnualNote && annualTotal && (
                 <p className="text-xs text-ink-muted mt-1">billed {annualTotal}</p>
               )}
-              {tier.highlighted && !isAnnual && (
-                <p className="text-xs text-primary font-medium mt-1">7-day free trial</p>
-              )}
-              {tier.highlighted && isAnnual && (
+              {tier.highlighted && (
                 <p className="text-xs text-primary font-medium mt-1">7-day free trial</p>
               )}
             </div>
@@ -459,6 +439,42 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
             <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
           </a>
         )}
+      </>
+    )
+  }
+
+  // Middle card: stable wrapper that never unmounts, content swaps inside
+  if (isMiddle) {
+    return (
+      <>
+        <motion.div variants={fadeInUp}>
+          {isLifetime ? (
+            <LifetimeCardContent />
+          ) : (
+            <div className={`relative flex flex-col rounded-[20px] p-6 md:p-7 ${styles.card}`}>
+              {cardInner()}
+            </div>
+          )}
+        </motion.div>
+        {isTeam && <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <motion.div
+        variants={fadeInUp}
+        animate={{
+          filter: isBlurred ? 'blur(8px)' : 'blur(0px)',
+          opacity: isBlurred ? 0.4 : 1,
+        }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        className={`relative flex flex-col rounded-[20px] p-6 md:p-7 transition-all duration-500 ${styles.card} ${
+          isBlurred ? 'pointer-events-none select-none' : ''
+        }`}
+      >
+        {cardInner()}
       </motion.div>
 
       {isTeam && <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />}

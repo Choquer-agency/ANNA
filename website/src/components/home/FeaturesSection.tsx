@@ -586,18 +586,18 @@ function SpeedComparison() {
               </div>
 
               {/* Waveform — 7 bars matching Anna's recording pill */}
-              <div className="mt-4 flex items-end justify-center gap-[2.5px] h-10">
+              <div className="mt-4 flex items-end justify-center gap-[3px] h-12">
                 {raceWaveformBars.map((bar, i) => (
                   <motion.div
                     key={i}
-                    className="w-[3px] rounded-full"
+                    className="w-[4px] rounded-full"
                     style={{
                       background: 'linear-gradient(to bottom, #FF6B9D 0%, rgba(255,255,255,0.85) 24%, rgba(255,255,255,0.85) 76%, #FF9E19 100%)',
                     }}
-                    initial={{ height: '10%' }}
+                    initial={{ height: '12%' }}
                     animate={(phase === 'racing' && !annaFinished) ? {
-                      height: ['10%', `${bar.height}%`, '10%'],
-                    } : { height: '10%' }}
+                      height: ['12%', `${bar.height}%`, '12%'],
+                    } : { height: '12%' }}
                     transition={{
                       duration: bar.duration,
                       delay: i * 0.04,
