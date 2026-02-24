@@ -779,15 +779,17 @@ app.whenReady().then(async () => {
       mainWindow?.webContents.send('update:error', err.message)
     })
 
-    autoUpdater.checkForUpdates().catch((err) =>
+    autoUpdater.checkForUpdates().catch((err) => {
       console.error('[updater] Check failed:', err)
-    )
+      mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
+    })
 
     // Check for updates every 4 hours
     setInterval(() => {
-      autoUpdater.checkForUpdates().catch((err) =>
+      autoUpdater.checkForUpdates().catch((err) => {
         console.error('[updater] Check failed:', err)
-      )
+        mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
+      })
     }, 4 * 60 * 60 * 1000)
   }
 
@@ -797,9 +799,12 @@ app.whenReady().then(async () => {
   // Manual update check
   ipcMain.handle('update:check', async () => {
     if (is.dev) return
-    autoUpdater.checkForUpdates().catch((err) =>
+    try {
+      await autoUpdater.checkForUpdates()
+    } catch (err: any) {
       console.error('[updater] Manual check failed:', err)
-    )
+      mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
+    }
   })
 
   // Download update (user-initiated)

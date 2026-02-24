@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "ANNA - Voice Dictation for macOS",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",
@@ -76,7 +76,7 @@
       "provider": "github",
       "owner": "Choquer-agency",
       "repo": "ANNA",
-      "private": true
+      "private": false
     },
     "afterAllArtifactBuild": "scripts/notarize-dmg.js",
     "extraResources": [
