@@ -152,23 +152,35 @@ contextBridge.exposeInMainWorld('annaAPI', {
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
 
   // Auto-update
-  onUpdateDownloaded: (callback: (version: string) => void): void => {
-    ipcRenderer.on('update:downloaded', (_event, version: string) => callback(version))
+  onUpdateDownloaded: (callback: (version: string) => void): (() => void) => {
+    const handler = (_event: any, version: string): void => callback(version)
+    ipcRenderer.on('update:downloaded', handler)
+    return () => ipcRenderer.removeListener('update:downloaded', handler)
   },
-  onUpdateChecking: (callback: () => void): void => {
-    ipcRenderer.on('update:checking', () => callback())
+  onUpdateChecking: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('update:checking', handler)
+    return () => ipcRenderer.removeListener('update:checking', handler)
   },
-  onUpdateAvailable: (callback: (version: string) => void): void => {
-    ipcRenderer.on('update:available', (_event, version: string) => callback(version))
+  onUpdateAvailable: (callback: (version: string) => void): (() => void) => {
+    const handler = (_event: any, version: string): void => callback(version)
+    ipcRenderer.on('update:available', handler)
+    return () => ipcRenderer.removeListener('update:available', handler)
   },
-  onUpdateNotAvailable: (callback: () => void): void => {
-    ipcRenderer.on('update:not-available', () => callback())
+  onUpdateNotAvailable: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('update:not-available', handler)
+    return () => ipcRenderer.removeListener('update:not-available', handler)
   },
-  onUpdateProgress: (callback: (percent: number) => void): void => {
-    ipcRenderer.on('update:download-progress', (_event, percent: number) => callback(percent))
+  onUpdateProgress: (callback: (percent: number) => void): (() => void) => {
+    const handler = (_event: any, percent: number): void => callback(percent)
+    ipcRenderer.on('update:download-progress', handler)
+    return () => ipcRenderer.removeListener('update:download-progress', handler)
   },
-  onUpdateError: (callback: (message: string) => void): void => {
-    ipcRenderer.on('update:error', (_event, message: string) => callback(message))
+  onUpdateError: (callback: (message: string) => void): (() => void) => {
+    const handler = (_event: any, message: string): void => callback(message)
+    ipcRenderer.on('update:error', handler)
+    return () => ipcRenderer.removeListener('update:error', handler)
   },
   checkForUpdates: (): Promise<void> => ipcRenderer.invoke('update:check'),
   downloadUpdate: (): Promise<void> => ipcRenderer.invoke('update:download'),

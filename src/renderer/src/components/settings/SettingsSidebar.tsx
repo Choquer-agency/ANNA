@@ -35,7 +35,7 @@ export function SettingsSidebar({
   activeTab: SettingsTab
   onTabChange: (tab: SettingsTab) => void
 }): React.JSX.Element {
-  const [version, setVersion] = useState('')
+  const [version, setVersion] = useState(process.env.APP_VERSION || '')
 
   useEffect(() => {
     window.annaAPI.getAppVersion().then(setVersion).catch(() => {})

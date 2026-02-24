@@ -48,6 +48,7 @@ export default defineConfig({
     define: {
       'process.env.POSTHOG_API_KEY': JSON.stringify(process.env.POSTHOG_API_KEY),
       'process.env.POSTHOG_HOST': JSON.stringify(process.env.POSTHOG_HOST),
+      'process.env.APP_VERSION': JSON.stringify(require('./package.json').version),
     },
     build: {
       rollupOptions: {

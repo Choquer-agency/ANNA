@@ -779,10 +779,12 @@ app.whenReady().then(async () => {
       mainWindow?.webContents.send('update:error', err.message)
     })
 
-    autoUpdater.checkForUpdates().catch((err) => {
-      console.error('[updater] Check failed:', err)
-      mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
-    })
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.error('[updater] Check failed:', err)
+        mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
+      })
+    }, 5000)
 
     // Check for updates every 4 hours
     setInterval(() => {
@@ -798,7 +800,10 @@ app.whenReady().then(async () => {
 
   // Manual update check
   ipcMain.handle('update:check', async () => {
-    if (is.dev) return
+    if (is.dev) {
+      mainWindow?.webContents.send('update:not-available')
+      return
+    }
     try {
       await autoUpdater.checkForUpdates()
     } catch (err: any) {
@@ -808,8 +813,13 @@ app.whenReady().then(async () => {
   })
 
   // Download update (user-initiated)
-  ipcMain.handle('update:download', () => {
-    autoUpdater.downloadUpdate()
+  ipcMain.handle('update:download', async () => {
+    try {
+      await autoUpdater.downloadUpdate()
+    } catch (err: any) {
+      console.error('[updater] Download failed:', err)
+      mainWindow?.webContents.send('update:error', err?.message || 'Download failed')
+    }
   })
 
   ipcMain.handle('update:install', () => {

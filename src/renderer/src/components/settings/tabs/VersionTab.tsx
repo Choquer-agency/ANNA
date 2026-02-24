@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
@@ -7,43 +7,57 @@ type UpdateStatus = 'idle' | 'checking' | 'available' | 'not-available' | 'downl
 
 export function VersionTab(): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
-  const [version, setVersion] = useState('')
+  const [version, setVersion] = useState(process.env.APP_VERSION || '')
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
   const [newVersion, setNewVersion] = useState('')
   const [downloadPercent, setDownloadPercent] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
+  const checkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     window.annaAPI.getAppVersion().then(setVersion).catch(() => {})
   }, [])
 
   useEffect(() => {
-    window.annaAPI.onUpdateChecking(() => setUpdateStatus('checking'))
-    window.annaAPI.onUpdateAvailable((v: string) => {
-      setUpdateStatus('available')
-      if (v) setNewVersion(v)
-    })
-    window.annaAPI.onUpdateNotAvailable(() => setUpdateStatus('not-available'))
-    window.annaAPI.onUpdateProgress((percent: number) => {
-      setUpdateStatus('downloading')
-      setDownloadPercent(percent)
-    })
-    window.annaAPI.onUpdateDownloaded((v: string) => {
-      setUpdateStatus('downloaded')
-      if (v) setNewVersion(v)
-    })
-    window.annaAPI.onUpdateError((message: string) => {
-      setUpdateStatus('error')
-      setErrorMessage(message)
-    })
+    const cleanups = [
+      window.annaAPI.onUpdateChecking(() => setUpdateStatus('checking')),
+      window.annaAPI.onUpdateAvailable((v: string) => {
+        setUpdateStatus('available')
+        if (v) setNewVersion(v)
+      }),
+      window.annaAPI.onUpdateNotAvailable(() => setUpdateStatus('not-available')),
+      window.annaAPI.onUpdateProgress((percent: number) => {
+        setUpdateStatus('downloading')
+        setDownloadPercent(percent)
+      }),
+      window.annaAPI.onUpdateDownloaded((v: string) => {
+        setUpdateStatus('downloaded')
+        if (v) setNewVersion(v)
+      }),
+      window.annaAPI.onUpdateError((message: string) => {
+        setUpdateStatus('error')
+        setErrorMessage(message)
+      })
+    ]
 
     return () => {
-      // Listeners are cleaned up globally via removeAllListeners
+      cleanups.forEach((cleanup) => cleanup())
+      if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current)
     }
   }, [])
 
   const handleCheckForUpdates = useCallback(async () => {
     setUpdateStatus('checking')
+    if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current)
+    checkTimeoutRef.current = setTimeout(() => {
+      setUpdateStatus((current) => {
+        if (current === 'checking') {
+          setErrorMessage('Update check timed out. Please try again.')
+          return 'error'
+        }
+        return current
+      })
+    }, 15000)
     await window.annaAPI.checkForUpdates()
   }, [])
 
@@ -84,7 +98,7 @@ export function VersionTab(): React.JSX.Element {
         </SettingsRow>
         <SettingsRow label="Check for Updates" description="Manually check if a newer version is available">
           <button
-            onClick={updateStatus === 'error' ? handleCheckForUpdates : handleCheckForUpdates}
+            onClick={handleCheckForUpdates}
             disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
             className="text-sm font-semibold text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
