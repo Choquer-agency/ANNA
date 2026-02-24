@@ -56,7 +56,7 @@ function StackCard({
       className="flex items-start justify-center"
       style={{
         position: 'sticky',
-        top: `${160 + index * 30}px`,
+        top: `calc(50vh - 180px + ${index * 30}px)`,
         zIndex: index + 1,
       }}
     >
@@ -95,7 +95,7 @@ export function StackingCardsSection() {
     <section ref={sectionRef} className="pt-16 md:pt-24 pb-0">
       <div className="mx-auto max-w-[1400px] px-6 md:px-10">
         {/* Sticky heading — pins at center of viewport */}
-        <div className="sticky top-[33vh] z-0 text-center pb-8 md:pb-12">
+        <div className="sticky top-[40vh] z-0 text-center pb-8 md:pb-12">
           <p className="text-primary text-sm uppercase tracking-[0.15em] font-medium mb-5">
             How it works
           </p>
@@ -115,12 +115,12 @@ export function StackingCardsSection() {
         </div>
 
         {/* Cards container — cards scroll up and layer over the heading */}
-        <div className="relative z-10 mx-auto max-w-[520px] mt-[65vh]">
+        <div className="relative z-10 mx-auto max-w-[520px] mt-[55vh]">
           {steps.map((step, i) => (
             <StackCard key={step.number} step={step} index={i} />
           ))}
           {/* Spacer so the last card has room to scroll into view */}
-          <div className="h-[40vh]" />
+          <div className="h-[15vh]" />
         </div>
       </div>
     </section>

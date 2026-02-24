@@ -108,7 +108,7 @@ export function HeroSection() {
 
   return (
     <section ref={containerRef} className="relative min-h-screen bg-mesh overflow-hidden">
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 pt-[clamp(8rem,15vh,12rem)] pb-[clamp(4rem,8vh,8rem)]">
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10 pt-[clamp(7rem,13vh,10.5rem)] pb-[clamp(4rem,8vh,8rem)]">
         <motion.div style={{ y: textY }} className="text-center">
           {/* Pill badge */}
           <motion.div

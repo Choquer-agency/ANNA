@@ -104,14 +104,13 @@ function shuffleArray<T>(arr: T[]): T[] {
 const VISIBLE_COUNT = 9
 
 export function LiveUsersSection() {
+  const [initialShuffle] = useState(() => shuffleArray(MOCK_USERS))
   const [visibleUsers, setVisibleUsers] = useState(() =>
-    shuffleArray(MOCK_USERS).slice(0, VISIBLE_COUNT)
+    initialShuffle.slice(0, VISIBLE_COUNT)
   )
-  const [pool, setPool] = useState(() => {
-    const initial = shuffleArray(MOCK_USERS).slice(0, VISIBLE_COUNT)
-    const ids = new Set(initial.map((u) => u.id))
-    return MOCK_USERS.filter((u) => !ids.has(u.id))
-  })
+  const [pool, setPool] = useState(() =>
+    initialShuffle.slice(VISIBLE_COUNT)
+  )
   const [extraCount, setExtraCount] = useState(
     () => MOCK_USERS.length - VISIBLE_COUNT
   )
@@ -159,11 +158,11 @@ export function LiveUsersSection() {
   }, [])
 
   return (
-    <section className="section-py-sm overflow-hidden">
+    <section className="pt-8 pb-[clamp(2rem,4vw,4rem)] overflow-hidden">
       <div className="mx-auto max-w-[1400px] px-6 md:px-10">
         {/* Heading */}
         <FadeIn>
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 mb-5">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />

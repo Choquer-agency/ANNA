@@ -231,7 +231,7 @@ export function Footer() {
           <div className="pb-10 md:pb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
             {/* Logo + copyright */}
             <div className="flex items-center gap-6">
-              <AnnaLogo className="h-4 text-white/30" />
+              <AnnaLogo className="h-4 text-white" />
               <span className="text-[0.8rem] text-white/20">
                 &copy; {new Date().getFullYear()} Choquer Creative Corp.
               </span>

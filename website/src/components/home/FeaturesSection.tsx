@@ -118,7 +118,7 @@ function AIAutoEditsIllustration() {
    Feature 2: Personal Dictionary — illustration
    ═══════════════════════════════════════════════════════ */
 const dictionaryWords = [
-  { word: 'Bryce Choquer', category: 'Name' },
+  { word: 'Jordan Mitchell', category: 'Name' },
   { word: 'PostgreSQL', category: 'Technical' },
   { word: 'Kubernetes', category: 'Technical' },
   { word: 'Anna AI', category: 'Company' },
@@ -127,6 +127,13 @@ const dictionaryWords = [
   { word: 'Next.js', category: 'Technical' },
   { word: 'Anthropic', category: 'Company' },
 ]
+
+const categoryColors: Record<string, string> = {
+  Name: 'bg-blue-100 text-blue-700',
+  Technical: 'bg-purple-100 text-purple-700',
+  Company: 'bg-green-100 text-green-700',
+  Product: 'bg-amber-100 text-amber-700',
+}
 
 function PersonalDictionaryIllustration() {
   const ref = useRef<HTMLDivElement>(null)
@@ -158,7 +165,7 @@ function PersonalDictionaryIllustration() {
             className="bg-white rounded-xl px-4 py-2.5 flex items-center justify-between border border-black/5"
           >
             <span className="text-sm font-medium text-ink">{entry.word}</span>
-            <span className="text-[0.65rem] font-medium text-ink-muted bg-surface-alt px-2 py-0.5 rounded-full">
+            <span className={`text-[0.65rem] font-medium px-2 py-0.5 rounded-full ${categoryColors[entry.category] || 'bg-surface-alt text-ink-muted'}`}>
               {entry.category}
             </span>
           </motion.div>
@@ -277,7 +284,10 @@ function LanguagesIllustration() {
             {langWaveformBars.map((bar, i) => (
               <motion.div
                 key={i}
-                className="w-[3px] rounded-full bg-primary/60"
+                className="w-[3px] rounded-full"
+                style={{
+                  background: 'linear-gradient(to bottom, #FF6B9D 0%, rgba(255,255,255,0.85) 24%, rgba(255,255,255,0.85) 76%, #FF9E19 100%)',
+                }}
                 animate={{
                   height: ['20%', `${bar.height}%`, '20%'],
                 }}
@@ -574,7 +584,10 @@ function SpeedComparison() {
                 {raceWaveformBars.map((bar, i) => (
                   <motion.div
                     key={i}
-                    className="w-[2.5px] rounded-full bg-primary/50"
+                    className="w-[2.5px] rounded-full"
+                    style={{
+                      background: 'linear-gradient(to bottom, #FF6B9D 0%, rgba(255,255,255,0.85) 24%, rgba(255,255,255,0.85) 76%, #FF9E19 100%)',
+                    }}
                     initial={{ height: '15%' }}
                     animate={(phase === 'racing' && !annaFinished) ? {
                       height: ['15%', `${bar.height}%`, '15%'],
