@@ -36,7 +36,7 @@ process.on('unhandledRejection', (reason) => {
 })
 
 import { config } from 'dotenv'
-import { app, BrowserWindow, ipcMain, dialog, nativeImage, net, systemPreferences, utilityProcess } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, systemPreferences, utilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { existsSync, unlinkSync, copyFileSync, readFileSync } from 'fs'
@@ -69,6 +69,33 @@ import { anyApi } from 'convex/server'
 
 let mainWindow: BrowserWindow | null = null
 
+// Update check — registered at module level so nothing can block it
+// Uses GitHub API directly (electron-updater's checkForUpdates() hangs in production)
+ipcMain.handle('update:check', async () => {
+  const current = app.getVersion()
+  try {
+    const { net } = require('electron')
+    const resp = await net.fetch(
+      'https://api.github.com/repos/Choquer-agency/ANNA/releases/latest',
+      { headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Anna-Updater' } }
+    )
+    if (!resp.ok) {
+      return { state: 'error', message: 'GitHub API returned ' + resp.status }
+    }
+    const data = await resp.json()
+    const latest = (data.tag_name || '').replace(/^v/, '') || current
+    if (latest !== current) {
+      return { state: 'available', version: latest }
+    }
+    return { state: 'not-available', version: current }
+  } catch (err: any) {
+    console.error('[updater] Check failed:', err)
+    return { state: 'error', message: err?.message || 'Update check failed' }
+  }
+})
+
+// App version — also at module level for reliability
+ipcMain.handle('app:get-version', () => app.getVersion())
 
 // Register anna:// deep link protocol
 if (process.defaultApp) {
@@ -787,33 +814,6 @@ app.whenReady().then(async () => {
     // so we don't call it on startup. Manual checks use net.fetch instead.
     // autoUpdater is still used for download + install once an update is found.
   }
-
-  // App version
-  ipcMain.handle('app:get-version', () => app.getVersion())
-
-  // Manual update check — uses net.fetch to check GitHub releases directly
-  // (electron-updater's checkForUpdates() hangs in production builds)
-  ipcMain.handle('update:check', async () => {
-    const current = app.getVersion()
-    try {
-      const resp = await net.fetch(
-        'https://api.github.com/repos/Choquer-agency/ANNA/releases/latest',
-        { headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Anna-Updater' } }
-      )
-      if (!resp.ok) {
-        return { state: 'error', message: `GitHub API returned ${resp.status}` }
-      }
-      const data = await resp.json() as { tag_name?: string }
-      const latest = data.tag_name?.replace(/^v/, '') || current
-      if (latest !== current) {
-        return { state: 'available', version: latest }
-      }
-      return { state: 'not-available', version: current }
-    } catch (err: any) {
-      console.error('[updater] Check failed:', err)
-      return { state: 'error', message: err?.message || 'Update check failed' }
-    }
-  })
 
   // Download update (user-initiated)
   ipcMain.handle('update:download', async () => {
