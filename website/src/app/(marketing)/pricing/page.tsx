@@ -82,7 +82,7 @@ export default function PricingPage() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-[1100px] mx-auto items-stretch"
+            className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-[1100px] mx-auto items-start"
           >
             {pricingTiers.map((tier, i) => (
               <PricingCard

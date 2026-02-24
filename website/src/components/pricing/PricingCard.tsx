@@ -225,11 +225,10 @@ function LifetimeCardContent() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-      className="lifetime-gradient-border rounded-[22px] p-[2px] h-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+      className="lifetime-gradient-border rounded-[22px] p-[2px]"
     >
       <div className="flex flex-col rounded-[20px] h-full bg-white p-6 md:p-7">
         {/* Icon + Title + Limited badge */}
@@ -328,14 +327,14 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
     }
   }
 
+  const isBlurred = isLifetime && !isMiddle
+
   // When lifetime is active: middle card becomes lifetime, others blur
   if (isLifetime && isMiddle) {
     return (
       <LifetimeCardContent />
     )
   }
-
-  const isBlurred = isLifetime && !isMiddle
 
   // Annual price annotation for Pro
   const showAnnualNote = isAnnual && tier.price && tier.price.annual > 0
@@ -350,7 +349,7 @@ export function PricingCard({ tier, isAnnual, isLifetime, index }: PricingCardPr
           opacity: isBlurred ? 0.4 : 1,
         }}
         transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-        className={`relative flex flex-col rounded-[20px] p-6 md:p-7 transition-all duration-500 h-full ${styles.card} ${
+        className={`relative flex flex-col rounded-[20px] p-6 md:p-7 transition-all duration-500 ${styles.card} ${
           isBlurred ? 'pointer-events-none select-none' : ''
         }`}
       >
