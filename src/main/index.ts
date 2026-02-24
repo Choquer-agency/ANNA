@@ -847,41 +847,44 @@ app.whenReady().then(async () => {
   // App version
   ipcMain.handle('app:get-version', () => app.getVersion())
 
-  // Manual update check — try electron-updater first, fall back to direct HTTP check
-  ipcMain.handle('update:check', async () => {
+  // Manual update check — returns result via IPC invoke (not events, which are unreliable)
+  ipcMain.handle('update:check', async (): Promise<{ state: string; version?: string; message?: string }> => {
     if (is.dev) {
-      mainWindow?.webContents.send('update:not-available')
-      return
+      return { state: 'not-available', version: app.getVersion() }
     }
     try {
-      console.log('[updater] Manual check starting, mainWindow exists:', !!mainWindow)
+      console.log('[updater] Manual check starting')
       const result = await Promise.race([
         autoUpdater.checkForUpdates(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('__timeout__')), 10000)
+          setTimeout(() => reject(new Error('__timeout__')), 8000)
         )
       ])
-      console.log('[updater] Check resolved:', result?.updateInfo?.version)
+      if (result && result.updateInfo) {
+        const latest = result.updateInfo.version
+        const current = app.getVersion()
+        console.log('[updater] electron-updater result: current=%s latest=%s', current, latest)
+        if (latest !== current) {
+          return { state: 'available', version: latest }
+        }
+        return { state: 'not-available', version: current }
+      }
+      return { state: 'not-available', version: app.getVersion() }
     } catch (err: any) {
       console.error('[updater] Primary check failed:', err?.message)
       // If electron-updater timed out or failed, try direct HTTP fallback
-      if (err?.message === '__timeout__' || err?.message?.includes('timed out')) {
+      try {
         console.log('[updater] Trying direct HTTP fallback...')
-        try {
-          const latestVersion = await fetchLatestVersionFromGitHub()
-          const currentVersion = app.getVersion()
-          console.log('[updater] Fallback result: current=%s latest=%s', currentVersion, latestVersion)
-          if (latestVersion && latestVersion !== currentVersion) {
-            mainWindow?.webContents.send('update:available', latestVersion)
-          } else {
-            mainWindow?.webContents.send('update:not-available')
-          }
-        } catch (fallbackErr: any) {
-          console.error('[updater] Fallback also failed:', fallbackErr?.message)
-          mainWindow?.webContents.send('update:error', 'Update check failed. Please check your internet connection.')
+        const latestVersion = await fetchLatestVersionFromGitHub()
+        const currentVersion = app.getVersion()
+        console.log('[updater] Fallback result: current=%s latest=%s', currentVersion, latestVersion)
+        if (latestVersion && latestVersion !== currentVersion) {
+          return { state: 'available', version: latestVersion }
         }
-      } else {
-        mainWindow?.webContents.send('update:error', err?.message || 'Update check failed')
+        return { state: 'not-available', version: currentVersion }
+      } catch (fallbackErr: any) {
+        console.error('[updater] Fallback also failed:', fallbackErr?.message)
+        return { state: 'error', message: 'Update check failed. Please check your internet connection.' }
       }
     }
   })

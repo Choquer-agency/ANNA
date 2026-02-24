@@ -182,7 +182,7 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.on('update:error', handler)
     return () => ipcRenderer.removeListener('update:error', handler)
   },
-  checkForUpdates: (): Promise<void> => ipcRenderer.invoke('update:check'),
+  checkForUpdates: (): Promise<{ state: string; version?: string; message?: string }> => ipcRenderer.invoke('update:check'),
   downloadUpdate: (): Promise<void> => ipcRenderer.invoke('update:download'),
   installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
 

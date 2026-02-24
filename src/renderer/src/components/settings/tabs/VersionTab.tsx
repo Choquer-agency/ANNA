@@ -57,8 +57,30 @@ export function VersionTab(): React.JSX.Element {
         }
         return current
       })
-    }, 15000)
-    await window.annaAPI.checkForUpdates()
+    }, 30000)
+    try {
+      const result = await window.annaAPI.checkForUpdates()
+      if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current)
+      if (result) {
+        switch (result.state) {
+          case 'available':
+            setUpdateStatus('available')
+            if (result.version) setNewVersion(result.version)
+            break
+          case 'not-available':
+            setUpdateStatus('not-available')
+            break
+          case 'error':
+            setUpdateStatus('error')
+            setErrorMessage(result.message || 'Update check failed')
+            break
+        }
+      }
+    } catch (err: any) {
+      if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current)
+      setUpdateStatus('error')
+      setErrorMessage(err?.message || 'Update check failed')
+    }
   }, [])
 
   const handleDownloadUpdate = useCallback(async () => {
