@@ -67,23 +67,20 @@ function SoundWaveBadge() {
 function AvatarBubble({ user }: { user: (typeof MOCK_USERS)[0] }) {
   return (
     <motion.div
-      layout
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-      className="relative"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4, ease: 'easeInOut' }}
+      className="relative w-[68px] h-[68px] sm:w-[76px] sm:h-[76px] shrink-0"
     >
-      <div className="relative w-[68px] h-[68px] sm:w-[76px] sm:h-[76px]">
-        <Image
-          src={user.avatar}
-          alt={user.name}
-          width={76}
-          height={76}
-          className="rounded-full ring-[3px] ring-white shadow-[0_4px_16px_rgba(0,0,0,0.1)] object-cover w-full h-full"
-        />
-        <SoundWaveBadge />
-      </div>
+      <Image
+        src={user.avatar}
+        alt={user.name}
+        width={76}
+        height={76}
+        className="rounded-full ring-[3px] ring-white shadow-[0_4px_16px_rgba(0,0,0,0.1)] object-cover w-full h-full"
+      />
+      <SoundWaveBadge />
     </motion.div>
   )
 }
@@ -181,7 +178,7 @@ export function LiveUsersSection() {
         {/* Single row of 9 avatars */}
         <FadeIn delay={0.15}>
           <div className="flex items-center justify-center gap-5 sm:gap-6">
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="sync">
               {visibleUsers.map((user) => (
                 <AvatarBubble key={user.id} user={user} />
               ))}

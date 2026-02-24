@@ -323,11 +323,17 @@ const ANNA_DURATION = 2450
 const KEYBOARD_CHAR_MS = KEYBOARD_DURATION / raceParagraph.length
 const ANNA_WORD_MS = ANNA_DURATION / TOTAL_WORDS
 
-// Waveform bar presets
-const raceWaveformBars = Array.from({ length: 56 }).map((_, i) => ({
-  height: 25 + ((i * 37 + 13) % 70),
-  duration: 0.5 + ((i * 53 + 7) % 60) / 100,
-}))
+// Waveform bar presets — 7 bars matching Anna's recording pill
+// Center bar tallest, outer bars decay symmetrically
+const raceWaveformBars = [
+  { height: 40, duration: 0.7 },
+  { height: 60, duration: 0.55 },
+  { height: 80, duration: 0.6 },
+  { height: 95, duration: 0.5 },
+  { height: 80, duration: 0.65 },
+  { height: 60, duration: 0.55 },
+  { height: 40, duration: 0.7 },
+]
 
 function SpeedComparison() {
   const ref = useRef<HTMLDivElement>(null)
@@ -579,22 +585,22 @@ function SpeedComparison() {
                 )}
               </div>
 
-              {/* Waveform */}
-              <div className="mt-4 flex items-end justify-center gap-[2px] h-10">
+              {/* Waveform — 7 bars matching Anna's recording pill */}
+              <div className="mt-4 flex items-end justify-center gap-[2.5px] h-10">
                 {raceWaveformBars.map((bar, i) => (
                   <motion.div
                     key={i}
-                    className="w-[2.5px] rounded-full"
+                    className="w-[3px] rounded-full"
                     style={{
                       background: 'linear-gradient(to bottom, #FF6B9D 0%, rgba(255,255,255,0.85) 24%, rgba(255,255,255,0.85) 76%, #FF9E19 100%)',
                     }}
-                    initial={{ height: '15%' }}
+                    initial={{ height: '10%' }}
                     animate={(phase === 'racing' && !annaFinished) ? {
-                      height: ['15%', `${bar.height}%`, '15%'],
-                    } : { height: '15%' }}
+                      height: ['10%', `${bar.height}%`, '10%'],
+                    } : { height: '10%' }}
                     transition={{
                       duration: bar.duration,
-                      delay: i * 0.02,
+                      delay: i * 0.04,
                       repeat: Infinity,
                       repeatType: 'loop',
                       ease: 'easeInOut',
