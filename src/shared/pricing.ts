@@ -92,8 +92,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     trial: { days: 7, requireCard: true },
     wordLimit: null,
     stripePriceIds: {
-      monthly: 'price_1T3sSHHlgz688d0xGERYtVtK',
-      annual: 'price_1T3sSMHlgz688d0xpI4csy0f',
+      monthly: 'price_1T3rtHHlgz688d0xzUJgmWUF',
+      annual: 'price_1T3rtHHlgz688d0xfG5ILqr7',
     },
   },
   lifetime: {
@@ -114,7 +114,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     },
     wordLimit: null,
     stripePriceIds: {
-      lifetime: 'price_1T3sSiHlgz688d0x9rMhoc9j',
+      lifetime: 'price_1T3rtHHlgz688d0xTjzFKnat',
     },
   },
 }
