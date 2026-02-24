@@ -2,12 +2,13 @@
 /node_modules
 /out
 /dist
-/src
+/src/main
+/src/preload
+/src/renderer
 /resources
 /scripts
 /build
 /.github
-/convex
 *.dmg
 *.zip
 *.node

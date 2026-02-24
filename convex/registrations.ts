@@ -1,6 +1,7 @@
 import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
+import { assertAdmin } from './adminLib'
 
 export const register = mutation({
   args: {
@@ -119,6 +120,7 @@ export const updateProfileImage = mutation({
 export const listAll = query({
   args: {},
   handler: async (ctx) => {
+    await assertAdmin(ctx)
     return await ctx.db.query('registrations').collect()
   },
 })
@@ -138,15 +140,6 @@ export const getAuthUserProfile = query({
           name: (user.name as string) || '',
           image: (user.image as string) || '',
         }
-      }
-    }
-    // Fallback: get the most recent user (for single-user desktop app)
-    const users = await ctx.db.query('users').order('desc').first()
-    if (users) {
-      return {
-        email: (users.email as string) || '',
-        name: (users.name as string) || '',
-        image: (users.image as string) || '',
       }
     }
     return null

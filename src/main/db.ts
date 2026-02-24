@@ -133,11 +133,13 @@ export function createSession(data: {
   return getSessionById(id)!
 }
 
+const SESSION_UPDATABLE_FIELDS = new Set(['status', 'raw_transcript', 'processed_transcript', 'duration_ms', 'word_count', 'audio_path', 'error'])
+
 export function updateSession(
   id: string,
   data: Partial<Pick<Session, 'status' | 'raw_transcript' | 'processed_transcript' | 'duration_ms' | 'word_count' | 'audio_path' | 'error'>>
 ): void {
-  const fields = Object.entries(data).filter(([, v]) => v !== undefined)
+  const fields = Object.entries(data).filter(([k, v]) => v !== undefined && SESSION_UPDATABLE_FIELDS.has(k))
   if (fields.length === 0) return
   const setClause = fields.map(([k]) => `${k} = ?`).join(', ')
   const values = fields.map(([, v]) => v)
@@ -393,8 +395,10 @@ export function createNote(): Note {
   return db.prepare('SELECT * FROM notes WHERE id = ?').get(id) as Note
 }
 
+const NOTE_UPDATABLE_FIELDS = new Set(['title', 'content', 'updated_at'])
+
 export function updateNote(id: string, data: { title?: string; content?: string }): void {
-  const fields = Object.entries(data).filter(([, v]) => v !== undefined)
+  const fields = Object.entries(data).filter(([k, v]) => v !== undefined && NOTE_UPDATABLE_FIELDS.has(k))
   if (fields.length === 0) return
   fields.push(['updated_at', new Date().toISOString().replace('T', ' ').slice(0, 19)])
   const setClause = fields.map(([k]) => `${k} = ?`).join(', ')

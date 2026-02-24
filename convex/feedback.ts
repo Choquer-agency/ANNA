@@ -20,25 +20,28 @@ export const send = action({
     const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) throw new Error('RESEND_API_KEY not configured')
 
+    // HTML-escape user content to prevent injection
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
     // Build HTML email body
     const html = `
-      <h2>Feedback from ${args.userName || 'Unknown'}</h2>
-      <p><strong>Email:</strong> ${args.userEmail || 'N/A'}</p>
-      <p><strong>App Version:</strong> ${args.appVersion || 'N/A'}</p>
+      <h2>Feedback from ${esc(args.userName || 'Unknown')}</h2>
+      <p><strong>Email:</strong> ${esc(args.userEmail || 'N/A')}</p>
+      <p><strong>App Version:</strong> ${esc(args.appVersion || 'N/A')}</p>
       <hr/>
       <h3>Feedback</h3>
-      <p>${args.feedbackText.replace(/\n/g, '<br/>')}</p>
+      <p>${esc(args.feedbackText).replace(/\n/g, '<br/>')}</p>
       <hr/>
       <h3>Session Info</h3>
       <ul>
-        <li><strong>ID:</strong> ${args.sessionId}</li>
-        <li><strong>Created:</strong> ${args.sessionCreatedAt}</li>
-        <li><strong>Status:</strong> ${args.sessionStatus}</li>
-        <li><strong>App:</strong> ${args.sessionAppName || 'N/A'}</li>
+        <li><strong>ID:</strong> ${esc(args.sessionId)}</li>
+        <li><strong>Created:</strong> ${esc(args.sessionCreatedAt)}</li>
+        <li><strong>Status:</strong> ${esc(args.sessionStatus)}</li>
+        <li><strong>App:</strong> ${esc(args.sessionAppName || 'N/A')}</li>
         <li><strong>Duration:</strong> ${args.sessionDurationMs ? `${(args.sessionDurationMs / 1000).toFixed(1)}s` : 'N/A'}</li>
       </ul>
-      ${args.rawTranscript ? `<h3>Raw Transcript</h3><pre style="white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:8px;">${args.rawTranscript}</pre>` : ''}
-      ${args.processedTranscript ? `<h3>Processed Transcript</h3><pre style="white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:8px;">${args.processedTranscript}</pre>` : ''}
+      ${args.rawTranscript ? `<h3>Raw Transcript</h3><pre style="white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:8px;">${esc(args.rawTranscript)}</pre>` : ''}
+      ${args.processedTranscript ? `<h3>Processed Transcript</h3><pre style="white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:8px;">${esc(args.processedTranscript)}</pre>` : ''}
     `
 
     // Build attachments array

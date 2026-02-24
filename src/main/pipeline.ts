@@ -127,7 +127,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
 
   const wavBuffer = readFileSync(session.audio_path)
 
-  const trace = getLangfuse().trace({
+  const trace = getLangfuse()?.trace({
     name: 'dictation-session',
     sessionId,
     metadata: {
@@ -143,12 +143,12 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
 
     const language = getSetting('language') ?? 'auto'
     const rawTranscript = await verifiedTranscribe(wavBuffer, language, trace)
-    trace.update({ input: rawTranscript })
+    trace?.update({ input: rawTranscript })
     updateSession(sessionId, { raw_transcript: rawTranscript })
 
     if (!rawTranscript.trim()) {
       updateSession(sessionId, { status: 'completed', processed_transcript: '' })
-      trace.update({ metadata: { status: 'completed', emptyTranscript: true } })
+      trace?.update({ metadata: { status: 'completed', emptyTranscript: true } })
       sendComplete(sessionId)
       return
     }
@@ -163,7 +163,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     }, styleProfile?.prompt_addendum, trace, customPrompt, language)
 
     const final = applyDictionaryReplacements(processed)
-    trace.update({ output: final })
+    trace?.update({ output: final })
     const wordCount = final.split(/\s+/).filter(Boolean).length
 
     updateSession(sessionId, {
@@ -172,7 +172,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
       status: 'completed'
     })
 
-    trace.update({ metadata: { status: 'completed', wordCount } })
+    trace?.update({ metadata: { status: 'completed', wordCount } })
     sendComplete(sessionId)
 
     const completedSession = getSessionById(sessionId)
@@ -181,7 +181,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
-    trace.update({ metadata: { status: 'failed', error: errorMsg } })
+    trace?.update({ metadata: { status: 'failed', error: errorMsg } })
     updateSession(sessionId, { status: 'failed', error: errorMsg })
     sendError(errorMsg)
 
@@ -191,7 +191,7 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     }
   }
 
-  await getLangfuse().flushAsync()
+  await getLangfuse()?.flushAsync()
 }
 
 function cleanupRecordingState(): void {
@@ -298,7 +298,7 @@ async function runPipeline(
   console.timeEnd('[pipeline] saveAudio')
 
   console.time('[pipeline] langfuseTrace')
-  const trace = getLangfuse().trace({
+  const trace = getLangfuse()?.trace({
     name: 'dictation-session',
     sessionId: session.id,
     metadata: {
@@ -328,12 +328,12 @@ async function runPipeline(
       console.time('[pipeline] transcribe')
       const rawTranscript = await transcribe(wavBuffer, language, trace)
       console.timeEnd('[pipeline] transcribe')
-      trace.update({ input: rawTranscript })
+      trace?.update({ input: rawTranscript })
       updateSession(session.id, { raw_transcript: rawTranscript })
 
       if (!rawTranscript.trim()) {
         updateSession(session.id, { status: 'completed', processed_transcript: '' })
-        trace.update({ metadata: { status: 'completed', emptyTranscript: true } })
+        trace?.update({ metadata: { status: 'completed', emptyTranscript: true } })
         sendComplete(session.id)
         return
       }
@@ -357,7 +357,7 @@ async function runPipeline(
       // Apply dictionary replacements
       console.time('[pipeline] dictionaryReplace')
       const final = applyDictionaryReplacements(processed)
-      trace.update({ output: final })
+      trace?.update({ output: final })
       console.timeEnd('[pipeline] dictionaryReplace')
 
       const wordCount = final.split(/\s+/).filter(Boolean).length
@@ -390,7 +390,7 @@ async function runPipeline(
       }
       console.timeEnd('[pipeline] injectText')
 
-      trace.update({ metadata: { status: 'completed', wordCount } })
+      trace?.update({ metadata: { status: 'completed', wordCount } })
       sendComplete(session.id)
       console.log(`[pipeline] TOTAL: ${(performance.now() - t0).toFixed(1)}ms`)
       console.log('[pipeline] Complete:', session.id)
@@ -460,7 +460,7 @@ async function runPipeline(
       const errorMsg = err instanceof Error ? err.message : String(err)
       console.error(`[pipeline] TOTAL (failed): ${(performance.now() - t0).toFixed(1)}ms`)
       console.error('[pipeline] Error:', errorMsg)
-      trace.update({ metadata: { status: 'failed', error: errorMsg } })
+      trace?.update({ metadata: { status: 'failed', error: errorMsg } })
       updateSession(session.id, { status: 'failed', error: errorMsg })
       sendError(errorMsg)
       trackMainEvent('dictation_error', { error_type: errorMsg })
@@ -496,7 +496,7 @@ async function runPipeline(
     if (slowNoticeTimeout) clearTimeout(slowNoticeTimeout)
     // Hide indicator immediately
     hideRecordingIndicator()
-    await getLangfuse().flushAsync()
+    await getLangfuse()?.flushAsync()
   }
 }
 

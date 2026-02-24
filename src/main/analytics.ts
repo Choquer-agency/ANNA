@@ -24,7 +24,7 @@ export function trackMainEvent(event: string, properties?: Record<string, unknow
   const ph = getPostHog()
   if (!ph) return
 
-  const distinctId = getSetting('user_email') || getSetting('device_id') || 'anonymous'
+  const distinctId = getSetting('device_id') || 'anonymous'
 
   ph.capture({
     distinctId,

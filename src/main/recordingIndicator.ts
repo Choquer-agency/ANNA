@@ -45,7 +45,9 @@ export function createRecordingIndicatorWindow(): void {
     type: 'panel',
     webPreferences: {
       preload: join(__dirname, '../preload/recording-preload.js'),
-      sandbox: false
+      sandbox: true,
+      nodeIntegration: false,
+      contextIsolation: true
     }
   })
 

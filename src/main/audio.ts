@@ -15,7 +15,9 @@ export function createAudioWindow(): void {
     height: 1,
     webPreferences: {
       preload: join(__dirname, '../preload/audio-preload.js'),
-      sandbox: false
+      sandbox: true,
+      nodeIntegration: false,
+      contextIsolation: true
     }
   })
 

@@ -2,6 +2,14 @@
 process.stdout?.on('error', (err) => { if ((err as NodeJS.ErrnoException).code !== 'EPIPE') throw err })
 process.stderr?.on('error', (err) => { if ((err as NodeJS.ErrnoException).code !== 'EPIPE') throw err })
 
+// Redact potential secrets from crash log entries
+function sanitizeCrashMessage(msg: string): string {
+  return msg
+    .replace(/sk[-_][a-zA-Z0-9_-]{20,}/g, 'sk-***REDACTED***')
+    .replace(/token[=:]\s*["']?[a-zA-Z0-9._-]{20,}/gi, 'token=***REDACTED***')
+    .replace(/Bearer\s+[a-zA-Z0-9._-]{20,}/g, 'Bearer ***REDACTED***')
+}
+
 // Global crash handlers — catch native module crashes and unhandled errors
 process.on('uncaughtException', (err) => {
   console.error('[CRASH] Uncaught exception:', err)
@@ -10,7 +18,7 @@ process.on('uncaughtException', (err) => {
     const { join } = require('path')
     const { app: elApp } = require('electron')
     const crashPath = join(elApp.getPath('userData'), 'crash.log')
-    const entry = `${new Date().toISOString()} | uncaughtException | ${err.stack || err.message}\n`
+    const entry = `${new Date().toISOString()} | uncaughtException | ${sanitizeCrashMessage(err.stack || err.message)}\n`
     appendFileSync(crashPath, entry)
   } catch { /* best-effort logging */ }
 })
@@ -22,7 +30,7 @@ process.on('unhandledRejection', (reason) => {
     const { join } = require('path')
     const { app: elApp } = require('electron')
     const crashPath = join(elApp.getPath('userData'), 'crash.log')
-    const entry = `${new Date().toISOString()} | unhandledRejection | ${reason}\n`
+    const entry = `${new Date().toISOString()} | unhandledRejection | ${sanitizeCrashMessage(String(reason))}\n`
     appendFileSync(crashPath, entry)
   } catch { /* best-effort logging */ }
 })
@@ -115,12 +123,12 @@ function storeProfileLocally(name: string, email: string, profileImageUrl?: stri
   if (profileImageUrl) {
     setSetting('profile_picture', profileImageUrl)
   }
-  console.log('[auth] Profile stored locally:', { firstName, lastName, email, hasImage: !!profileImageUrl })
+  console.log('[auth] Profile stored locally:', { hasName: !!firstName, hasEmail: !!email, hasImage: !!profileImageUrl })
 }
 
 // Handle deep link URL
 function handleDeepLink(url: string): void {
-  console.log('[auth] Deep link received:', url)
+  console.log('[auth] Deep link received:', url.replace(/token=[^&]+/, 'token=***'))
   try {
     const parsed = new URL(url)
     if (parsed.host === 'auth' || parsed.pathname === '//auth' || parsed.pathname === '/auth') {
@@ -203,7 +211,9 @@ function createWindow(): void {
     titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: true,
+      nodeIntegration: false,
+      contextIsolation: true
     }
   })
 
@@ -476,16 +486,53 @@ app.whenReady().then(async () => {
   ipcMain.handle('notes:delete', (_e, id: string) => deleteNote(id))
 
   // Settings
+  let captureMonitorCleanup: (() => void) | null = null
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
   ipcMain.handle('settings:set', async (_e, key: string, value: string) => {
     setSetting(key, value)
     if (key === 'hotkey') {
+      // A key was selected — clear capture monitor so stop-capture won't interfere
+      captureMonitorCleanup = null
       await reregisterHotkey(value)
     }
     if (key === 'launch_at_login') {
       app.setLoginItemSettings({ openAtLogin: value === 'true' })
     }
   })
+  // Hotkey capture — temporary fn key monitoring for the settings UI
+  ipcMain.handle('hotkey:start-capture', async () => {
+    // Unregister current hotkey so it doesn't fire during capture
+    const { unregisterHotkeys } = await import('./hotkey')
+    unregisterHotkeys()
+    // Stop any existing capture monitor
+    if (captureMonitorCleanup) {
+      captureMonitorCleanup()
+      captureMonitorCleanup = null
+    }
+    const { startFnKeyMonitor, stopFnKeyMonitor } = await import('./fnKeyMonitor')
+    const started = await startFnKeyMonitor(() => {
+      // Fn key was pressed during capture — notify renderer
+      mainWindow?.webContents.send('hotkey:fn-captured')
+    })
+    if (started) {
+      captureMonitorCleanup = () => stopFnKeyMonitor()
+    }
+    return started
+  })
+  ipcMain.handle('hotkey:stop-capture', async () => {
+    const wasCancelled = !!captureMonitorCleanup
+    if (captureMonitorCleanup) {
+      captureMonitorCleanup()
+      captureMonitorCleanup = null
+    }
+    // Only re-register if capture was cancelled (not when a key was selected,
+    // since settings:set already handles re-registration)
+    if (wasCancelled) {
+      const currentHotkey = getSetting('hotkey') || 'Ctrl+Space'
+      await reregisterHotkey(currentHotkey)
+    }
+  })
+
   ipcMain.handle('settings:get-env', () => ({
     hasOpenAI: !!process.env.OPENAI_API_KEY,
     hasAnthropic: !!process.env.ANTHROPIC_API_KEY
@@ -508,9 +555,15 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('auth:open-web', (_event, path: string) => {
+    const ALLOWED_PATHS = ['login', 'signup', 'silent-auth', 'pricing', 'account']
+    const sanitized = path.replace(/^\/+/, '').split(/[?#/]/)[0]
+    if (!ALLOWED_PATHS.includes(sanitized)) {
+      console.warn('[auth] Blocked attempt to open unauthorized path:', path)
+      return
+    }
     const { shell } = require('electron')
     const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
-    shell.openExternal(`${websiteUrl}/${path}?electron_redirect=true`)
+    shell.openExternal(`${websiteUrl}/${sanitized}?electron_redirect=true`)
   })
 
   ipcMain.handle('auth:sign-out', () => {
@@ -568,6 +621,17 @@ app.whenReady().then(async () => {
     const { shell } = require('electron')
     const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
     shell.openExternal(`${websiteUrl}/pricing`)
+  })
+
+  ipcMain.handle('churn:submit-survey', async (_event: any, reason: string, details?: string) => {
+    try {
+      const { ensureClient } = require('./convex')
+      const client = ensureClient()
+      const { api } = require('../../convex/_generated/api')
+      await client.mutation(api.churn.submitChurnEvent, { reason, details })
+    } catch (err) {
+      console.error('[churn] Failed to submit survey:', err)
+    }
   })
 
   ipcMain.handle('system:get-username', () => {

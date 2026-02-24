@@ -7,7 +7,7 @@ import { assertOwner, assertAdmin } from './adminLib'
 export const addAdminUser = mutation({
   args: {
     email: v.string(),
-    role: v.string(),
+    role: v.union(v.literal('owner'), v.literal('viewer')),
   },
   handler: async (ctx, args) => {
     const { email: addedBy } = await assertOwner(ctx)
@@ -182,22 +182,27 @@ export const deleteFixedCost = mutation({
 // ─── Seed admin user (one-time) ────────────────────────────────────────
 
 export const seedAdminUser = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await assertOwner(ctx)
+    const email = args.email ?? 'bryce@choquercreative.com'
+
     const existing = await ctx.db
       .query('admin_users')
-      .withIndex('by_email', (q) => q.eq('email', 'bryce@choquercreative.com'))
+      .withIndex('by_email', (q) => q.eq('email', email))
       .first()
 
     if (!existing) {
       await ctx.db.insert('admin_users', {
-        email: 'bryce@choquercreative.com',
+        email,
         role: 'owner',
         addedAt: new Date().toISOString(),
       })
-      return 'Created admin user'
+      return `Created admin user: ${email}`
     }
 
-    return 'Admin user already exists'
+    return `Admin user already exists: ${email}`
   },
 })
