@@ -224,7 +224,7 @@ export function Footer() {
         <div className="relative mx-auto max-w-[1400px] px-6 md:px-10">
           {/* Massive logo section */}
           <div className="pt-28 md:pt-40 pb-20 md:pb-28 flex flex-col items-center justify-center">
-            <AnnaLogo className="w-full max-w-[600px] md:max-w-[800px] text-white/[0.04]" />
+            <AnnaLogo className="w-full max-w-[600px] md:max-w-[800px] text-white" />
           </div>
 
           {/* Bottom nav */}
