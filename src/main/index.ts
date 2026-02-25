@@ -356,9 +356,9 @@ app.whenReady().then(async () => {
   // }
 
   createAudioWindow()
-  createRecordingIndicatorWindow() // Always visible — starts as idle pill
   cleanupStaleSessions() // Mark any stale processing sessions as failed
-  createWindow()
+  createWindow() // Main window first — establishes app as regular foreground app
+  createRecordingIndicatorWindow() // Floating pill created after main window
 
   // Send hotkey info to idle indicator tooltip
   const currentHotkey = getSetting('hotkey') || 'Ctrl+Space'
