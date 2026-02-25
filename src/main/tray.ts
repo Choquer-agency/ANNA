@@ -64,6 +64,7 @@ function buildMenu(): Menu {
         if (mainWindowRef && !mainWindowRef.isDestroyed()) {
           mainWindowRef.show()
           mainWindowRef.focus()
+          app.focus({ steal: true })
         }
       }
     },

@@ -225,6 +225,7 @@ app.on('open-url', (event, url) => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
+    app.focus({ steal: true })
   }
 })
 
@@ -240,6 +241,7 @@ if (!gotTheLock) {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
+      app.focus({ steal: true })
     }
   })
 }
@@ -251,6 +253,7 @@ function createWindow(): void {
     minWidth: 1122,
     minHeight: 699,
     title: 'ANNA',
+    show: false,
     titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -258,6 +261,12 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true
     }
+  })
+
+  // Show window only when content is loaded — prevents dock bouncing
+  mainWindow.on('ready-to-show', () => {
+    mainWindow?.show()
+    app.focus({ steal: true })
   })
 
   setPipelineMainWindow(mainWindow)
@@ -284,10 +293,13 @@ app.whenReady().then(async () => {
     console.error('[CRASH] Render process gone:', details.reason)
   })
 
-  // Set dock icon in dev mode (production uses the bundled .icns from the app bundle)
-  if (process.platform === 'darwin' && is.dev) {
-    const iconPath = join(__dirname, '../../build/icon.icns')
-    app.dock.setIcon(nativeImage.createFromPath(iconPath))
+  // Ensure dock icon is visible on macOS
+  if (process.platform === 'darwin') {
+    await app.dock.show()
+    if (is.dev) {
+      const iconPath = join(__dirname, '../../build/icon.icns')
+      app.dock.setIcon(nativeImage.createFromPath(iconPath))
+    }
   }
 
   // Check API keys
@@ -831,7 +843,12 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    } else if (mainWindow) {
+      mainWindow.show()
+      app.focus({ steal: true })
+    }
   })
 })
 
