@@ -86,7 +86,18 @@ export function VersionTab(): React.JSX.Element {
   const handleDownloadUpdate = useCallback(async () => {
     setUpdateStatus('downloading')
     setDownloadPercent(0)
-    await window.annaAPI.downloadUpdate()
+    try {
+      const result = await window.annaAPI.downloadUpdate()
+      if (result?.state === 'downloaded') {
+        setUpdateStatus('downloaded')
+      } else if (result?.state === 'error') {
+        setUpdateStatus('error')
+        setErrorMessage(result.message || 'Download failed')
+      }
+    } catch (err: any) {
+      setUpdateStatus('error')
+      setErrorMessage(err?.message || 'Download failed')
+    }
   }, [])
 
   const handleInstallUpdate = useCallback(() => {

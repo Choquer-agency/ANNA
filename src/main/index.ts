@@ -97,6 +97,23 @@ ipcMain.handle('update:check', async () => {
 // App version — also at module level for reliability
 ipcMain.handle('app:get-version', () => app.getVersion())
 
+// Download update (user-initiated) — uses electron-updater for actual download
+ipcMain.handle('update:download', async () => {
+  try {
+    const { autoUpdater } = require('electron-updater')
+    await autoUpdater.downloadUpdate()
+    return { state: 'downloaded' }
+  } catch (err: any) {
+    console.error('[updater] Download failed:', err)
+    return { state: 'error', message: err?.message || 'Download failed' }
+  }
+})
+
+ipcMain.handle('update:install', () => {
+  const { autoUpdater } = require('electron-updater')
+  autoUpdater.quitAndInstall()
+})
+
 // Register anna:// deep link protocol
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -814,20 +831,6 @@ app.whenReady().then(async () => {
     // so we don't call it on startup. Manual checks use net.fetch instead.
     // autoUpdater is still used for download + install once an update is found.
   }
-
-  // Download update (user-initiated)
-  ipcMain.handle('update:download', async () => {
-    try {
-      await autoUpdater.downloadUpdate()
-    } catch (err: any) {
-      console.error('[updater] Download failed:', err)
-      mainWindow?.webContents.send('update:error', err?.message || 'Download failed')
-    }
-  })
-
-  ipcMain.handle('update:install', () => {
-    autoUpdater.quitAndInstall()
-  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
