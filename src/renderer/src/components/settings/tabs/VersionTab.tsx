@@ -84,25 +84,19 @@ export function VersionTab(): React.JSX.Element {
   }, [])
 
   const handleDownloadUpdate = useCallback(async () => {
-    setUpdateStatus('downloading')
-    setDownloadPercent(0)
     try {
-      const result = await window.annaAPI.downloadUpdate()
-      if (result?.state === 'downloaded') {
-        setUpdateStatus('downloaded')
-      } else if (result?.state === 'error') {
+      const result = await window.annaAPI.downloadUpdate(newVersion)
+      if (result?.state === 'error') {
         setUpdateStatus('error')
         setErrorMessage(result.message || 'Download failed')
+      } else {
+        setUpdateStatus('downloaded')
       }
     } catch (err: any) {
       setUpdateStatus('error')
       setErrorMessage(err?.message || 'Download failed')
     }
-  }, [])
-
-  const handleInstallUpdate = useCallback(() => {
-    window.annaAPI.installUpdate()
-  }, [])
+  }, [newVersion])
 
   function renderStatusBadge(): React.JSX.Element {
     switch (updateStatus) {
@@ -157,48 +151,22 @@ export function VersionTab(): React.JSX.Element {
               onMouseMove={onMouseMove}
               className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all shrink-0 ml-4"
             >
-              <span className="relative z-[2]">Download & Install</span>
+              <span className="relative z-[2]">Download Update</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Downloading — show progress */}
-      {updateStatus === 'downloading' && (
-        <div className="bg-surface-raised border-2 border-amber-400 rounded-2xl p-5 shadow-float">
-          <div>
-            <h3 className="text-sm font-semibold text-ink">
-              Downloading{newVersion ? ` v${newVersion}` : ''}... {Math.round(downloadPercent)}%
-            </h3>
-            <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all duration-300"
-                style={{ width: `${downloadPercent}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Downloaded — ready to install */}
+      {/* Downloaded — DMG opened in browser */}
       {updateStatus === 'downloaded' && (
         <div className="bg-surface-raised border-2 border-primary rounded-2xl p-5 shadow-float">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-ink">
-                Update ready{newVersion ? ` — v${newVersion}` : ''}
-              </h3>
-              <p className="text-xs text-ink-muted mt-0.5">
-                Restart to finish updating.
-              </p>
-            </div>
-            <button
-              onClick={handleInstallUpdate}
-              onMouseMove={onMouseMove}
-              className="plasma-hover px-4 py-2 text-sm text-white bg-primary rounded-xl hover:bg-primary-hover active:scale-[0.98] transition-all shrink-0 ml-4"
-            >
-              <span className="relative z-[2]">Restart Now</span>
-            </button>
+          <div>
+            <h3 className="text-sm font-semibold text-ink">
+              Downloading v{newVersion}
+            </h3>
+            <p className="text-xs text-ink-muted mt-0.5">
+              The installer is downloading in your browser. Open the DMG and drag Anna to Applications to update.
+            </p>
           </div>
         </div>
       )}

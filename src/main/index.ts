@@ -97,21 +97,19 @@ ipcMain.handle('update:check', async () => {
 // App version — also at module level for reliability
 ipcMain.handle('app:get-version', () => app.getVersion())
 
-// Download update (user-initiated) — uses electron-updater for actual download
-ipcMain.handle('update:download', async () => {
+// Download update — opens the DMG download in the browser
+ipcMain.handle('update:download', async (_event: any, version: string) => {
   try {
-    const { autoUpdater } = require('electron-updater')
-    await autoUpdater.downloadUpdate()
-    return { state: 'downloaded' }
+    const { shell } = require('electron')
+    const arch = process.arch === 'arm64' ? 'arm64' : ''
+    const dmgName = arch ? `Anna-${version}-${arch}.dmg` : `Anna-${version}.dmg`
+    const url = `https://github.com/Choquer-agency/ANNA/releases/download/v${version}/${dmgName}`
+    await shell.openExternal(url)
+    return { state: 'downloading' }
   } catch (err: any) {
     console.error('[updater] Download failed:', err)
     return { state: 'error', message: err?.message || 'Download failed' }
   }
-})
-
-ipcMain.handle('update:install', () => {
-  const { autoUpdater } = require('electron-updater')
-  autoUpdater.quitAndInstall()
 })
 
 // Register anna:// deep link protocol
