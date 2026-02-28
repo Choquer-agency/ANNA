@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Mic, ChevronRight, ToggleRight } from 'lucide-react'
 import { usePlasmaHover } from '../../hooks/usePlasmaHover'
+import { usePlatform } from '../../hooks/usePlatform'
 import { track } from '../../lib/analytics'
 
 interface PermissionsStepProps {
@@ -25,7 +26,7 @@ function AccessibilityIcon({ size = 20 }: { size?: number }): React.JSX.Element 
   )
 }
 
-function ManualInstructions({ target }: { target: 'Microphone' | 'Accessibility' }): React.JSX.Element {
+function MacManualInstructions({ target }: { target: 'Microphone' | 'Accessibility' }): React.JSX.Element {
   return (
     <div className="mt-2 p-4 rounded-xl border border-border bg-surface-alt">
       <p className="text-xs font-semibold text-ink-secondary mb-3">
@@ -55,8 +56,34 @@ function ManualInstructions({ target }: { target: 'Microphone' | 'Accessibility'
   )
 }
 
+function WindowsManualInstructions(): React.JSX.Element {
+  return (
+    <div className="mt-2 p-4 rounded-xl border border-border bg-surface-alt">
+      <p className="text-xs font-semibold text-ink-secondary mb-3">
+        To enable manually:
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+        <span className="font-medium text-ink-secondary">Settings</span>
+        <ChevronRight size={10} className="text-ink-faint" />
+        <span className="font-medium text-ink-secondary">Privacy & security</span>
+        <ChevronRight size={10} className="text-ink-faint" />
+        <span className="font-medium text-ink-secondary">Microphone</span>
+        <ChevronRight size={10} className="text-ink-faint" />
+        <span className="inline-flex items-center gap-1">
+          <ToggleRight size={14} className="text-success-text" />
+          <span className="font-semibold text-success-text">Toggle on Anna</span>
+        </span>
+      </div>
+      <p className="text-[11px] text-ink-faint mt-2.5">
+        Anna detects changes automatically — no restart needed.
+      </p>
+    </div>
+  )
+}
+
 export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
+  const { platform, capabilities } = usePlatform()
   const [micStatus, setMicStatus] = useState<string>('not-determined')
   const [accessibilityGranted, setAccessibilityGranted] = useState(false)
 
@@ -109,7 +136,8 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
   const micGranted = micStatus === 'granted'
   const micDenied = micAttempted && !micGranted
   const accessibilityDenied = accessibilityAttempted && !accessibilityGranted
-  const allGranted = micGranted && accessibilityGranted
+  const showAccessibility = capabilities.hasAccessibilityPermission
+  const allGranted = micGranted && (showAccessibility ? accessibilityGranted : true)
 
   // Track when manual instructions become visible
   useEffect(() => {
@@ -159,36 +187,42 @@ export function PermissionsStep({ onNext }: PermissionsStepProps): React.JSX.Ele
               </button>
             )}
           </div>
-          {micDenied && <ManualInstructions target="Microphone" />}
+          {micDenied && (
+            platform === 'darwin'
+              ? <MacManualInstructions target="Microphone" />
+              : <WindowsManualInstructions />
+          )}
         </div>
 
-        {/* Accessibility */}
-        <div>
-          <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-surface">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              accessibilityGranted ? 'bg-success-bg text-success-text' : 'bg-primary-soft text-primary'
-            }`}>
-              <AccessibilityIcon size={20} />
+        {/* Accessibility (macOS only) */}
+        {showAccessibility && (
+          <div>
+            <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-surface">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                accessibilityGranted ? 'bg-success-bg text-success-text' : 'bg-primary-soft text-primary'
+              }`}>
+                <AccessibilityIcon size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Accessibility</p>
+                <p className="text-xs text-ink-muted">Required for text insertion</p>
+              </div>
+              {accessibilityGranted ? (
+                <span className="text-xs font-semibold text-success-text bg-success-bg px-2.5 py-1 rounded-full">
+                  Granted
+                </span>
+              ) : (
+                <button
+                  onClick={openAccessibility}
+                  className="text-xs font-semibold text-primary bg-primary-soft px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white transition-colors cursor-pointer"
+                >
+                  Open Settings
+                </button>
+              )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Accessibility</p>
-              <p className="text-xs text-ink-muted">Required for text insertion</p>
-            </div>
-            {accessibilityGranted ? (
-              <span className="text-xs font-semibold text-success-text bg-success-bg px-2.5 py-1 rounded-full">
-                Granted
-              </span>
-            ) : (
-              <button
-                onClick={openAccessibility}
-                className="text-xs font-semibold text-primary bg-primary-soft px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white transition-colors cursor-pointer"
-              >
-                Open Settings
-              </button>
-            )}
+            {accessibilityDenied && <MacManualInstructions target="Accessibility" />}
           </div>
-          {accessibilityDenied && <ManualInstructions target="Accessibility" />}
-        </div>
+        )}
       </div>
 
       {!allGranted && (

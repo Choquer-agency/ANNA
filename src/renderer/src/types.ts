@@ -69,6 +69,18 @@ declare global {
       refreshProfile: () => Promise<{ name: string; email: string; profileImageUrl?: string } | null>
       onAuthChanged: (cb: (data: { isAuthenticated: boolean }) => void) => void
 
+      // Platform info
+      getPlatformInfo: () => Promise<{
+        platform: string
+        capabilities: {
+          hasFnKeyMonitor: boolean
+          hasAccessibilityPermission: boolean
+          titleBarStyle: string
+          modifierKey: string
+          defaultHotkey: string
+        }
+      }>
+
       // System: microphone + accessibility
       requestMicrophone: () => Promise<boolean>
       checkMicrophone: () => Promise<string>

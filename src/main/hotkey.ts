@@ -1,5 +1,5 @@
 import { globalShortcut } from 'electron'
-import { startFnKeyMonitor, stopFnKeyMonitor } from './fnKeyMonitor'
+import { getPlatform } from './platform'
 import { setSetting } from './db'
 
 let onToggle: (() => void) | null = null
@@ -7,10 +7,21 @@ let usingFnKey = false
 
 export async function registerHotkey(callback: () => void, accelerator: string = 'Ctrl+Space'): Promise<boolean> {
   onToggle = callback
+  const platform = getPlatform()
 
   if (accelerator === 'fn') {
+    if (!platform.startFnKeyMonitor) {
+      // Platform doesn't support fn key monitoring — fall back
+      console.error('[hotkey] fn key not supported on this platform, falling back to', platform.capabilities.defaultHotkey)
+      setSetting('hotkey', platform.capabilities.defaultHotkey)
+      const registered = globalShortcut.register(platform.capabilities.defaultHotkey, () => {
+        onToggle?.()
+      })
+      return registered
+    }
+
     usingFnKey = true
-    const started = await startFnKeyMonitor(() => {
+    const started = await platform.startFnKeyMonitor(() => {
       onToggle?.()
     })
 
@@ -42,17 +53,28 @@ export async function registerHotkey(callback: () => void, accelerator: string =
 }
 
 export async function reregisterHotkey(accelerator: string): Promise<boolean> {
+  const platform = getPlatform()
+
   // Stop fn key monitor if it was active
   if (usingFnKey) {
-    stopFnKeyMonitor()
+    platform.stopFnKeyMonitor?.()
     usingFnKey = false
   }
   globalShortcut.unregisterAll()
 
   // Handle fn key specially
   if (accelerator === 'fn') {
+    if (!platform.startFnKeyMonitor) {
+      console.error('[hotkey] fn key not supported on this platform, falling back to', platform.capabilities.defaultHotkey)
+      setSetting('hotkey', platform.capabilities.defaultHotkey)
+      const registered = globalShortcut.register(platform.capabilities.defaultHotkey, () => {
+        onToggle?.()
+      })
+      return registered
+    }
+
     usingFnKey = true
-    const started = await startFnKeyMonitor(() => {
+    const started = await platform.startFnKeyMonitor(() => {
       onToggle?.()
     })
     if (started) {
@@ -84,7 +106,7 @@ export async function reregisterHotkey(accelerator: string): Promise<boolean> {
 
 export function unregisterHotkeys(): void {
   if (usingFnKey) {
-    stopFnKeyMonitor()
+    getPlatform().stopFnKeyMonitor?.()
     usingFnKey = false
   }
   globalShortcut.unregisterAll()

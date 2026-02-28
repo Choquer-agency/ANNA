@@ -47,7 +47,9 @@ function createIcon(filled: boolean): Electron.NativeImage {
   for (let x = 5; x <= 10; x++) set(x, 13)
 
   const img = nativeImage.createFromBitmap(buf, { width: size, height: size })
-  img.setTemplateImage(true)
+  if (process.platform === 'darwin') {
+    img.setTemplateImage(true)
+  }
   return img
 }
 

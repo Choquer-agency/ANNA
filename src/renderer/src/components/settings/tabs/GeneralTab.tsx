@@ -2,23 +2,35 @@ import { useState, useEffect, useCallback } from 'react'
 import { Pencil } from 'lucide-react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
+import { usePlatform } from '../../../hooks/usePlatform'
 
-function parseHotkeyParts(hk: string): string[] {
+function parseHotkeyParts(hk: string, isMac: boolean): string[] {
   if (hk === 'fn') return ['fn']
   return hk.split('+').map((part) => {
-    const map: Record<string, string> = {
-      'CommandOrControl': '⌘',
-      'Alt': '⌥',
-      'Shift': '⇧ Shift',
-      'Ctrl': '⌃',
-      'Space': 'Space'
-    }
+    const map: Record<string, string> = isMac
+      ? {
+          'CommandOrControl': '⌘',
+          'Alt': '⌥',
+          'Shift': '⇧ Shift',
+          'Ctrl': '⌃',
+          'Space': 'Space'
+        }
+      : {
+          'CommandOrControl': 'Ctrl',
+          'Alt': 'Alt',
+          'Shift': 'Shift',
+          'Ctrl': 'Ctrl',
+          'Space': 'Space'
+        }
     return map[part] || part
   })
 }
 
 export function GeneralTab(): React.JSX.Element {
-  const [hotkey, setHotkey] = useState('Ctrl+Space')
+  const { platform, capabilities } = usePlatform()
+  const isMac = platform === 'darwin'
+  const defaultHotkey = capabilities.defaultHotkey
+  const [hotkey, setHotkey] = useState(defaultHotkey)
   const [capturingHotkey, setCapturingHotkey] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
@@ -29,7 +41,7 @@ export function GeneralTab(): React.JSX.Element {
       window.annaAPI.getSetting('hotkey'),
       window.annaAPI.getSetting('microphone_device')
     ])
-    setHotkey(hk || 'Ctrl+Space')
+    setHotkey(hk || defaultHotkey)
     setSelectedDevice(micDevice || 'default')
     setLoaded(true)
   }, [])
@@ -55,14 +67,16 @@ export function GeneralTab(): React.JSX.Element {
   useEffect(() => {
     if (!capturingHotkey) return
 
-    // Start fn key monitor in main process so we can detect it
-    window.annaAPI.startHotkeyCapture()
-
-    const removeFnListener = window.annaAPI.onFnKeyCaptured(() => {
-      setHotkey('fn')
-      setCapturingHotkey(false)
-      window.annaAPI.setSetting('hotkey', 'fn')
-    })
+    // Start fn key monitor in main process so we can detect it (macOS only)
+    let removeFnListener: (() => void) | undefined
+    if (capabilities.hasFnKeyMonitor) {
+      window.annaAPI.startHotkeyCapture()
+      removeFnListener = window.annaAPI.onFnKeyCaptured(() => {
+        setHotkey('fn')
+        setCapturingHotkey(false)
+        window.annaAPI.setSetting('hotkey', 'fn')
+      })
+    }
 
     function onKeyDown(e: KeyboardEvent): void {
       e.preventDefault()
@@ -103,19 +117,22 @@ export function GeneralTab(): React.JSX.Element {
     return () => {
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('keyup', onEscape, true)
-      removeFnListener()
-      window.annaAPI.stopHotkeyCapture()
+      removeFnListener?.()
+      if (capabilities.hasFnKeyMonitor) {
+        window.annaAPI.stopHotkeyCapture()
+      }
     }
   }, [capturingHotkey])
 
   if (!loaded) return <div />
 
-  const parts = parseHotkeyParts(hotkey)
+  const parts = parseHotkeyParts(hotkey, isMac)
+  const defaultParts = parseHotkeyParts(defaultHotkey, isMac)
 
   function resetToDefault(): void {
-    setHotkey('Ctrl+Space')
+    setHotkey(defaultHotkey)
     setCapturingHotkey(false)
-    window.annaAPI.setSetting('hotkey', 'Ctrl+Space')
+    window.annaAPI.setSetting('hotkey', defaultHotkey)
   }
 
   return (
@@ -147,12 +164,12 @@ export function GeneralTab(): React.JSX.Element {
                 </>
               )}
             </div>
-            {hotkey !== 'Ctrl+Space' && (
+            {hotkey !== defaultHotkey && (
               <button
                 onClick={resetToDefault}
                 className="text-xs text-primary hover:underline self-start ml-1"
               >
-                Reset to default (⌃ Space)
+                Reset to default ({defaultParts.join(' ')})
               </button>
             )}
           </div>

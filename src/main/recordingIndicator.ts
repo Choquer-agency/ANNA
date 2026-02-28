@@ -28,6 +28,8 @@ export function createRecordingIndicatorWindow(): void {
 
   const pos = getPosition()
 
+  const isMac = process.platform === 'darwin'
+
   indicatorWindow = new BrowserWindow({
     width: WIN_WIDTH,
     height: WIN_HEIGHT,
@@ -37,7 +39,7 @@ export function createRecordingIndicatorWindow(): void {
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    level: 'screen-saver',
+    ...(isMac ? { level: 'screen-saver' as const } : {}),
     skipTaskbar: true,
     resizable: false,
     focusable: false,
@@ -50,7 +52,7 @@ export function createRecordingIndicatorWindow(): void {
     }
   })
 
-  indicatorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  indicatorWindow.setVisibleOnAllWorkspaces(true, isMac ? { visibleOnFullScreen: true } : {})
   indicatorWindow.setIgnoreMouseEvents(true, { forward: true })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

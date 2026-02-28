@@ -61,6 +61,18 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.on('auth:changed', (_event, data) => callback(data))
   },
 
+  // Platform info
+  getPlatformInfo: (): Promise<{
+    platform: string
+    capabilities: {
+      hasFnKeyMonitor: boolean
+      hasAccessibilityPermission: boolean
+      titleBarStyle: string
+      modifierKey: string
+      defaultHotkey: string
+    }
+  }> => ipcRenderer.invoke('system:get-platform-info'),
+
   // System: microphone + accessibility
   requestMicrophone: (): Promise<boolean> => ipcRenderer.invoke('system:request-microphone'),
   checkMicrophone: (): Promise<string> => ipcRenderer.invoke('system:check-microphone'),

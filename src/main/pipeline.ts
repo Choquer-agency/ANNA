@@ -2,13 +2,13 @@ import { app, ipcMain } from 'electron'
 import { syncSession } from './convex'
 import { join } from 'path'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
-import { getActiveWindow } from './activeWindow'
+import { getPlatform } from './platform'
 import { startRecording, stopRecording, getRecordingState, getRecordingDuration } from './audio'
 import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions, getStats, getWeeklyStats } from './db'
 import { syncWordCount } from './convex'
 import { transcribe } from './transcribe'
 import { processTranscript } from './process'
-import { injectText } from './inject'
+import type { ActiveWindowInfo } from './platform'
 import { getLangfuse } from './langfuse'
 import {
   showRecordingIndicator,
@@ -82,11 +82,11 @@ function getCurrentPage(): Promise<string> {
 
 let repositionInterval: ReturnType<typeof setInterval> | null = null
 let indicatorIPCSetup = false
-let cachedActiveWindow: Awaited<ReturnType<typeof getActiveWindow>> = null
+let cachedActiveWindow: ActiveWindowInfo | null = null
 
 // Buffer held temporarily when user cancels (for undo)
 let cancelledWavBuffer: Buffer | null = null
-let cancelledActiveWindow: Awaited<ReturnType<typeof getActiveWindow>> = null
+let cancelledActiveWindow: ActiveWindowInfo | null = null
 let cancelledDurationMs = 0
 let cancelUndoTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -266,7 +266,7 @@ async function handleUndoCancel(): Promise<void> {
  */
 async function runPipeline(
   wavBuffer: Buffer,
-  activeWin: Awaited<ReturnType<typeof getActiveWindow>>,
+  activeWin: ActiveWindowInfo | null,
   durationMs: number
 ): Promise<void> {
   const t0 = performance.now()
@@ -283,7 +283,7 @@ async function runPipeline(
   // Create session
   const session = createSession({
     app_name: activeWin?.appName ?? null,
-    app_bundle_id: activeWin?.bundleId ?? null,
+    app_bundle_id: activeWin?.appId ?? null,
     window_title: activeWin?.title ?? null
   })
   updateSession(session.id, { duration_ms: durationMs })
@@ -343,15 +343,19 @@ async function runPipeline(
       const expanded = expandSnippets(rawTranscript)
       const styleProfile = getStyleProfileForApp(
         activeWin?.appName ?? null,
-        activeWin?.bundleId ?? null
+        activeWin?.appId ?? null
       )
       console.timeEnd('[pipeline] snippets+style')
 
-      // Process with Claude
+      // Process with Claude + check current page in parallel
       sendStatus('processing', { sessionId: session.id })
       updateSession(session.id, { status: 'processing' })
       console.time('[pipeline] processTranscript')
-      const processed = await processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language)
+      const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
+      const [processed, currentPage] = await Promise.all([
+        processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language),
+        currentPagePromise
+      ])
       console.timeEnd('[pipeline] processTranscript')
 
       // Apply dictionary replacements
@@ -368,11 +372,6 @@ async function runPipeline(
         status: 'completed'
       })
 
-      // Check if we should dictate into a note instead of injecting
-      console.time('[pipeline] getCurrentPage')
-      const currentPage = await getCurrentPage()
-      console.timeEnd('[pipeline] getCurrentPage')
-
       // Play sound alongside paste (fire-and-forget, no await)
       playDictationStop()
 
@@ -385,7 +384,8 @@ async function runPipeline(
       } else {
         const autoPaste = getSetting('auto_paste')
         if (autoPaste !== 'false') {
-          await injectText(final, activeWin?.bundleId)
+          const currentWin = await getPlatform().getActiveWindow()
+          await getPlatform().injectText(final, currentWin?.appId)
         }
       }
       console.timeEnd('[pipeline] injectText')
@@ -568,7 +568,7 @@ export async function handleHotkeyToggle(): Promise<void> {
       )
       indicatorIPCSetup = true
     }
-    cachedActiveWindow = await getActiveWindow()
+    cachedActiveWindow = await getPlatform().getActiveWindow()
 
     // Send hotkey info to indicator for tooltip display
     const hotkey = getSetting('hotkey') || 'Ctrl+Space'

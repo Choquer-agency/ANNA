@@ -36,11 +36,10 @@ process.on('unhandledRejection', (reason) => {
 })
 
 import { config } from 'dotenv'
-import { app, BrowserWindow, ipcMain, dialog, nativeImage, systemPreferences, utilityProcess } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, utilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { existsSync, unlinkSync, copyFileSync, readFileSync } from 'fs'
-import { userInfo, hostname } from 'os'
 import { is } from '@electron-toolkit/utils'
 
 // Only load .env in dev — production builds have env vars baked in via define
@@ -61,7 +60,7 @@ import { handleHotkeyToggle, setPipelineMainWindow, retrySession, cleanupStaleSe
 import { createRecordingIndicatorWindow, destroyRecordingIndicator, sendHotkeyInfo } from './recordingIndicator'
 import { shutdownLangfuse } from './langfuse'
 import { trackMainEvent, shutdownPostHog } from './analytics'
-import { probeAccessibility } from './accessibilityProbe'
+import { getPlatform } from './platform'
 import { createTray, destroyTray } from './tray'
 import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex, fetchWordUsage } from './convex'
 import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
@@ -97,13 +96,18 @@ ipcMain.handle('update:check', async () => {
 // App version — also at module level for reliability
 ipcMain.handle('app:get-version', () => app.getVersion())
 
-// Download update — opens the DMG download in the browser
+// Download update — opens the installer download in the browser
 ipcMain.handle('update:download', async (_event: any, version: string) => {
   try {
     const { shell } = require('electron')
-    const arch = process.arch === 'arm64' ? 'arm64' : ''
-    const dmgName = arch ? `Anna-${version}-${arch}.dmg` : `Anna-${version}.dmg`
-    const url = `https://github.com/Choquer-agency/ANNA/releases/download/v${version}/${dmgName}`
+    let fileName: string
+    if (process.platform === 'darwin') {
+      const arch = process.arch === 'arm64' ? 'arm64' : ''
+      fileName = arch ? `Anna-${version}-${arch}.dmg` : `Anna-${version}.dmg`
+    } else {
+      fileName = `Anna-Setup-${version}.exe`
+    }
+    const url = `https://github.com/Choquer-agency/ANNA/releases/download/v${version}/${fileName}`
     await shell.openExternal(url)
     return { state: 'downloading' }
   } catch (err: any) {
@@ -247,6 +251,8 @@ if (!gotTheLock) {
 }
 
 function createWindow(): void {
+  const isMac = process.platform === 'darwin'
+
   mainWindow = new BrowserWindow({
     width: 1122,
     height: 699,
@@ -254,7 +260,14 @@ function createWindow(): void {
     minHeight: 699,
     title: 'ANNA',
     show: false,
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
+    ...(isMac ? {} : {
+      titleBarOverlay: {
+        color: '#f8f8f8',
+        symbolColor: '#333',
+        height: 40
+      }
+    }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
@@ -313,18 +326,21 @@ app.whenReady().then(async () => {
   initDB()
 
   // Pre-validate whisper native module in a child process.
-  // If the native binary segfaults on this macOS version, the child dies
+  // If the native binary segfaults on this OS version, the child dies
   // and we warn the user instead of crashing on first dictation.
   try {
     const whisperCheck = utilityProcess.fork(join(__dirname, 'whisper-check.js'))
     whisperCheck.on('exit', (code) => {
       if (code !== 0) {
         console.error(`[whisper-check] Native module validation failed (exit code ${code})`)
+        const detail = process.platform === 'darwin'
+          ? `Voice dictation requires a compatible macOS version. Please update to the latest macOS for the best experience.\n\nCurrent: macOS ${process.getSystemVersion()}`
+          : 'Voice dictation failed to initialize. Please ensure your system is up to date.'
         dialog.showMessageBox({
           type: 'warning',
           title: 'Compatibility Notice',
-          message: 'Anna may not work correctly on this macOS version.',
-          detail: `Voice dictation requires a compatible macOS version. Please update to the latest macOS for the best experience.\n\nCurrent: macOS ${process.getSystemVersion()}`,
+          message: 'Anna may not work correctly on this system.',
+          detail,
           buttons: ['OK']
         })
       } else {
@@ -361,7 +377,7 @@ app.whenReady().then(async () => {
   createRecordingIndicatorWindow() // Floating pill created after main window
 
   // Send hotkey info to idle indicator tooltip
-  const currentHotkey = getSetting('hotkey') || 'Ctrl+Space'
+  const currentHotkey = getSetting('hotkey') || getPlatform().capabilities.defaultHotkey
   // Small delay to ensure renderer is loaded
   setTimeout(() => sendHotkeyInfo(currentHotkey), 1000)
 
@@ -373,9 +389,9 @@ app.whenReady().then(async () => {
     shell.openExternal(`${websiteUrl}/silent-auth`)
   }
 
-  // Register hotkey — use stored setting or default to fn
+  // Register hotkey — use stored setting or platform default
   const storedHotkey = getSetting('hotkey')
-  await registerHotkey(handleHotkeyToggle, storedHotkey || 'Ctrl+Space')
+  await registerHotkey(handleHotkeyToggle, storedHotkey || getPlatform().capabilities.defaultHotkey)
 
   // Apply launch at login setting
   const launchSetting = getSetting('launch_at_login')
@@ -557,20 +573,22 @@ app.whenReady().then(async () => {
   // Hotkey capture — temporary fn key monitoring for the settings UI
   ipcMain.handle('hotkey:start-capture', async () => {
     // Unregister current hotkey so it doesn't fire during capture
-    const { unregisterHotkeys } = await import('./hotkey')
     unregisterHotkeys()
     // Stop any existing capture monitor
     if (captureMonitorCleanup) {
       captureMonitorCleanup()
       captureMonitorCleanup = null
     }
-    const { startFnKeyMonitor, stopFnKeyMonitor } = await import('./fnKeyMonitor')
-    const started = await startFnKeyMonitor(() => {
+    const platform = getPlatform()
+    if (!platform.startFnKeyMonitor) {
+      return false
+    }
+    const started = await platform.startFnKeyMonitor(() => {
       // Fn key was pressed during capture — notify renderer
       mainWindow?.webContents.send('hotkey:fn-captured')
     })
     if (started) {
-      captureMonitorCleanup = () => stopFnKeyMonitor()
+      captureMonitorCleanup = () => platform.stopFnKeyMonitor?.()
     }
     return started
   })
@@ -583,7 +601,7 @@ app.whenReady().then(async () => {
     // Only re-register if capture was cancelled (not when a key was selected,
     // since settings:set already handles re-registration)
     if (wasCancelled) {
-      const currentHotkey = getSetting('hotkey') || 'Ctrl+Space'
+      const currentHotkey = getSetting('hotkey') || getPlatform().capabilities.defaultHotkey
       await reregisterHotkey(currentHotkey)
     }
   })
@@ -591,6 +609,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('settings:get-env', () => ({
     hasOpenAI: !!process.env.OPENAI_API_KEY,
     hasAnthropic: !!process.env.ANTHROPIC_API_KEY
+  }))
+
+  // Platform info — exposes capabilities to renderer
+  ipcMain.handle('system:get-platform-info', () => ({
+    platform: process.platform,
+    capabilities: getPlatform().capabilities
   }))
 
   // Convex Cloud Sync
@@ -699,13 +723,7 @@ app.whenReady().then(async () => {
     if (fullName) return fullName.split(' ')[0]
 
     // Last resort: OS account name (pre-login state)
-    try {
-      const { execSync } = require('child_process')
-      const osName = execSync('id -F', { encoding: 'utf-8' }).trim()
-      if (osName) return osName.split(' ')[0]
-    } catch {}
-    const name = userInfo().username
-    return name.charAt(0).toUpperCase() + name.slice(1)
+    return getPlatform().getSystemUsername()
   })
 
   // User registration (onboarding)
@@ -733,28 +751,21 @@ app.whenReady().then(async () => {
 
   // System: microphone + accessibility
   ipcMain.handle('system:request-microphone', async () => {
-    return await systemPreferences.askForMediaAccess('microphone')
+    return await getPlatform().requestMicrophoneAccess()
   })
 
   ipcMain.handle('system:check-microphone', () => {
-    return systemPreferences.getMediaAccessStatus('microphone')
+    return getPlatform().checkMicrophoneAccess()
   })
 
   ipcMain.handle('system:open-accessibility-settings', () => {
-    const { shell } = require('electron')
-    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility')
+    getPlatform().openAccessibilitySettings()
   })
 
   ipcMain.handle('system:check-accessibility', async () => {
-    // Fast path: Electron API (no false positives, only false negatives on stale cache)
-    if (systemPreferences.isTrustedAccessibilityClient(false)) {
-      return true
-    }
+    const granted = await getPlatform().checkAccessibility()
 
-    // Electron returned false — may be stale. Use ground-truth probe.
-    const granted = await probeAccessibility()
-
-    if (granted) {
+    if (granted && process.platform === 'darwin') {
       // Permission is actually working. If we fell back from fn to Alt+Space
       // during startup, re-register the fn key now.
       const storedHotkey = getSetting('hotkey')

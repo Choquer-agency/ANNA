@@ -9,6 +9,7 @@ import {
   HelpCircle
 } from 'lucide-react'
 import { AnnaLogo } from './AnnaLogo'
+import { usePlatform } from '../hooks/usePlatform'
 
 export type Page = 'home' | 'dictionary' | 'snippets' | 'style' | 'notes' | 'help'
 
@@ -29,6 +30,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onNavigate, settingsOpen, onSettingsOpen }: SidebarProps): React.JSX.Element {
   const [version, setVersion] = useState('')
+  const { platform } = usePlatform()
 
   useEffect(() => {
     window.annaAPI.getAppVersion().then(setVersion).catch(() => {})
@@ -39,8 +41,8 @@ export function Sidebar({ currentPage, onNavigate, settingsOpen, onSettingsOpen 
       className="w-56 flex flex-col h-full shrink-0"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
-      {/* Traffic light spacer */}
-      <div className="h-10 shrink-0" />
+      {/* Traffic light spacer (macOS) / title bar drag area (Windows) */}
+      <div className={platform === 'darwin' ? 'h-10 shrink-0' : 'h-8 shrink-0'} />
 
       {/* Logo */}
       <div
@@ -52,6 +54,11 @@ export function Sidebar({ currentPage, onNavigate, settingsOpen, onSettingsOpen 
           <span className="text-[10px] font-semibold bg-primary text-white px-1.5 py-0.5 rounded-full">
             Pro
           </span>
+          {import.meta.env.DEV && (
+            <span className="text-[9px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+              Dev
+            </span>
+          )}
         </div>
       </div>
 
