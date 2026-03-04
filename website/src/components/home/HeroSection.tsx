@@ -5,6 +5,7 @@ import { useRef, useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { ease } from '@/lib/animations'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
+import { usePlatformDetect, getPlatformLabel } from '@/hooks/usePlatformDetect'
 
 const typewriterWords = [
   'Gmail',
@@ -98,6 +99,7 @@ function Typewriter() {
 
 export function HeroSection() {
   const { onMouseMove } = usePlasmaHover()
+  const platform = usePlatformDetect()
   const containerRef = useRef<HTMLDivElement>(null)
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -119,7 +121,7 @@ export function HeroSection() {
           >
             <span className="inline-flex items-center gap-2 bg-primary-soft text-primary px-4 py-2 rounded-full text-sm font-semibold">
               <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-              Now available for macOS
+              Now available for macOS & Windows
             </span>
           </motion.div>
 
@@ -143,7 +145,7 @@ export function HeroSection() {
             transition={{ duration: 0.8, ease, delay: 0.2 }}
             className="mt-8 body-lg text-ink-muted max-w-[520px] mx-auto"
           >
-            AI-powered voice dictation for macOS. Press a shortcut, speak
+            AI-powered voice dictation for macOS & Windows. Press a shortcut, speak
             naturally, and watch polished text appear anywhere you can type.
           </motion.p>
 
@@ -158,7 +160,7 @@ export function HeroSection() {
               href="/signup"
               className="inline-flex items-center gap-2.5 bg-primary text-white px-8 py-4 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_24px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 group"
             >
-              Download for Mac
+              Download for {getPlatformLabel(platform)}
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
             </a>
           </motion.div>

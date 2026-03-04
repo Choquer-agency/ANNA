@@ -3,9 +3,11 @@
 import { ArrowRight } from 'lucide-react'
 import { FadeIn } from '@/components/ui/FadeIn'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
+import { usePlatformDetect, getPlatformLabel } from '@/hooks/usePlatformDetect'
 
 export function CTASection() {
   const { onMouseMove } = usePlasmaHover()
+  const platform = usePlatformDetect()
   return (
     <section id="download" className="section-py">
       <div className="mx-auto max-w-[1400px] px-6 md:px-10">
@@ -30,11 +32,13 @@ export function CTASection() {
                 onMouseMove={onMouseMove}
                 className="inline-flex items-center gap-2.5 bg-primary text-white px-8 py-4 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_24px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 group"
               >
-                <span className="relative z-[2]">Download for Mac — Free</span>
+                <span className="relative z-[2]">Download for {getPlatformLabel(platform)} — Free</span>
                 <ArrowRight className="relative z-[2] w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
               </a>
             </div>
-            <p className="mt-4 text-sm text-ink-faint">macOS 13+ required. Apple Silicon & Intel.</p>
+            <p className="mt-4 text-sm text-ink-faint">
+              {platform === 'windows' ? 'Windows 10+ required.' : 'macOS 13+ required. Apple Silicon & Intel.'}
+            </p>
           </FadeIn>
         </div>
       </div>

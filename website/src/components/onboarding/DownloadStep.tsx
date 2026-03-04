@@ -5,6 +5,7 @@ import { Download } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ease } from '@/lib/animations'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
+import { usePlatformDetect, getDownloadPath, getPlatformLabel } from '@/hooks/usePlatformDetect'
 
 interface DownloadStepProps {
   onComplete: () => void
@@ -12,6 +13,7 @@ interface DownloadStepProps {
 
 export function DownloadStep({ onComplete }: DownloadStepProps) {
   const { onMouseMove } = usePlasmaHover()
+  const platform = usePlatformDetect()
   const [downloaded, setDownloaded] = useState(false)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
@@ -30,7 +32,7 @@ export function DownloadStep({ onComplete }: DownloadStepProps) {
   }
 
   const handleDownloadAndComplete = () => {
-    window.open('/download/mac', '_blank')
+    window.open(getDownloadPath(platform), '_blank')
     onComplete()
   }
 
@@ -46,8 +48,8 @@ export function DownloadStep({ onComplete }: DownloadStepProps) {
       </h2>
       <p className="text-[0.9rem] text-ink-muted mb-8">
         {downloaded
-          ? "You're all set! Download the app to start dictating anywhere on your Mac."
-          : 'Get the macOS app to start dictating anywhere on your computer.'}
+          ? `You're all set! Download the app to start dictating anywhere on your ${getPlatformLabel(platform) === 'Windows' ? 'PC' : 'Mac'}.`
+          : 'Get the desktop app to start dictating anywhere on your computer.'}
       </p>
 
       {/* 3D Anna icon with mouse-tracking parallax */}
@@ -95,7 +97,7 @@ export function DownloadStep({ onComplete }: DownloadStepProps) {
 
       {!downloaded ? (
         <a
-          href="/download/mac"
+          href={getDownloadPath(platform)}
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleDownload}
@@ -103,7 +105,7 @@ export function DownloadStep({ onComplete }: DownloadStepProps) {
           className="w-full inline-flex items-center justify-center gap-2 bg-primary text-white py-3.5 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_20px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 cursor-pointer group"
         >
           <Download className="relative z-[2] w-4 h-4" />
-          <span className="relative z-[2]">Download for Mac</span>
+          <span className="relative z-[2]">Download for {getPlatformLabel(platform)}</span>
         </a>
       ) : (
         <motion.div

@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-motion'
-import { Menu, X, ArrowRight, Download } from 'lucide-react'
+import { Menu, X, ArrowRight, Download, Apple, Monitor } from 'lucide-react'
 import { AnnaLogo } from '@/components/ui/AnnaLogo'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
+import { usePlatformDetect, getDownloadPath, getPlatformLabel } from '@/hooks/usePlatformDetect'
 
 const navLinks = [
   { label: 'Features', href: '#features' },
@@ -19,6 +20,7 @@ export function Navbar() {
   const downloadRef = useRef<HTMLDivElement>(null)
   const { scrollY } = useScroll()
   const { onMouseMove } = usePlasmaHover()
+  const platform = usePlatformDetect()
 
   // Close download dropdown when clicking outside
   useEffect(() => {
@@ -80,14 +82,24 @@ export function Navbar() {
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                   className="absolute top-full mt-3 left-1/2 -translate-x-1/2"
                 >
-                  <a
-                    href="/download/mac"
-                    onClick={() => setDownloadOpen(false)}
-                    className="inline-flex items-center gap-2.5 whitespace-nowrap bg-white border border-border rounded-full px-5 py-2.5 text-[0.85rem] font-medium text-ink shadow-sm hover:shadow-md hover:border-ink/20 transition-all duration-300"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Download Anna</span>
-                  </a>
+                  <div className="flex flex-col gap-2 bg-white border border-border rounded-2xl p-2 shadow-sm min-w-[180px]">
+                    <a
+                      href="/download/mac"
+                      onClick={() => setDownloadOpen(false)}
+                      className="flex items-center gap-2.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-[0.85rem] font-medium text-ink hover:bg-surface-alt transition-colors duration-200"
+                    >
+                      <Apple className="w-4 h-4" />
+                      <span>Download for Mac</span>
+                    </a>
+                    <a
+                      href="/download/windows"
+                      onClick={() => setDownloadOpen(false)}
+                      className="flex items-center gap-2.5 whitespace-nowrap rounded-xl px-4 py-2.5 text-[0.85rem] font-medium text-ink hover:bg-surface-alt transition-colors duration-200"
+                    >
+                      <Monitor className="w-4 h-4" />
+                      <span>Download for Windows</span>
+                    </a>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -140,12 +152,12 @@ export function Navbar() {
               </a>
             ))}
             <a
-              href="/download/mac"
+              href={getDownloadPath(platform)}
               className="inline-flex items-center gap-2 text-lg text-ink-secondary hover:text-ink"
               onClick={() => setMobileOpen(false)}
             >
               <Download className="w-4 h-4" />
-              Download Anna
+              Download for {getPlatformLabel(platform)}
             </a>
             <hr className="border-border" />
             <a href="/login" className="text-lg text-ink-secondary">
