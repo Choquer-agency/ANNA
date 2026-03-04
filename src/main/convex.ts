@@ -93,6 +93,7 @@ export async function syncSession(session: Session): Promise<void> {
       flagged: session.flagged,
       flagReason: session.flag_reason ?? undefined,
       error: session.error ?? undefined,
+      mode: session.mode ?? 'dictation',
     })
 
     markSynced(session.id)

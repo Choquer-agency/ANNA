@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 import { usePlatform } from '../../../hooks/usePlatform'
@@ -35,14 +35,23 @@ export function GeneralTab(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedDevice, setSelectedDevice] = useState('default')
+  const [commandModeEnabled, setCommandModeEnabled] = useState(true)
+  const [triggerPhrases, setTriggerPhrases] = useState<string[]>(['Hey Anna', 'Anna'])
+  const [newPhrase, setNewPhrase] = useState('')
 
   const loadSettings = useCallback(async () => {
-    const [hk, micDevice] = await Promise.all([
+    const [hk, micDevice, cmdEnabled, cmdPhrases] = await Promise.all([
       window.annaAPI.getSetting('hotkey'),
-      window.annaAPI.getSetting('microphone_device')
+      window.annaAPI.getSetting('microphone_device'),
+      window.annaAPI.getSetting('command_mode_enabled'),
+      window.annaAPI.getSetting('command_trigger_phrases')
     ])
     setHotkey(hk || defaultHotkey)
     setSelectedDevice(micDevice || 'default')
+    setCommandModeEnabled(cmdEnabled !== 'false')
+    if (cmdPhrases) {
+      try { setTriggerPhrases(JSON.parse(cmdPhrases)) } catch { /* use defaults */ }
+    }
     setLoaded(true)
   }, [])
 
@@ -196,6 +205,76 @@ export function GeneralTab(): React.JSX.Element {
               ))}
           </select>
         </SettingsRow>
+      </SettingsCard>
+
+      <SettingsCard title="Command Mode">
+        <SettingsRow label="Enable command mode" description="Say a trigger phrase to have Anna execute tasks instead of dictating">
+          <button
+            onClick={async () => {
+              const next = !commandModeEnabled
+              setCommandModeEnabled(next)
+              await window.annaAPI.setSetting('command_mode_enabled', String(next))
+            }}
+            className={`relative w-11 h-6 rounded-full transition-colors ${commandModeEnabled ? 'bg-primary' : 'bg-gray-300'}`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${commandModeEnabled ? 'translate-x-5' : ''}`}
+            />
+          </button>
+        </SettingsRow>
+
+        {commandModeEnabled && (
+          <SettingsRow label="Trigger phrases" description="Start your recording with one of these phrases to activate command mode">
+            <div className="flex flex-col gap-2 min-w-[200px]">
+              {triggerPhrases.map((phrase, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="px-3 py-1.5 bg-white/60 border border-border rounded-xl text-sm text-ink flex-1">
+                    {phrase}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      const next = triggerPhrases.filter((_, j) => j !== i)
+                      setTriggerPhrases(next)
+                      await window.annaAPI.setSetting('command_trigger_phrases', JSON.stringify(next))
+                    }}
+                    className="p-1 text-ink-muted hover:text-red-500 transition-colors rounded-md hover:bg-surface-alt"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newPhrase}
+                  onChange={(e) => setNewPhrase(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && newPhrase.trim()) {
+                      const next = [...triggerPhrases, newPhrase.trim()]
+                      setTriggerPhrases(next)
+                      setNewPhrase('')
+                      await window.annaAPI.setSetting('command_trigger_phrases', JSON.stringify(next))
+                    }
+                  }}
+                  placeholder="Add phrase..."
+                  className="px-3 py-1.5 border border-border rounded-xl text-sm bg-white/60 text-ink flex-1 focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                />
+                <button
+                  onClick={async () => {
+                    if (!newPhrase.trim()) return
+                    const next = [...triggerPhrases, newPhrase.trim()]
+                    setTriggerPhrases(next)
+                    setNewPhrase('')
+                    await window.annaAPI.setSetting('command_trigger_phrases', JSON.stringify(next))
+                  }}
+                  className="p-1 text-ink-muted hover:text-primary transition-colors rounded-md hover:bg-surface-alt"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          </SettingsRow>
+        )}
       </SettingsCard>
     </div>
   )

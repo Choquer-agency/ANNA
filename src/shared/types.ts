@@ -13,6 +13,7 @@ export interface Session {
   error: string | null
   flagged: boolean
   flag_reason: string | null
+  mode: 'dictation' | 'command'
 }
 
 export interface Stats {
@@ -64,4 +65,23 @@ export interface Note {
 export interface Setting {
   key: string
   value: string
+}
+
+export interface VocabularyTerm {
+  term: string
+  aliases?: string[]
+  category?: string
+}
+
+export interface VocabularyPack {
+  id: string
+  name: string
+  description: string
+  icon: string
+  domain: string
+  is_builtin: boolean
+  enabled: boolean
+  app_patterns: string[] | null
+  terms: VocabularyTerm[]
+  created_at: string
 }

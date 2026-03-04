@@ -22,8 +22,9 @@ func activateApp(bundleId: String) -> Bool {
         return false
     }
 
-    // Wait up to 500ms for the app to become frontmost
-    let deadline = Date().addingTimeInterval(0.5)
+    // Wait up to 150ms for the app to become frontmost
+    // (recording indicator is hidden before paste, so target app is usually already active)
+    let deadline = Date().addingTimeInterval(0.15)
     while Date() < deadline {
         if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleId {
             return true

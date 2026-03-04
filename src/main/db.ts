@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import type { Session, Setting, Stats, WeeklyStats, DictionaryEntry, Snippet, StyleProfile, Note } from '../shared/types'
+import type { Session, Setting, Stats, WeeklyStats, DictionaryEntry, Snippet, StyleProfile, Note, VocabularyPack, VocabularyTerm } from '../shared/types'
 import { PLANS } from '../shared/pricing'
 
 let db: Database.Database
@@ -11,6 +11,7 @@ export function initDB(): void {
   const dbPath = join(app.getPath('userData'), 'anna.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
+  db.pragma('foreign_keys = ON')
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -106,6 +107,39 @@ function runMigrations(): void {
     db.exec(`ALTER TABLE sessions ADD COLUMN flag_reason TEXT DEFAULT NULL`)
     setSchemaVersion(6)
   }
+
+  if (version < 7) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS vocabulary_packs (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        icon TEXT NOT NULL DEFAULT 'BookOpen',
+        domain TEXT NOT NULL DEFAULT 'custom',
+        is_builtin INTEGER NOT NULL DEFAULT 0,
+        builtin_key TEXT,
+        enabled INTEGER NOT NULL DEFAULT 0,
+        app_patterns TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS vocabulary_terms (
+        id TEXT PRIMARY KEY,
+        pack_id TEXT NOT NULL REFERENCES vocabulary_packs(id) ON DELETE CASCADE,
+        term TEXT NOT NULL,
+        aliases TEXT,
+        category TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_vocab_terms_pack ON vocabulary_terms(pack_id);
+    `)
+    setSchemaVersion(7)
+  }
+
+  if (version < 8) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'dictation'`)
+    setSchemaVersion(8)
+  }
 }
 
 function getSchemaVersion(): number {
@@ -133,11 +167,11 @@ export function createSession(data: {
   return getSessionById(id)!
 }
 
-const SESSION_UPDATABLE_FIELDS = new Set(['status', 'raw_transcript', 'processed_transcript', 'duration_ms', 'word_count', 'audio_path', 'error'])
+const SESSION_UPDATABLE_FIELDS = new Set(['status', 'raw_transcript', 'processed_transcript', 'duration_ms', 'word_count', 'audio_path', 'error', 'mode'])
 
 export function updateSession(
   id: string,
-  data: Partial<Pick<Session, 'status' | 'raw_transcript' | 'processed_transcript' | 'duration_ms' | 'word_count' | 'audio_path' | 'error'>>
+  data: Partial<Pick<Session, 'status' | 'raw_transcript' | 'processed_transcript' | 'duration_ms' | 'word_count' | 'audio_path' | 'error' | 'mode'>>
 ): void {
   const fields = Object.entries(data).filter(([k, v]) => v !== undefined && SESSION_UPDATABLE_FIELDS.has(k))
   if (fields.length === 0) return
@@ -408,6 +442,123 @@ export function updateNote(id: string, data: { title?: string; content?: string 
 
 export function deleteNote(id: string): void {
   db.prepare('DELETE FROM notes WHERE id = ?').run(id)
+}
+
+// --- Vocabulary Packs ---
+
+function hydrateVocabularyPack(row: Record<string, unknown>): VocabularyPack {
+  const packId = row.id as string
+  const terms = db.prepare('SELECT term, aliases, category FROM vocabulary_terms WHERE pack_id = ?').all(packId) as Array<Record<string, unknown>>
+  return {
+    id: packId,
+    name: row.name as string,
+    description: row.description as string,
+    icon: row.icon as string,
+    domain: row.domain as string,
+    is_builtin: Boolean(row.is_builtin),
+    enabled: Boolean(row.enabled),
+    app_patterns: row.app_patterns ? JSON.parse(row.app_patterns as string) : null,
+    terms: terms.map((t) => ({
+      term: t.term as string,
+      aliases: t.aliases ? JSON.parse(t.aliases as string) : undefined,
+      category: (t.category as string) || undefined,
+    })),
+    created_at: row.created_at as string,
+  }
+}
+
+export function getVocabularyPacks(): VocabularyPack[] {
+  const rows = db.prepare('SELECT * FROM vocabulary_packs ORDER BY is_builtin DESC, created_at ASC').all() as Array<Record<string, unknown>>
+  return rows.map(hydrateVocabularyPack)
+}
+
+export function getVocabularyPackById(id: string): VocabularyPack | undefined {
+  const row = db.prepare('SELECT * FROM vocabulary_packs WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  if (!row) return undefined
+  return hydrateVocabularyPack(row)
+}
+
+export function getEnabledVocabularyPacks(): VocabularyPack[] {
+  const rows = db.prepare('SELECT * FROM vocabulary_packs WHERE enabled = 1 ORDER BY is_builtin DESC, created_at ASC').all() as Array<Record<string, unknown>>
+  return rows.map(hydrateVocabularyPack)
+}
+
+export function setVocabularyPackEnabled(id: string, enabled: boolean): void {
+  db.prepare('UPDATE vocabulary_packs SET enabled = ? WHERE id = ?').run(enabled ? 1 : 0, id)
+}
+
+export function addVocabularyPack(data: { name: string; description: string; icon?: string; domain?: string; terms: VocabularyTerm[] }): VocabularyPack {
+  const id = randomUUID()
+  db.prepare(
+    'INSERT INTO vocabulary_packs (id, name, description, icon, domain) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, data.name, data.description, data.icon ?? 'BookOpen', data.domain ?? 'custom')
+
+  const insertTerm = db.prepare('INSERT INTO vocabulary_terms (id, pack_id, term, aliases, category) VALUES (?, ?, ?, ?, ?)')
+  for (const t of data.terms) {
+    insertTerm.run(randomUUID(), id, t.term, t.aliases ? JSON.stringify(t.aliases) : null, t.category ?? null)
+  }
+
+  return getVocabularyPackById(id)!
+}
+
+export function updateVocabularyPack(id: string, data: { name?: string; description?: string; terms?: VocabularyTerm[] }): void {
+  if (data.name !== undefined || data.description !== undefined) {
+    const fields: string[] = []
+    const values: unknown[] = []
+    if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name) }
+    if (data.description !== undefined) { fields.push('description = ?'); values.push(data.description) }
+    values.push(id)
+    db.prepare(`UPDATE vocabulary_packs SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+  }
+
+  if (data.terms !== undefined) {
+    db.prepare('DELETE FROM vocabulary_terms WHERE pack_id = ?').run(id)
+    const insertTerm = db.prepare('INSERT INTO vocabulary_terms (id, pack_id, term, aliases, category) VALUES (?, ?, ?, ?, ?)')
+    for (const t of data.terms) {
+      insertTerm.run(randomUUID(), id, t.term, t.aliases ? JSON.stringify(t.aliases) : null, t.category ?? null)
+    }
+  }
+}
+
+export function deleteVocabularyPack(id: string): void {
+  db.prepare('DELETE FROM vocabulary_packs WHERE id = ? AND is_builtin = 0').run(id)
+}
+
+export function getBuiltinPackVersion(key: string): number | null {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(`vocab_pack_version_${key}`) as Setting | undefined
+  return row ? parseInt(row.value, 10) : null
+}
+
+export function setBuiltinPackVersion(key: string, version: number): void {
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`vocab_pack_version_${key}`, String(version))
+}
+
+export function upsertBuiltinPack(key: string, packData: {
+  name: string; description: string; icon: string; domain: string;
+  app_patterns?: string[]; terms: VocabularyTerm[]
+}): void {
+  const existing = db.prepare('SELECT id FROM vocabulary_packs WHERE builtin_key = ?').get(key) as { id: string } | undefined
+
+  if (existing) {
+    db.prepare('UPDATE vocabulary_packs SET name = ?, description = ?, icon = ?, domain = ?, app_patterns = ? WHERE id = ?')
+      .run(packData.name, packData.description, packData.icon, packData.domain, packData.app_patterns ? JSON.stringify(packData.app_patterns) : null, existing.id)
+
+    db.prepare('DELETE FROM vocabulary_terms WHERE pack_id = ?').run(existing.id)
+    const insertTerm = db.prepare('INSERT INTO vocabulary_terms (id, pack_id, term, aliases, category) VALUES (?, ?, ?, ?, ?)')
+    for (const t of packData.terms) {
+      insertTerm.run(randomUUID(), existing.id, t.term, t.aliases ? JSON.stringify(t.aliases) : null, t.category ?? null)
+    }
+  } else {
+    const id = randomUUID()
+    db.prepare(
+      'INSERT INTO vocabulary_packs (id, name, description, icon, domain, is_builtin, builtin_key, app_patterns) VALUES (?, ?, ?, ?, ?, 1, ?, ?)'
+    ).run(id, packData.name, packData.description, packData.icon, packData.domain, key, packData.app_patterns ? JSON.stringify(packData.app_patterns) : null)
+
+    const insertTerm = db.prepare('INSERT INTO vocabulary_terms (id, pack_id, term, aliases, category) VALUES (?, ?, ?, ?, ?)')
+    for (const t of packData.terms) {
+      insertTerm.run(randomUUID(), id, t.term, t.aliases ? JSON.stringify(t.aliases) : null, t.category ?? null)
+    }
+  }
 }
 
 // --- Close ---

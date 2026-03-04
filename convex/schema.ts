@@ -33,6 +33,9 @@ export default defineSchema({
 
     // Error
     error: v.optional(v.string()),
+
+    // Mode: 'dictation' (default) or 'command'
+    mode: v.optional(v.string()),
   })
     .index('by_user', ['userId'])
     .index('by_user_and_local_id', ['userId', 'localId'])

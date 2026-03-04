@@ -19,6 +19,7 @@ export const upsert = mutation({
     flagged: v.boolean(),
     flagReason: v.optional(v.string()),
     error: v.optional(v.string()),
+    mode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Prefer auth-based userId, fall back to legacy arg

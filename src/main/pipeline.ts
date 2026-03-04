@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, clipboard, ipcMain } from 'electron'
 import { syncSession } from './convex'
 import { join } from 'path'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
@@ -7,7 +7,7 @@ import { startRecording, stopRecording, getRecordingState, getRecordingDuration 
 import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions, getStats, getWeeklyStats } from './db'
 import { syncWordCount } from './convex'
 import { transcribe } from './transcribe'
-import { processTranscript } from './process'
+import { processTranscript, processCommand } from './process'
 import type { ActiveWindowInfo } from './platform'
 import { getLangfuse } from './langfuse'
 import {
@@ -50,6 +50,36 @@ function applyDictionaryReplacements(text: string): string {
   return result
 }
 
+const DEFAULT_TRIGGER_PHRASES = ['hey anna', 'anna']
+
+function detectCommandMode(transcript: string): { isCommand: boolean; command: string } {
+  if (getSetting('command_mode_enabled') === 'false') {
+    return { isCommand: false, command: transcript }
+  }
+
+  const triggerSetting = getSetting('command_trigger_phrases')
+  const phrases = triggerSetting
+    ? JSON.parse(triggerSetting) as string[]
+    : DEFAULT_TRIGGER_PHRASES
+
+  // Sort longest-first so "hey anna" matches before "anna"
+  const sorted = [...phrases].sort((a, b) => b.length - a.length)
+  const lower = transcript.toLowerCase().trimStart()
+
+  for (const phrase of sorted) {
+    if (lower.startsWith(phrase.toLowerCase())) {
+      const remainder = transcript
+        .slice(transcript.toLowerCase().indexOf(phrase.toLowerCase()) + phrase.length)
+        .replace(/^[,.\s]+/, '')
+        .trim()
+      if (remainder.length > 0) {
+        return { isCommand: true, command: remainder }
+      }
+    }
+  }
+  return { isCommand: false, command: transcript }
+}
+
 let mainWindowRef: Electron.BrowserWindow | null = null
 
 export function setPipelineMainWindow(win: Electron.BrowserWindow | null): void {
@@ -83,6 +113,7 @@ function getCurrentPage(): Promise<string> {
 let repositionInterval: ReturnType<typeof setInterval> | null = null
 let indicatorIPCSetup = false
 let cachedActiveWindow: ActiveWindowInfo | null = null
+let cachedClipboardContext: string | null = null
 
 // Buffer held temporarily when user cancels (for undo)
 let cancelledWavBuffer: Buffer | null = null
@@ -221,6 +252,7 @@ async function handleCancel(): Promise<void> {
   cancelledActiveWindow = cachedActiveWindow
   cancelledDurationMs = getRecordingDuration()
   cachedActiveWindow = null
+  cachedClipboardContext = null
 
   // Show cancelled state in indicator
   sendStateChange('cancelled')
@@ -257,7 +289,7 @@ async function handleUndoCancel(): Promise<void> {
   sendStateChange('processing')
   console.log('[pipeline] Undo cancel — processing recording')
 
-  await runPipeline(wavBuffer, activeWin, durationMs)
+  await runPipeline(wavBuffer, activeWin, durationMs, null)
 }
 
 /**
@@ -267,7 +299,8 @@ async function handleUndoCancel(): Promise<void> {
 async function runPipeline(
   wavBuffer: Buffer,
   activeWin: ActiveWindowInfo | null,
-  durationMs: number
+  durationMs: number,
+  clipboardContext: string | null
 ): Promise<void> {
   const t0 = performance.now()
 
@@ -297,6 +330,7 @@ async function runPipeline(
   updateSession(session.id, { audio_path: audioPath })
   console.timeEnd('[pipeline] saveAudio')
 
+  // Trace name and mode are updated after transcription when we know the mode
   console.time('[pipeline] langfuseTrace')
   const trace = getLangfuse()?.trace({
     name: 'dictation-session',
@@ -338,31 +372,58 @@ async function runPipeline(
         return
       }
 
-      // Expand snippets + look up style profile
-      console.time('[pipeline] snippets+style')
-      const expanded = expandSnippets(rawTranscript)
-      const styleProfile = getStyleProfileForApp(
-        activeWin?.appName ?? null,
-        activeWin?.appId ?? null
-      )
-      console.timeEnd('[pipeline] snippets+style')
+      // Detect command mode from trigger phrase
+      const { isCommand, command: commandText } = detectCommandMode(rawTranscript)
+      const mode = isCommand ? 'command' : 'dictation' as const
+      updateSession(session.id, { mode })
+      trace?.update({ metadata: { mode } })
+      if (isCommand) {
+        console.log('[pipeline] Command mode detected, trigger phrase matched')
+      }
 
-      // Process with Claude + check current page in parallel
-      sendStatus('processing', { sessionId: session.id })
-      updateSession(session.id, { status: 'processing' })
-      console.time('[pipeline] processTranscript')
-      const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
-      const [processed, currentPage] = await Promise.all([
-        processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language),
-        currentPagePromise
-      ])
-      console.timeEnd('[pipeline] processTranscript')
+      let final: string
+      let currentPage = ''
 
-      // Apply dictionary replacements
-      console.time('[pipeline] dictionaryReplace')
-      const final = applyDictionaryReplacements(processed)
-      trace?.update({ output: final })
-      console.timeEnd('[pipeline] dictionaryReplace')
+      if (mode === 'command') {
+        // Command mode: send to Claude as a task, skip snippets/dictionary
+        sendStatus('processing', { sessionId: session.id, mode: 'command' })
+        updateSession(session.id, { status: 'processing' })
+        console.time('[pipeline] processCommand')
+        const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
+        const [commandResult, page] = await Promise.all([
+          processCommand(commandText, activeWin, clipboardContext, trace, language),
+          currentPagePromise
+        ])
+        final = commandResult
+        currentPage = page
+        console.timeEnd('[pipeline] processCommand')
+        trace?.update({ output: final })
+      } else {
+        // Dictation mode: existing flow
+        console.time('[pipeline] snippets+style')
+        const expanded = expandSnippets(rawTranscript)
+        const styleProfile = getStyleProfileForApp(
+          activeWin?.appName ?? null,
+          activeWin?.appId ?? null
+        )
+        console.timeEnd('[pipeline] snippets+style')
+
+        sendStatus('processing', { sessionId: session.id })
+        updateSession(session.id, { status: 'processing' })
+        console.time('[pipeline] processTranscript')
+        const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
+        const [processed, page] = await Promise.all([
+          processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language),
+          currentPagePromise
+        ])
+        currentPage = page
+        console.timeEnd('[pipeline] processTranscript')
+
+        console.time('[pipeline] dictionaryReplace')
+        final = applyDictionaryReplacements(processed)
+        trace?.update({ output: final })
+        console.timeEnd('[pipeline] dictionaryReplace')
+      }
 
       const wordCount = final.split(/\s+/).filter(Boolean).length
 
@@ -396,10 +457,11 @@ async function runPipeline(
       console.log('[pipeline] Complete:', session.id)
 
       // Analytics
-      trackMainEvent('dictation_completed', {
+      trackMainEvent(mode === 'command' ? 'command_completed' : 'dictation_completed', {
         duration_ms: durationMs,
         word_count: wordCount,
-        app_context: activeWin?.appName
+        app_context: activeWin?.appName,
+        mode
       })
 
       if (!getSetting('first_dictation_tracked')) {
@@ -504,7 +566,9 @@ export async function handleHotkeyToggle(): Promise<void> {
   if (getRecordingState()) {
     // Stop recording and run pipeline
     const activeWin = cachedActiveWindow
+    const clipboardCtx = cachedClipboardContext
     cachedActiveWindow = null
+    cachedClipboardContext = null
     const durationMs = getRecordingDuration()
 
     cleanupRecordingState()
@@ -517,7 +581,7 @@ export async function handleHotkeyToggle(): Promise<void> {
     const wavBuffer = await stopRecording()
     console.timeEnd('[pipeline] stopRecording')
 
-    await runPipeline(wavBuffer, activeWin, durationMs)
+    await runPipeline(wavBuffer, activeWin, durationMs, clipboardCtx)
   } else {
     // Paywall check — block recording if free user exceeds weekly word limit
     try {
@@ -569,6 +633,7 @@ export async function handleHotkeyToggle(): Promise<void> {
       indicatorIPCSetup = true
     }
     cachedActiveWindow = await getPlatform().getActiveWindow()
+    cachedClipboardContext = clipboard.readText() || null
 
     // Send hotkey info to indicator for tooltip display
     const hotkey = getSetting('hotkey') || 'Ctrl+Space'
