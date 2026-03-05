@@ -31,6 +31,19 @@ export function isAuthenticated(): boolean {
   return !!token && token.length > 0
 }
 
+/** Check if the stored JWT token is expired */
+export function isTokenExpired(): boolean {
+  const token = getStoredToken()
+  if (!token) return true
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    // Consider expired if within 5 minutes of expiry
+    return payload.exp * 1000 < Date.now() + 5 * 60 * 1000
+  } catch {
+    return true
+  }
+}
+
 export function applyAuthToClient(client: ConvexHttpClient): void {
   const token = getStoredToken()
   if (token) {

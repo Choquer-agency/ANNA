@@ -40,12 +40,13 @@ export function getClient(): ConvexHttpClient | null {
 export function ensureClient(): ConvexHttpClient {
   if (!client && process.env.CONVEX_URL) {
     client = new ConvexHttpClient(process.env.CONVEX_URL)
-    if (isAuthValid()) {
-      applyAuthToClient(client)
-    }
   }
   if (!client) {
     throw new Error('No Convex client available')
+  }
+  // Always ensure auth is applied if available
+  if (isAuthValid()) {
+    applyAuthToClient(client)
   }
   return client
 }

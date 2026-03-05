@@ -4,7 +4,7 @@
 
 import { getSetting, setSetting } from './db'
 import { ensureClient } from './convex'
-import { isAuthenticated } from './auth'
+import { isAuthenticated, isTokenExpired } from './auth'
 import { anyApi } from 'convex/server'
 
 const api = anyApi
@@ -44,6 +44,13 @@ export function loadCachedSubscription(): SubscriptionStatus {
 export async function refreshSubscription(): Promise<SubscriptionStatus> {
   if (!isAuthenticated()) {
     cachedStatus = DEFAULT_STATUS
+    return cachedStatus
+  }
+
+  // Don't query server with expired token — it returns "free" for unauthenticated
+  // users which would overwrite a valid cached paid subscription
+  if (isTokenExpired()) {
+    console.log('[subscription] Token expired, using cached status')
     return cachedStatus
   }
 

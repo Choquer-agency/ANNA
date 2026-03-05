@@ -63,8 +63,8 @@ import { trackMainEvent, shutdownPostHog } from './analytics'
 import { getPlatform } from './platform'
 import { createTray, destroyTray } from './tray'
 import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex, fetchWordUsage } from './convex'
-import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
-import { getSubscriptionStatus, startSubscriptionRefresh } from './subscription'
+import { isAuthenticated as isAuthValid, isTokenExpired, storeAuthTokens, clearAuthTokens } from './auth'
+import { getSubscriptionStatus, startSubscriptionRefresh, refreshSubscription, loadCachedSubscription } from './subscription'
 import { api } from '../../convex/_generated/api'
 import { anyApi } from 'convex/server'
 
@@ -189,6 +189,8 @@ function handleDeepLink(url: string): void {
         enableSync()
         // Reconcile word usage from Convex (multi-device sync)
         reconcileWordUsage()
+        // Refresh subscription status with fresh token
+        refreshSubscription().catch(() => {})
         // Notify renderer
         mainWindow?.webContents.send('auth:changed', { isAuthenticated: true })
         console.log('[auth] Token received and stored via deep link')
@@ -326,6 +328,7 @@ app.whenReady().then(async () => {
   }
 
   initDB()
+  loadCachedSubscription() // Load subscription cache early so IPC handlers return correct value
 
   // Pre-validate whisper native module in a child process.
   // If the native binary segfaults on this OS version, the child dies
@@ -384,8 +387,14 @@ app.whenReady().then(async () => {
   setTimeout(() => sendHotkeyInfo(currentHotkey), 1000)
 
   // Silent auth: on first launch without a token, auto-open browser to check for existing session
+  // Also refresh expired tokens on subsequent launches
   if (!isAuthValid() && !getSetting('has_launched_before')) {
     setSetting('has_launched_before', 'true')
+    const { shell } = require('electron')
+    const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+    shell.openExternal(`${websiteUrl}/silent-auth`)
+  } else if (isAuthValid() && isTokenExpired()) {
+    console.log('[auth] Token expired, refreshing via silent auth...')
     const { shell } = require('electron')
     const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
     shell.openExternal(`${websiteUrl}/silent-auth`)
