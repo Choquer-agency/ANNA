@@ -62,6 +62,7 @@ export default defineSchema({
     platform: v.optional(v.string()),
     selectedPlan: v.optional(v.string()),
     profileImageUrl: v.optional(v.string()),
+    syncEnabled: v.optional(v.boolean()),
   })
     .index('by_user', ['userId'])
     .index('by_email', ['email']),

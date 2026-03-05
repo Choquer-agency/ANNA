@@ -74,8 +74,8 @@ export async function syncSession(session: Session): Promise<void> {
   if (!isSyncEnabled() || !client) return
 
   try {
-    // Always pass userId as fallback — server prefers auth context if available
-    const userId = getUserId()
+    // Only pass userId as fallback when not authenticated — server prefers auth context
+    const userId = isAuthValid() ? undefined : getUserId()
 
     await client.mutation(api.sessions.upsert, {
       localId: session.id,

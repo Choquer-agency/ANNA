@@ -10,10 +10,29 @@ export const getSubscription = query({
     const userId = await getAuthUserId(ctx)
     if (!userId) return { planId: 'free' as const, status: 'active' as const }
 
-    const sub = await ctx.db
+    // Primary: look up by Auth userId
+    let sub = await ctx.db
       .query('subscriptions')
       .withIndex('by_user', (q) => q.eq('userId', String(userId)))
       .first()
+
+    // Fallback: look up by auth user's email (subscription may have been
+    // created via Stripe webhook with email or UUID as userId)
+    if (!sub) {
+      const authUser = await ctx.db.get(userId)
+      const email = authUser?.email as string | undefined
+      if (email) {
+        sub = await ctx.db
+          .query('subscriptions')
+          .filter((q) =>
+            q.or(
+              q.eq(q.field('userId'), email),
+              q.eq(q.field('email'), email)
+            )
+          )
+          .first()
+      }
+    }
 
     if (!sub || (sub.status !== 'active' && sub.status !== 'trialing')) {
       return { planId: 'free' as const, status: 'active' as const }
@@ -254,3 +273,4 @@ async function handleSubscriptionDeleted(
     })
   }
 }
+

@@ -453,14 +453,7 @@ export const getCustomerDetail = query({
       }
     } catch { /* userId might not be a valid doc ID */ }
 
-    // Check user profile
-    const profile = await ctx.db
-      .query('userProfiles')
-      .withIndex('by_user', (q) => q.eq('userId', args.userId))
-      .first()
-    if (profile) {
-      deviceName = deviceName ?? profile.deviceName ?? null
-    }
+    // deviceName is now on registrations (merged from userProfiles)
 
     const sub = await ctx.db
       .query('subscriptions')
