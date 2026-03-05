@@ -62,10 +62,10 @@ function App(): React.JSX.Element {
           if (email) identify(email, { name, email })
         })
       }
-    })
+    }).catch(() => setAuthenticated(false))
     window.annaAPI.getSetting('onboarding_completed').then((val) => {
       setOnboardingCompleted(val === 'true')
-    })
+    }).catch(() => setOnboardingCompleted(false))
   }, [])
 
   // Listen for auth changes from deep link

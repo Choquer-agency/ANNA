@@ -64,6 +64,8 @@ import { getPlatform } from './platform'
 import { createTray, destroyTray } from './tray'
 import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex, fetchWordUsage } from './convex'
 import { isAuthenticated as isAuthValid, storeAuthTokens, clearAuthTokens } from './auth'
+import { getSubscriptionStatus, startSubscriptionRefresh } from './subscription'
+import { api } from '../../convex/_generated/api'
 import { anyApi } from 'convex/server'
 
 let mainWindow: BrowserWindow | null = null
@@ -389,17 +391,13 @@ app.whenReady().then(async () => {
     shell.openExternal(`${websiteUrl}/silent-auth`)
   }
 
-  // Register hotkey — use stored setting or platform default
-  const storedHotkey = getSetting('hotkey')
-  await registerHotkey(handleHotkeyToggle, storedHotkey || getPlatform().capabilities.defaultHotkey)
-
   // Apply launch at login setting
   const launchSetting = getSetting('launch_at_login')
   if (launchSetting === 'true') {
     app.setLoginItemSettings({ openAtLogin: true })
   }
 
-  // IPC handlers
+  // IPC handlers — registered BEFORE hotkey so renderer can call them immediately
   ipcMain.handle('sessions:get-all', () => getSessions())
 
   ipcMain.handle('session:retry', async (_event, sessionId: string, customPrompt?: string) => {
@@ -684,7 +682,6 @@ app.whenReady().then(async () => {
 
   // Subscription / Paywall
   ipcMain.handle('subscription:get-status', () => {
-    const { getSubscriptionStatus } = require('./subscription')
     return getSubscriptionStatus()
   })
 
@@ -704,9 +701,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('churn:submit-survey', async (_event: any, reason: string, details?: string) => {
     try {
-      const { ensureClient } = require('./convex')
       const client = ensureClient()
-      const { api } = require('../../convex/_generated/api')
       await client.mutation(api.churn.submitChurnEvent, { reason, details })
     } catch (err) {
       console.error('[churn] Failed to submit survey:', err)
@@ -785,6 +780,10 @@ app.whenReady().then(async () => {
     app.exit(0)
   })
 
+  // Register hotkey — after IPC handlers so renderer isn't blocked by fn key monitor (up to 3s)
+  const storedHotkey = getSetting('hotkey')
+  await registerHotkey(handleHotkeyToggle, storedHotkey || getPlatform().capabilities.defaultHotkey)
+
   // Initialize Convex cloud sync
   initConvex()
 
@@ -794,7 +793,6 @@ app.whenReady().then(async () => {
   }
 
   // Start subscription status refresh
-  const { startSubscriptionRefresh } = require('./subscription')
   startSubscriptionRefresh()
 
   // Run catch-up sync every 5 minutes

@@ -10,6 +10,7 @@ import { transcribe } from './transcribe'
 import { processTranscript, processCommand } from './process'
 import type { ActiveWindowInfo } from './platform'
 import { getLangfuse } from './langfuse'
+import { getSubscriptionStatus } from './subscription'
 import {
   showRecordingIndicator,
   hideRecordingIndicator,
@@ -483,7 +484,6 @@ async function runPipeline(
 
       // Check if user just crossed a limit threshold (post-dictation)
       try {
-        const { getSubscriptionStatus } = require('./subscription')
         const sub = getSubscriptionStatus()
         if (sub.planId === 'free') {
           const weekly = getWeeklyStats()
@@ -585,7 +585,6 @@ export async function handleHotkeyToggle(): Promise<void> {
   } else {
     // Paywall check — block recording if free user exceeds weekly word limit
     try {
-      const { getSubscriptionStatus } = require('./subscription')
       const sub = getSubscriptionStatus()
       if (sub.planId === 'free') {
         const weekly = getWeeklyStats()
