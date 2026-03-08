@@ -68,10 +68,14 @@ export function useAnna() {
       setPipelineStatus(data.status)
     })
 
-    window.annaAPI.onPipelineComplete(() => {
+    window.annaAPI.onPipelineComplete((data: Record<string, unknown>) => {
       setPipelineStatus('idle')
       loadSessions().catch(() => {})
       loadStats().catch(() => {})
+      const timing = data?.timing as { transcribe: number; process: number; total: number } | undefined
+      if (timing) {
+        addToast(`${(timing.total / 1000).toFixed(1)}s total — transcribe: ${(timing.transcribe / 1000).toFixed(1)}s, process: ${(timing.process / 1000).toFixed(1)}s`, 'success')
+      }
     })
 
     window.annaAPI.onPipelineError(() => {

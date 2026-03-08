@@ -93,8 +93,8 @@ function sendStatus(status: string, data?: Record<string, unknown>): void {
   mainWindowRef?.webContents.send('pipeline:status', { status, ...data })
 }
 
-function sendComplete(sessionId: string): void {
-  mainWindowRef?.webContents.send('pipeline:complete', { sessionId })
+function sendComplete(sessionId: string, extra?: Record<string, unknown>): void {
+  mainWindowRef?.webContents.send('pipeline:complete', { sessionId, ...extra })
 }
 
 function sendError(error: string): void {
@@ -372,7 +372,9 @@ async function runPipeline(
       if (whisperPrompt) console.log(`[pipeline] Whisper prompt hint: ${whisperPrompt.length} chars`)
 
       console.time('[pipeline] transcribe')
+      const tTranscribe = performance.now()
       const rawTranscript = await transcribe(wavBuffer, language, trace, whisperPrompt || undefined)
+      const transcribeMs = performance.now() - tTranscribe
       console.timeEnd('[pipeline] transcribe')
       console.log(`[pipeline] RAW: ${rawTranscript}`)
       trace?.update({ input: rawTranscript })
@@ -397,11 +399,14 @@ async function runPipeline(
       let final: string
       let currentPage = ''
 
+      let processMs = 0
+
       if (mode === 'command') {
         // Command mode: send to Claude as a task, skip snippets/dictionary
         sendStatus('processing', { sessionId: session.id, mode: 'command' })
         updateSession(session.id, { status: 'processing' })
         console.time('[pipeline] processCommand')
+        const tProcess = performance.now()
         const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
         const [commandResult, page] = await Promise.all([
           processCommand(commandText, activeWin, clipboardContext, trace, language),
@@ -409,6 +414,7 @@ async function runPipeline(
         ])
         final = commandResult
         currentPage = page
+        processMs = performance.now() - tProcess
         console.timeEnd('[pipeline] processCommand')
         trace?.update({ output: final })
       } else {
@@ -425,12 +431,14 @@ async function runPipeline(
         updateSession(session.id, { status: 'processing' })
         const claudeVocabHint = buildClaudeVocabularyHint(vocabTerms)
         console.time('[pipeline] processTranscript')
+        const tProcess = performance.now()
         const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
         const [processed, page] = await Promise.all([
           processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language, claudeVocabHint || undefined),
           currentPagePromise
         ])
         currentPage = page
+        processMs = performance.now() - tProcess
         console.timeEnd('[pipeline] processTranscript')
 
         console.log(`[pipeline] CLAUDE: ${processed}`)
@@ -471,9 +479,16 @@ async function runPipeline(
       }
       console.timeEnd('[pipeline] injectText')
 
+      const totalMs = performance.now() - t0
       trace?.update({ metadata: { status: 'completed', wordCount } })
-      sendComplete(session.id)
-      console.log(`[pipeline] TOTAL: ${(performance.now() - t0).toFixed(1)}ms`)
+      sendComplete(session.id, {
+        timing: {
+          transcribe: Math.round(transcribeMs),
+          process: Math.round(processMs),
+          total: Math.round(totalMs)
+        }
+      })
+      console.log(`[pipeline] TOTAL: ${totalMs.toFixed(1)}ms (transcribe: ${transcribeMs.toFixed(1)}ms, process: ${processMs.toFixed(1)}ms)`)
       console.log('[pipeline] Complete:', session.id)
 
       // Analytics
