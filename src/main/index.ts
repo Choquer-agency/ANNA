@@ -101,24 +101,50 @@ ipcMain.handle('update:check', async () => {
 // App version — also at module level for reliability
 ipcMain.handle('app:get-version', () => app.getVersion())
 
-// Download update — opens the installer download in the browser
+// Download update — uses electron-updater for in-app download, falls back to browser
 ipcMain.handle('update:download', async (_event: any, version: string) => {
   try {
-    const { shell } = require('electron')
-    let fileName: string
-    if (process.platform === 'darwin') {
-      const arch = process.arch === 'arm64' ? 'arm64' : ''
-      fileName = arch ? `Anna-${version}-${arch}.dmg` : `Anna-${version}.dmg`
-    } else {
-      fileName = `Anna-Setup-${version}.exe`
+    // electron-updater needs checkForUpdates() first to populate internal state
+    const result = await Promise.race([
+      autoUpdater.checkForUpdates(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000))
+    ])
+
+    if (!result) {
+      throw new Error('checkForUpdates timed out')
     }
-    const url = `https://github.com/Choquer-agency/ANNA/releases/download/v${version}/${fileName}`
-    await shell.openExternal(url)
+
+    // Start download (progress reported via update:download-progress events)
+    autoUpdater.downloadUpdate().catch((err) => {
+      console.error('[updater] downloadUpdate error:', err)
+      mainWindow?.webContents.send('update:error', err.message || 'Download failed')
+    })
+
     return { state: 'downloading' }
   } catch (err: any) {
-    console.error('[updater] Download failed:', err)
-    return { state: 'error', message: err?.message || 'Download failed' }
+    console.warn('[updater] In-app download failed, falling back to browser:', err.message)
+    try {
+      const { shell } = require('electron')
+      let fileName: string
+      if (process.platform === 'darwin') {
+        const arch = process.arch === 'arm64' ? 'arm64' : ''
+        fileName = arch ? `Anna-${version}-${arch}.dmg` : `Anna-${version}.dmg`
+      } else {
+        fileName = `Anna-Setup-${version}.exe`
+      }
+      const url = `https://github.com/Choquer-agency/ANNA/releases/download/v${version}/${fileName}`
+      await shell.openExternal(url)
+      return { state: 'downloading-browser' }
+    } catch (fallbackErr: any) {
+      console.error('[updater] Browser fallback also failed:', fallbackErr)
+      return { state: 'error', message: fallbackErr?.message || 'Download failed' }
+    }
   }
+})
+
+// Install downloaded update — quits app and installs
+ipcMain.handle('update:install', () => {
+  autoUpdater.quitAndInstall(false, true)
 })
 
 // Register anna:// deep link protocol

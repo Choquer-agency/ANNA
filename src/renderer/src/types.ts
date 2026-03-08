@@ -139,8 +139,8 @@ declare global {
       onUpdateNotAvailable: (cb: () => void) => void
       onUpdateProgress: (cb: (percent: number) => void) => void
       onUpdateError: (cb: (message: string) => void) => void
-      checkForUpdates: () => Promise<void>
-      downloadUpdate: () => Promise<void>
+      checkForUpdates: () => Promise<{ state: string; version?: string; message?: string }>
+      downloadUpdate: (version: string) => Promise<{ state: string; message?: string }>
       installUpdate: () => Promise<void>
 
       onPipelineStatus: (cb: (data: PipelineStatus) => void) => void

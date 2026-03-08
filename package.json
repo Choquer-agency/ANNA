@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.36",
+  "version": "1.0.37",
   "description": "ANNA - AI Voice Dictation",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",

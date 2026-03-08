@@ -3,7 +3,7 @@ import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 import { usePlasmaHover } from '../../../hooks/usePlasmaHover'
 
-type UpdateStatus = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+type UpdateStatus = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'downloaded-browser' | 'error'
 
 export function VersionTab(): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
@@ -22,8 +22,10 @@ export function VersionTab(): React.JSX.Element {
     const cleanups = [
       window.annaAPI.onUpdateChecking(() => setUpdateStatus('checking')),
       window.annaAPI.onUpdateAvailable((v: string) => {
-        setUpdateStatus('available')
         if (v) setNewVersion(v)
+        setUpdateStatus((current) =>
+          current === 'downloading' || current === 'downloaded' ? current : 'available'
+        )
       }),
       window.annaAPI.onUpdateNotAvailable(() => setUpdateStatus('not-available')),
       window.annaAPI.onUpdateProgress((percent: number) => {
@@ -84,14 +86,17 @@ export function VersionTab(): React.JSX.Element {
   }, [])
 
   const handleDownloadUpdate = useCallback(async () => {
+    setUpdateStatus('downloading')
+    setDownloadPercent(0)
     try {
       const result = await window.annaAPI.downloadUpdate(newVersion)
       if (result?.state === 'error') {
         setUpdateStatus('error')
         setErrorMessage(result.message || 'Download failed')
-      } else {
-        setUpdateStatus('downloaded')
+      } else if (result?.state === 'downloading-browser') {
+        setUpdateStatus('downloaded-browser')
       }
+      // If state === 'downloading', progress events will handle the rest
     } catch (err: any) {
       setUpdateStatus('error')
       setErrorMessage(err?.message || 'Download failed')
@@ -108,6 +113,8 @@ export function VersionTab(): React.JSX.Element {
         return <span className="text-xs text-amber-600 font-medium">Downloading...</span>
       case 'downloaded':
         return <span className="text-xs text-emerald-600 font-medium">Ready to install</span>
+      case 'downloaded-browser':
+        return <span className="text-xs text-amber-600 font-medium">Download in browser</span>
       case 'not-available':
         return <span className="text-xs text-emerald-600 font-medium">Latest version</span>
       case 'error':
@@ -157,8 +164,49 @@ export function VersionTab(): React.JSX.Element {
         </div>
       )}
 
-      {/* Downloaded — DMG opened in browser */}
+      {/* Downloading — progress bar */}
+      {updateStatus === 'downloading' && (
+        <div className="bg-surface-raised border-2 border-amber-400 rounded-2xl p-5 shadow-float">
+          <h3 className="text-sm font-semibold text-ink">
+            Downloading v{newVersion}...
+          </h3>
+          <div className="mt-3 w-full bg-ink/10 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-primary h-full rounded-full transition-all duration-300"
+              style={{ width: `${downloadPercent}%` }}
+            />
+          </div>
+          <p className="text-xs text-ink-muted mt-2">
+            {Math.round(downloadPercent)}% complete
+          </p>
+        </div>
+      )}
+
+      {/* Downloaded — restart to install */}
       {updateStatus === 'downloaded' && (
+        <div className="bg-surface-raised border-2 border-emerald-400 rounded-2xl p-5 shadow-float">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">
+                v{newVersion} ready to install
+              </h3>
+              <p className="text-xs text-ink-muted mt-0.5">
+                The update has been downloaded. Restart Anna to apply it.
+              </p>
+            </div>
+            <button
+              onClick={() => window.annaAPI.installUpdate()}
+              onMouseMove={onMouseMove}
+              className="plasma-hover px-4 py-2 text-sm text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 active:scale-[0.98] transition-all shrink-0 ml-4"
+            >
+              <span className="relative z-[2]">Restart Now</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Browser fallback — old manual flow */}
+      {updateStatus === 'downloaded-browser' && (
         <div className="bg-surface-raised border-2 border-primary rounded-2xl p-5 shadow-float">
           <div>
             <h3 className="text-sm font-semibold text-ink">
