@@ -20,14 +20,22 @@ export function VersionTab(): React.JSX.Element {
 
   useEffect(() => {
     const cleanups = [
-      window.annaAPI.onUpdateChecking(() => setUpdateStatus('checking')),
+      window.annaAPI.onUpdateChecking(() => {
+        setUpdateStatus((current) =>
+          current === 'downloading' || current === 'downloaded' ? current : 'checking'
+        )
+      }),
       window.annaAPI.onUpdateAvailable((v: string) => {
         if (v) setNewVersion(v)
         setUpdateStatus((current) =>
           current === 'downloading' || current === 'downloaded' ? current : 'available'
         )
       }),
-      window.annaAPI.onUpdateNotAvailable(() => setUpdateStatus('not-available')),
+      window.annaAPI.onUpdateNotAvailable(() => {
+        setUpdateStatus((current) =>
+          current === 'downloading' || current === 'downloaded' ? current : 'not-available'
+        )
+      }),
       window.annaAPI.onUpdateProgress((percent: number) => {
         setUpdateStatus('downloading')
         setDownloadPercent(percent)

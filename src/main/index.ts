@@ -103,6 +103,18 @@ ipcMain.handle('app:get-version', () => app.getVersion())
 
 // Download update — uses electron-updater for in-app download, falls back to browser
 ipcMain.handle('update:download', async (_event: any, version: string) => {
+  // Check if the app is on a read-only volume (e.g. running from DMG or Downloads on macOS)
+  if (process.platform === 'darwin') {
+    const appPath = app.getAppPath()
+    const isReadOnly = appPath.includes('/Volumes/') || appPath.includes('.dmg/')
+    if (isReadOnly) {
+      return {
+        state: 'error',
+        message: 'Please move Anna to your Applications folder before updating. You can drag it from the DMG or Downloads into Applications.'
+      }
+    }
+  }
+
   try {
     // electron-updater needs checkForUpdates() first to populate internal state
     const result = await Promise.race([
@@ -117,7 +129,13 @@ ipcMain.handle('update:download', async (_event: any, version: string) => {
     // Start download (progress reported via update:download-progress events)
     autoUpdater.downloadUpdate().catch((err) => {
       console.error('[updater] downloadUpdate error:', err)
-      mainWindow?.webContents.send('update:error', err.message || 'Download failed')
+      const msg = err.message || 'Download failed'
+      // Provide a friendly message for read-only volume errors
+      if (msg.includes('read-only') || msg.includes('EROFS')) {
+        mainWindow?.webContents.send('update:error', 'Please move Anna to your Applications folder before updating.')
+      } else {
+        mainWindow?.webContents.send('update:error', msg)
+      }
     })
 
     return { state: 'downloading' }
@@ -1006,7 +1024,10 @@ app.whenReady().then(async () => {
 
     autoUpdater.on('error', (err) => {
       console.error('[updater] Error:', err.message)
-      mainWindow?.webContents.send('update:error', err.message)
+      const msg = (err.message || '').includes('read-only')
+        ? 'Please move Anna to your Applications folder before updating.'
+        : err.message
+      mainWindow?.webContents.send('update:error', msg)
     })
 
     // Note: autoUpdater.checkForUpdates() hangs in production builds,
