@@ -24,9 +24,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Restore build assets overwritten by node-gyp
-        run: git checkout -- build/entitlements.mac.plist build/icon.icns build/icon.ico
-
       - name: Install cross-architecture native modules
         run: npm run install:cross-arch
 

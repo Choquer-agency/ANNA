@@ -28,7 +28,8 @@
     "appId": "com.anna.dictation",
     "productName": "Anna",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "buildResources"
     },
     "files": [
       "out/**/*"
@@ -51,10 +52,10 @@
           ]
         }
       ],
-      "icon": "build/icon.icns",
+      "icon": "buildResources/icon.icns",
       "identity": "Bryce Choquer (VAC2837QGB)",
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
+      "entitlements": "buildResources/entitlements.mac.plist",
+      "entitlementsInherit": "buildResources/entitlements.mac.plist",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "notarize": true,
@@ -82,7 +83,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico"
+      "icon": "buildResources/icon.ico"
     },
     "nsis": {
       "oneClick": false,
