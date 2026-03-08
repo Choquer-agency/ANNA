@@ -15,6 +15,7 @@ import type * as adminMutations from "../adminMutations.js";
 import type * as adminQueries from "../adminQueries.js";
 import type * as auth from "../auth.js";
 import type * as churn from "../churn.js";
+import type * as corrections from "../corrections.js";
 import type * as crons from "../crons.js";
 import type * as feedback from "../feedback.js";
 import type * as http from "../http.js";
@@ -24,6 +25,7 @@ import type * as registrations from "../registrations.js";
 import type * as sessions from "../sessions.js";
 import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as userSettings from "../userSettings.js";
 import type * as wordUsage from "../wordUsage.js";
 
 import type {
@@ -40,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   adminQueries: typeof adminQueries;
   auth: typeof auth;
   churn: typeof churn;
+  corrections: typeof corrections;
   crons: typeof crons;
   feedback: typeof feedback;
   http: typeof http;
@@ -49,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   sessions: typeof sessions;
   stripe: typeof stripe;
   subscriptions: typeof subscriptions;
+  userSettings: typeof userSettings;
   wordUsage: typeof wordUsage;
 }>;
 

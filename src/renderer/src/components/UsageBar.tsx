@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { track } from '../lib/analytics'
+import { UpgradeModal } from './UpgradeModal'
 
 interface UsageBarProps {
   weeklyWords: number
@@ -7,6 +9,7 @@ interface UsageBarProps {
 }
 
 export function UsageBar({ weeklyWords, wordLimit, periodResetsAt }: UsageBarProps): React.JSX.Element {
+  const [showUpgrade, setShowUpgrade] = useState(false)
   const percent = Math.min((weeklyWords / wordLimit) * 100, 100)
   const resetDate = new Date(periodResetsAt)
   const resetLabel = resetDate.toLocaleDateString('en-US', {
@@ -23,36 +26,40 @@ export function UsageBar({ weeklyWords, wordLimit, periodResetsAt }: UsageBarPro
 
   function handleUpgradeClick(): void {
     track('free_limit_upgrade_clicked', { source: 'usage_bar' })
-    window.annaAPI.openUpgrade()
+    setShowUpgrade(true)
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface-alt/50 px-4 py-3 mb-4">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs text-ink-secondary">
-          {weeklyWords.toLocaleString()} / {wordLimit.toLocaleString()} words this week
-        </span>
-        <span className="text-xs text-ink-muted">
-          {Math.round(percent)}%
-        </span>
+    <>
+      <div className="rounded-xl border border-border bg-surface-alt/50 px-4 py-3 mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-ink-secondary">
+            {weeklyWords.toLocaleString()} / {wordLimit.toLocaleString()} words this week
+          </span>
+          <span className="text-xs text-ink-muted">
+            {Math.round(percent)}%
+          </span>
+        </div>
+        <div className="w-full h-1.5 rounded-full bg-surface-alt overflow-hidden mb-2">
+          <div
+            className={`h-full rounded-full ${barColor} transition-all duration-500`}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-ink-muted">
+            Resets {resetLabel}
+          </span>
+          <button
+            onClick={handleUpgradeClick}
+            className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+          >
+            Upgrade for Unlimited
+          </button>
+        </div>
       </div>
-      <div className="w-full h-1.5 rounded-full bg-surface-alt overflow-hidden mb-2">
-        <div
-          className={`h-full rounded-full ${barColor} transition-all duration-500`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-ink-muted">
-          Resets {resetLabel}
-        </span>
-        <button
-          onClick={handleUpgradeClick}
-          className="text-[11px] text-primary hover:underline cursor-pointer"
-        >
-          Upgrade for unlimited
-        </button>
-      </div>
-    </div>
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+    </>
   )
 }

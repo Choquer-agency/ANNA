@@ -1,6 +1,7 @@
 import { ConvexHttpClient } from 'convex/browser'
 import { anyApi } from 'convex/server'
-import { getSetting, setSetting, getUnsyncedSessions, markSynced } from './db'
+import { getSetting, setSetting, getUnsyncedSessions, markSynced, getUnsyncedCorrections, markCorrectionSynced } from './db'
+import { applyApprovedCorrections } from './vocabulary'
 import { readFileSync } from 'fs'
 import { getRecordingState } from './audio'
 import { hostname } from 'os'
@@ -47,6 +48,9 @@ export function ensureClient(): ConvexHttpClient {
   // Always ensure auth is applied if available
   if (isAuthValid()) {
     applyAuthToClient(client)
+    console.log('[convex] ensureClient: auth applied')
+  } else {
+    console.log('[convex] ensureClient: no auth available')
   }
   return client
 }
@@ -108,26 +112,91 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+export async function syncCorrections(): Promise<void> {
+  if (!isSyncEnabled() || !client) return
+
+  const unsynced = getUnsyncedCorrections()
+  if (unsynced.length === 0) return
+
+  console.log(`[convex] Syncing ${unsynced.length} corrections`)
+
+  const userId = isAuthValid() ? undefined : getUserId()
+
+  for (const correction of unsynced) {
+    if (getRecordingState()) break
+    try {
+      await client.mutation(api.corrections.upsert, {
+        userId,
+        sessionId: correction.session_id,
+        originalText: correction.original_text,
+        correctedText: correction.corrected_text!,
+        appName: correction.app_name ?? undefined,
+        appBundleId: correction.app_bundle_id ?? undefined,
+        createdAt: correction.created_at,
+        capturedAt: correction.captured_at!,
+      })
+      markCorrectionSynced(correction.id)
+      await delay(CATCH_UP_DELAY_MS)
+    } catch (err) {
+      console.error('[convex] Correction sync failed:', err)
+      break
+    }
+  }
+}
+
 export async function runCatchUpSync(): Promise<void> {
   if (!isSyncEnabled()) return
 
   const unsynced = getUnsyncedSessions()
-  if (unsynced.length === 0) return
+  if (unsynced.length === 0 && getUnsyncedCorrections().length === 0) return
 
-  console.log(`[convex] Catch-up sync: ${unsynced.length} unsynced sessions`)
+  if (unsynced.length > 0) {
+    console.log(`[convex] Catch-up sync: ${unsynced.length} unsynced sessions`)
 
-  for (const session of unsynced) {
-    // Skip if a dictation is actively in progress
-    if (getRecordingState()) {
-      console.log('[convex] Recording in progress, pausing catch-up sync')
-      break
+    for (const session of unsynced) {
+      // Skip if a dictation is actively in progress
+      if (getRecordingState()) {
+        console.log('[convex] Recording in progress, pausing catch-up sync')
+        break
+      }
+      try {
+        await syncSession(session)
+        await delay(CATCH_UP_DELAY_MS)
+      } catch {
+        break
+      }
     }
-    try {
-      await syncSession(session)
-      await delay(CATCH_UP_DELAY_MS)
-    } catch {
-      break
+  }
+
+  // Also sync corrections
+  await syncCorrections()
+
+  // Pull approved vocabulary recommendations
+  await pullApprovedCorrections()
+}
+
+export async function pullApprovedCorrections(): Promise<void> {
+  if (!isSyncEnabled() || !client) return
+
+  try {
+    const since = getSetting('last_correction_pull') ?? undefined
+    const approved = await client.query(api.corrections.getApprovedRecommendations, { since })
+
+    if (!approved || approved.length === 0) return
+
+    const applied = applyApprovedCorrections(
+      approved.map((r: { originalWord: string; correctedWord: string; approvedAt?: string }) => ({
+        originalWord: r.originalWord,
+        correctedWord: r.correctedWord,
+        approvedAt: r.approvedAt,
+      }))
+    )
+
+    if (applied > 0) {
+      console.log(`[convex] Applied ${applied} approved vocabulary corrections`)
     }
+  } catch (err) {
+    console.error('[convex] Failed to pull approved corrections:', err)
   }
 }
 
@@ -274,6 +343,86 @@ export async function updateProfileNameInConvex(name: string): Promise<void> {
 export async function updateProfileImageInConvex(profileImageUrl: string): Promise<void> {
   const c = ensureClient()
   await c.mutation(api.registrations.updateProfileImage, { profileImageUrl })
+}
+
+// ─── Settings Sync ────────────────────────────────────────────────────────
+
+const SYNCABLE_SETTINGS = [
+  'hotkey',
+  'theme',
+  'language',
+  'microphone_device',
+  'command_mode_enabled',
+  'command_trigger_phrases',
+  'auto_paste',
+  'dictation_sounds',
+  'context_awareness',
+]
+
+let settingsSyncTimeout: ReturnType<typeof setTimeout> | null = null
+
+export function syncSettingToCloud(key: string, value: string): void {
+  if (!SYNCABLE_SETTINGS.includes(key)) return
+  if (!client || !isAuthValid()) return
+
+  // Debounce — batch rapid changes into a single sync
+  if (settingsSyncTimeout) clearTimeout(settingsSyncTimeout)
+  settingsSyncTimeout = setTimeout(() => {
+    pushAllSyncableSettings().catch((err) =>
+      console.error('[convex] Settings sync failed:', err)
+    )
+  }, 2000)
+}
+
+async function pushAllSyncableSettings(): Promise<void> {
+  if (!client || !isAuthValid()) return
+
+  const settings: Record<string, string> = {}
+  for (const key of SYNCABLE_SETTINGS) {
+    const val = getSetting(key)
+    if (val !== undefined) settings[key] = val
+  }
+
+  try {
+    applyAuthToClient(client)
+    await client.mutation(api.userSettings.save, {
+      settings: JSON.stringify(settings),
+    })
+    console.log('[convex] Settings synced to cloud')
+  } catch (err) {
+    console.error('[convex] Settings push failed:', err)
+  }
+}
+
+export async function pullSettingsFromCloud(): Promise<void> {
+  if (!client || !isAuthValid()) return
+
+  try {
+    applyAuthToClient(client)
+    const result = await client.query(api.userSettings.get, {})
+    if (!result?.settings) return
+
+    const cloud: Record<string, string> = JSON.parse(result.settings)
+    let changed = false
+
+    for (const key of SYNCABLE_SETTINGS) {
+      const cloudVal = cloud[key]
+      if (cloudVal === undefined) continue
+
+      const localVal = getSetting(key)
+      if (localVal !== cloudVal) {
+        setSetting(key, cloudVal)
+        changed = true
+        console.log(`[convex] Pulled setting: ${key}`)
+      }
+    }
+
+    if (changed) {
+      console.log('[convex] Cloud settings applied locally')
+    }
+  } catch (err) {
+    console.error('[convex] Settings pull failed:', err)
+  }
 }
 
 // ─── Word Usage Sync ──────────────────────────────────────────────────────

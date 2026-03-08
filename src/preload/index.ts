@@ -20,6 +20,13 @@ contextBridge.exposeInMainWorld('annaAPI', {
   updateDictionaryEntry: (id: string, phrase: string, replacement: string): Promise<void> => ipcRenderer.invoke('dictionary:update', id, phrase, replacement),
   deleteDictionaryEntry: (id: string): Promise<void> => ipcRenderer.invoke('dictionary:delete', id),
 
+  // Vocabulary Packs
+  getVocabularyPacks: (): Promise<unknown[]> => ipcRenderer.invoke('vocab:get-all'),
+  setVocabularyPackEnabled: (id: string, enabled: boolean): Promise<void> => ipcRenderer.invoke('vocab:set-enabled', id, enabled),
+  addVocabularyPack: (data: unknown): Promise<unknown> => ipcRenderer.invoke('vocab:add', data),
+  updateVocabularyPack: (id: string, data: unknown): Promise<void> => ipcRenderer.invoke('vocab:update', id, data),
+  deleteVocabularyPack: (id: string): Promise<void> => ipcRenderer.invoke('vocab:delete', id),
+
   // Snippets
   getSnippets: (): Promise<unknown[]> => ipcRenderer.invoke('snippets:get-all'),
   addSnippet: (trigger: string, expansion: string): Promise<unknown> => ipcRenderer.invoke('snippets:add', trigger, expansion),
@@ -59,6 +66,9 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.invoke('profile:refresh'),
   onAuthChanged: (callback: (data: { isAuthenticated: boolean }) => void): void => {
     ipcRenderer.on('auth:changed', (_event, data) => callback(data))
+  },
+  onSubscriptionUpdated: (callback: (status: any) => void): void => {
+    ipcRenderer.on('subscription:updated', (_event, status) => callback(status))
   },
 
   // Platform info
@@ -110,8 +120,15 @@ contextBridge.exposeInMainWorld('annaAPI', {
   getSubscriptionStatus: (): Promise<unknown> => ipcRenderer.invoke('subscription:get-status'),
   openBillingPortal: (): Promise<void> => ipcRenderer.invoke('subscription:open-billing'),
   openUpgrade: (): Promise<void> => ipcRenderer.invoke('subscription:open-upgrade'),
+  createCheckout: (plan: string, interval: string): Promise<void> =>
+    ipcRenderer.invoke('subscription:create-checkout', plan, interval),
+  getInvoices: (): Promise<{ invoices: Array<{ id: string; date: string; amount: number; currency: string; status: string; description: string; invoiceUrl: string | null }> }> =>
+    ipcRenderer.invoke('subscription:get-invoices'),
+  openInvoice: (url: string): Promise<void> => ipcRenderer.invoke('subscription:open-invoice', url),
   submitChurnSurvey: (reason: string, details?: string): Promise<void> =>
     ipcRenderer.invoke('churn:submit-survey', reason, details),
+  submitTeamWaitlist: (data: { name: string; email: string; company: string; teamSize: string }): Promise<void> =>
+    ipcRenderer.invoke('team:submit-waitlist', data),
   getWeeklyUsage: (): Promise<unknown> => ipcRenderer.invoke('wordUsage:get'),
   onPaywallLimitReached: (callback: (data: { wordCount: number; wordLimit: number; periodResetsAt: string }) => void): void => {
     ipcRenderer.on('paywall:limit-reached', (_event, data) => callback(data))
@@ -216,6 +233,7 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.removeAllListeners('update:download-progress')
     ipcRenderer.removeAllListeners('update:error')
     ipcRenderer.removeAllListeners('auth:changed')
+    ipcRenderer.removeAllListeners('subscription:updated')
     ipcRenderer.removeAllListeners('paywall:limit-reached')
     ipcRenderer.removeAllListeners('paywall:approaching-limit')
     ipcRenderer.removeAllListeners('paywall:almost-done')

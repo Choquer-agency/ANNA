@@ -88,6 +88,14 @@ export default defineSchema({
     .index('by_stripe_customer', ['stripeCustomerId'])
     .index('by_stripe_subscription', ['stripeSubscriptionId']),
 
+  // ─── User Settings (synced preferences) ──────────────────────────────
+  userSettings: defineTable({
+    userId: v.string(),
+    settings: v.string(), // JSON blob of all synced settings
+    updatedAt: v.string(),
+  })
+    .index('by_user', ['userId']),
+
   // ─── Word Usage Tracking ──────────────────────────────────────────────
   wordUsage: defineTable({
     userId: v.string(),
@@ -115,6 +123,34 @@ export default defineSchema({
     addedBy: v.optional(v.string()),
   })
     .index('by_email', ['email']),
+
+  // ─── Correction Tracking ──────────────────────────────────────────────
+  corrections: defineTable({
+    userId: v.string(),
+    sessionId: v.string(),
+    originalText: v.string(),
+    correctedText: v.string(),
+    appName: v.optional(v.string()),
+    appBundleId: v.optional(v.string()),
+    createdAt: v.string(),
+    capturedAt: v.string(),
+    reviewStatus: v.optional(v.string()), // null | approved | denied
+    reviewedAt: v.optional(v.string()),
+  })
+    .index('by_user', ['userId'])
+    .index('by_review_status', ['reviewStatus']),
+
+  vocabularyRecommendations: defineTable({
+    originalWord: v.string(),
+    correctedWord: v.string(),
+    occurrences: v.number(),
+    correctionIds: v.array(v.string()),
+    priority: v.string(), // high | medium | low
+    status: v.string(), // pending | approved | denied
+    approvedAt: v.optional(v.string()),
+  })
+    .index('by_status', ['status'])
+    .index('by_priority', ['priority']),
 
   churn_events: defineTable({
     userId: v.string(),

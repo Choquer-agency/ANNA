@@ -9,6 +9,7 @@ import {
   Calculator,
   TrendingDown,
   HeartPulse,
+  SpellCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +20,7 @@ const navItems = [
   { href: '/costs', label: 'Costs & Profit', icon: Calculator },
   { href: '/churn', label: 'Churn', icon: TrendingDown },
   { href: '/health', label: 'Health Scores', icon: HeartPulse },
+  { href: '/corrections', label: 'Corrections', icon: SpellCheck },
 ]
 
 export function Sidebar() {

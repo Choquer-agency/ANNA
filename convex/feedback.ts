@@ -94,3 +94,48 @@ export const send = action({
     return { success: true }
   },
 })
+
+export const sendTeamWaitlist = action({
+  args: {
+    name: v.string(),
+    email: v.string(),
+    company: v.string(),
+    teamSize: v.string(),
+  },
+  handler: async (_ctx, args) => {
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) throw new Error('RESEND_API_KEY not configured')
+
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+    const html = `
+      <h2>New Team Waitlist Signup</h2>
+      <p><strong>Name:</strong> ${esc(args.name)}</p>
+      <p><strong>Email:</strong> ${esc(args.email)}</p>
+      <p><strong>Company:</strong> ${esc(args.company)}</p>
+      <p><strong>Team size:</strong> ${esc(args.teamSize)}</p>
+    `
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Anna <noreply@ollieinvoice.com>',
+        to: ['anna@choquer.agency'],
+        subject: `Team waitlist: ${args.name} at ${args.company}`,
+        html,
+        replyTo: args.email,
+      }),
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`Resend API error ${response.status}: ${text}`)
+    }
+
+    return { success: true }
+  },
+})

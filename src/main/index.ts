@@ -52,7 +52,8 @@ import {
   getSnippets, addSnippet, updateSnippet, deleteSnippet,
   getStyleProfiles, addStyleProfile, updateStyleProfile, deleteStyleProfile,
   getNotes, createNote, updateNote, deleteNote,
-  getSetting, setSetting
+  getSetting, setSetting,
+  getVocabularyPacks, setVocabularyPackEnabled, addVocabularyPack, updateVocabularyPack, deleteVocabularyPack
 } from './db'
 import { createAudioWindow, destroyAudioWindow } from './audio'
 import { registerHotkey, unregisterHotkeys, reregisterHotkey } from './hotkey'
@@ -62,9 +63,11 @@ import { shutdownLangfuse } from './langfuse'
 import { trackMainEvent, shutdownPostHog } from './analytics'
 import { getPlatform } from './platform'
 import { createTray, destroyTray } from './tray'
-import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex, fetchWordUsage } from './convex'
+import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runCatchUpSync, uploadFlaggedAudio, isSyncEnabled, registerUserInConvex, refreshClientAuth, ensureClient, fetchRegistrationProfile, updateProfileNameInConvex, updateProfileImageInConvex, fetchWordUsage, syncSettingToCloud, pullSettingsFromCloud } from './convex'
 import { isAuthenticated as isAuthValid, isTokenExpired, storeAuthTokens, clearAuthTokens } from './auth'
-import { getSubscriptionStatus, startSubscriptionRefresh, refreshSubscription, loadCachedSubscription } from './subscription'
+import { getSubscriptionStatus, startSubscriptionRefresh, refreshSubscription, loadCachedSubscription, onSubscriptionChange } from './subscription'
+import { seedBuiltinPacks } from './vocabulary'
+import { PLANS } from '../shared/pricing'
 import { api } from '../../convex/_generated/api'
 import { anyApi } from 'convex/server'
 
@@ -191,6 +194,16 @@ function handleDeepLink(url: string): void {
         reconcileWordUsage()
         // Refresh subscription status with fresh token
         refreshSubscription().catch(() => {})
+        // Pull synced settings from cloud (hotkey, theme, etc.)
+        pullSettingsFromCloud().then(() => {
+          // Re-register hotkey in case it changed from cloud
+          const cloudHotkey = getSetting('hotkey')
+          if (cloudHotkey) {
+            reregisterHotkey(cloudHotkey).catch((err) =>
+              console.error('[hotkey] Failed to apply cloud hotkey:', err)
+            )
+          }
+        }).catch(() => {})
         // Notify renderer
         mainWindow?.webContents.send('auth:changed', { isAuthenticated: true })
         console.log('[auth] Token received and stored via deep link')
@@ -326,9 +339,17 @@ app.whenReady().then(async () => {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn('[main] WARNING: ANTHROPIC_API_KEY not set in .env')
   }
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn('[main] WARNING: GEMINI_API_KEY not set in .env')
+  }
 
   initDB()
   loadCachedSubscription() // Load subscription cache early so IPC handlers return correct value
+
+  // Notify renderer when subscription status changes (e.g. after silent auth refresh)
+  onSubscriptionChange((status) => {
+    mainWindow?.webContents.send('subscription:updated', status)
+  })
 
   // Pre-validate whisper native module in a child process.
   // If the native binary segfaults on this OS version, the child dies
@@ -377,6 +398,7 @@ app.whenReady().then(async () => {
   // }
 
   createAudioWindow()
+  seedBuiltinPacks() // Load vocabulary packs into DB for Whisper/Gemini hints
   cleanupStaleSessions() // Mark any stale processing sessions as failed
   createWindow() // Main window first — establishes app as regular foreground app
   createRecordingIndicatorWindow() // Floating pill created after main window
@@ -545,6 +567,13 @@ app.whenReady().then(async () => {
   ipcMain.handle('dictionary:update', (_e, id: string, phrase: string, replacement: string) => updateDictionaryEntry(id, phrase, replacement))
   ipcMain.handle('dictionary:delete', (_e, id: string) => deleteDictionaryEntry(id))
 
+  // Vocabulary Packs
+  ipcMain.handle('vocab:get-all', () => getVocabularyPacks())
+  ipcMain.handle('vocab:set-enabled', (_e, id: string, enabled: boolean) => setVocabularyPackEnabled(id, enabled))
+  ipcMain.handle('vocab:add', (_e, data) => addVocabularyPack(data))
+  ipcMain.handle('vocab:update', (_e, id: string, data) => updateVocabularyPack(id, data))
+  ipcMain.handle('vocab:delete', (_e, id: string) => deleteVocabularyPack(id))
+
   // Snippets
   ipcMain.handle('snippets:get-all', () => getSnippets())
   ipcMain.handle('snippets:add', (_e, trigger: string, expansion: string) => addSnippet(trigger, expansion))
@@ -568,6 +597,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
   ipcMain.handle('settings:set', async (_e, key: string, value: string) => {
     setSetting(key, value)
+    syncSettingToCloud(key, value)
     if (key === 'hotkey') {
       // A key was selected — clear capture monitor so stop-capture won't interfere
       captureMonitorCleanup = null
@@ -615,7 +645,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('settings:get-env', () => ({
     hasOpenAI: !!process.env.OPENAI_API_KEY,
-    hasAnthropic: !!process.env.ANTHROPIC_API_KEY
+    hasAnthropic: !!process.env.ANTHROPIC_API_KEY,
+    hasGemini: !!process.env.GEMINI_API_KEY
   }))
 
   // Platform info — exposes capabilities to renderer
@@ -689,16 +720,49 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Poll for subscription change after checkout (10s intervals, 5 min max)
+  let checkoutPollTimer: ReturnType<typeof setInterval> | null = null
+  function pollForSubscriptionChange(): void {
+    if (checkoutPollTimer) clearInterval(checkoutPollTimer)
+    const startPlan = getSubscriptionStatus().planId
+    let elapsed = 0
+    checkoutPollTimer = setInterval(async () => {
+      elapsed += 10_000
+      if (elapsed > 5 * 60 * 1000) {
+        clearInterval(checkoutPollTimer!)
+        checkoutPollTimer = null
+        return
+      }
+      try {
+        const updated = await refreshSubscription()
+        if (updated.planId !== startPlan) {
+          clearInterval(checkoutPollTimer!)
+          checkoutPollTimer = null
+        }
+      } catch {}
+    }, 10_000)
+  }
+
   // Subscription / Paywall
   ipcMain.handle('subscription:get-status', () => {
     return getSubscriptionStatus()
   })
 
   ipcMain.handle('subscription:open-billing', async () => {
-    // For now, open the website pricing page. When Stripe is fully wired,
-    // this would call createBillingPortalSession and open the returned URL.
     const { shell } = require('electron')
     const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+    try {
+      const client = ensureClient()
+      const result = await client.action(anyApi.stripe.createBillingPortalSession, {
+        returnUrl: `${websiteUrl}/checkout/success`,
+      })
+      if (result?.url) {
+        shell.openExternal(result.url)
+        return
+      }
+    } catch (err) {
+      console.error('[subscription] Billing portal failed, falling back to pricing page:', err)
+    }
     shell.openExternal(`${websiteUrl}/pricing`)
   })
 
@@ -708,12 +772,68 @@ app.whenReady().then(async () => {
     shell.openExternal(`${websiteUrl}/pricing`)
   })
 
+  ipcMain.handle('subscription:create-checkout', async (_event: any, plan: string, interval: string) => {
+    const { shell } = require('electron')
+    const websiteUrl = process.env.WEBSITE_URL || 'https://annatype.io'
+
+    const planDef = PLANS[plan]
+    if (!planDef?.stripePriceIds) throw new Error(`Unknown plan: ${plan}`)
+
+    const priceId = planDef.stripePriceIds[interval]
+    if (!priceId) throw new Error(`No price ID for ${plan}/${interval}`)
+
+    const isLifetime = interval === 'lifetime'
+
+    const client = ensureClient()
+    const result = await client.action(anyApi.stripe.createCheckoutSession, {
+      priceId,
+      successUrl: `${websiteUrl}/checkout/success`,
+      cancelUrl: `${websiteUrl}/pricing`,
+      isLifetime,
+      skipTrial: true,
+    })
+
+    if (result?.url) {
+      shell.openExternal(result.url)
+      // Start polling for subscription update after checkout
+      pollForSubscriptionChange()
+    }
+  })
+
+  ipcMain.handle('subscription:open-invoice', (_event: any, url: string) => {
+    const { shell } = require('electron')
+    // Only allow Stripe invoice URLs
+    if (url.startsWith('https://invoice.stripe.com/') || url.startsWith('https://pay.stripe.com/')) {
+      shell.openExternal(url)
+    }
+  })
+
+  ipcMain.handle('subscription:get-invoices', async () => {
+    try {
+      const client = ensureClient()
+      return await client.action(anyApi.stripe.getInvoices, {})
+    } catch (err) {
+      console.error('[subscription] Failed to fetch invoices:', err)
+      return { invoices: [] }
+    }
+  })
+
   ipcMain.handle('churn:submit-survey', async (_event: any, reason: string, details?: string) => {
     try {
       const client = ensureClient()
       await client.mutation(api.churn.submitChurnEvent, { reason, details })
     } catch (err) {
       console.error('[churn] Failed to submit survey:', err)
+    }
+  })
+
+  ipcMain.handle('team:submit-waitlist', async (_event: any, data: { name: string; email: string; company: string; teamSize: string }) => {
+    try {
+      const client = ensureClient()
+      await client.action(api.feedback.sendTeamWaitlist, data)
+    } catch (err) {
+      console.error('[team] Failed to submit waitlist:', err)
+      throw err
     }
   })
 
@@ -796,9 +916,17 @@ app.whenReady().then(async () => {
   // Initialize Convex cloud sync
   initConvex()
 
-  // Reconcile word usage from Convex if already authenticated
+  // Reconcile word usage and pull settings from Convex if already authenticated
   if (isAuthValid()) {
     reconcileWordUsage()
+    pullSettingsFromCloud().then(() => {
+      const cloudHotkey = getSetting('hotkey')
+      if (cloudHotkey && cloudHotkey !== storedHotkey) {
+        reregisterHotkey(cloudHotkey).catch((err) =>
+          console.error('[hotkey] Failed to apply cloud hotkey on startup:', err)
+        )
+      }
+    }).catch(() => {})
   }
 
   // Start subscription status refresh

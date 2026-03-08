@@ -23,6 +23,8 @@ import {
 import { updateTrayRecordingState } from './tray'
 import { trackMainEvent } from './analytics'
 import { playDictationStart, playDictationStop } from './sounds'
+import { getActiveVocabularyTerms, buildWhisperPrompt, buildClaudeVocabularyHint, applyVocabularyCorrections } from './vocabulary'
+import { scheduleCorrection } from './correctionTracker'
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -112,6 +114,8 @@ function getCurrentPage(): Promise<string> {
 }
 
 let repositionInterval: ReturnType<typeof setInterval> | null = null
+let selectionPollInterval: ReturnType<typeof setInterval> | null = null
+let collectedSelections: string[] = []
 let indicatorIPCSetup = false
 let cachedActiveWindow: ActiveWindowInfo | null = null
 let cachedClipboardContext: string | null = null
@@ -121,33 +125,17 @@ let cancelledWavBuffer: Buffer | null = null
 let cancelledActiveWindow: ActiveWindowInfo | null = null
 let cancelledDurationMs = 0
 let cancelUndoTimeout: ReturnType<typeof setTimeout> | null = null
+let recordingMaxDurationTimeout: ReturnType<typeof setTimeout> | null = null
+let recordingWarningTimeout: ReturnType<typeof setTimeout> | null = null
 
+// Maximum recording duration (10 minutes) and warning (9:40)
+const MAX_RECORDING_DURATION_MS = 600_000
+const RECORDING_WARNING_MS = 580_000
 // Processing timeout (3 minutes)
 const PROCESSING_TIMEOUT_MS = 180_000
 // "Taking longer" notice threshold
 const SLOW_PROCESSING_MS = 15_000
 
-/**
- * Run transcription multiple times and pick the consensus result.
- */
-async function verifiedTranscribe(
-  wavBuffer: Buffer,
-  language: string = 'auto',
-  trace?: ReturnType<ReturnType<typeof getLangfuse>['trace']>
-): Promise<string> {
-  const first = await transcribe(wavBuffer, language, trace)
-  const second = await transcribe(wavBuffer, language)
-
-  if (first.trim() === second.trim()) return first
-
-  const third = await transcribe(wavBuffer, language)
-  if (first.trim() === third.trim()) return first
-  if (second.trim() === third.trim()) return second
-
-  const candidates = [first, second, third]
-  candidates.sort((a, b) => b.trim().length - a.trim().length)
-  return candidates[0]
-}
 
 export async function retrySession(sessionId: string, customPrompt?: string): Promise<void> {
   trackMainEvent('dictation_retried')
@@ -174,7 +162,9 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     sendStatus('transcribing', { sessionId })
 
     const language = getSetting('language') ?? 'auto'
-    const rawTranscript = await verifiedTranscribe(wavBuffer, language, trace)
+    const vocabTerms = getActiveVocabularyTerms(session.app_name, session.app_bundle_id)
+    const whisperPrompt = buildWhisperPrompt(vocabTerms)
+    const rawTranscript = await transcribe(wavBuffer, language, trace, whisperPrompt || undefined)
     trace?.update({ input: rawTranscript })
     updateSession(sessionId, { raw_transcript: rawTranscript })
 
@@ -187,14 +177,16 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
 
     const expanded = expandSnippets(rawTranscript)
     const styleProfile = getStyleProfileForApp(session.app_name ?? null, session.app_bundle_id ?? null)
+    const claudeVocabHint = buildClaudeVocabularyHint(vocabTerms)
 
     sendStatus('processing', { sessionId })
     const processed = await processTranscript(expanded, {
       appName: session.app_name ?? undefined,
       windowTitle: session.window_title ?? undefined
-    }, styleProfile?.prompt_addendum, trace, customPrompt, language)
+    }, styleProfile?.prompt_addendum, trace, customPrompt, language, claudeVocabHint || undefined)
 
-    const final = applyDictionaryReplacements(processed)
+    const vocabCorrected = applyVocabularyCorrections(processed, vocabTerms)
+    const final = applyDictionaryReplacements(vocabCorrected)
     trace?.update({ output: final })
     const wordCount = final.split(/\s+/).filter(Boolean).length
 
@@ -232,6 +224,18 @@ function cleanupRecordingState(): void {
     clearInterval(repositionInterval)
     repositionInterval = null
   }
+  if (selectionPollInterval) {
+    clearInterval(selectionPollInterval)
+    selectionPollInterval = null
+  }
+  if (recordingMaxDurationTimeout) {
+    clearTimeout(recordingMaxDurationTimeout)
+    recordingMaxDurationTimeout = null
+  }
+  if (recordingWarningTimeout) {
+    clearTimeout(recordingWarningTimeout)
+    recordingWarningTimeout = null
+  }
 }
 
 /**
@@ -254,6 +258,7 @@ async function handleCancel(): Promise<void> {
   cancelledDurationMs = getRecordingDuration()
   cachedActiveWindow = null
   cachedClipboardContext = null
+  collectedSelections = []
 
   // Show cancelled state in indicator
   sendStateChange('cancelled')
@@ -360,9 +365,16 @@ async function runPipeline(
       sendStatus('transcribing', { sessionId: session.id })
       updateSession(session.id, { status: 'transcribing' })
       const language = getSetting('language') ?? 'auto'
+
+      // Build vocabulary hints for Whisper
+      const vocabTerms = getActiveVocabularyTerms(activeWin?.appName, activeWin?.appId)
+      const whisperPrompt = buildWhisperPrompt(vocabTerms)
+      if (whisperPrompt) console.log(`[pipeline] Whisper prompt hint: ${whisperPrompt.length} chars`)
+
       console.time('[pipeline] transcribe')
-      const rawTranscript = await transcribe(wavBuffer, language, trace)
+      const rawTranscript = await transcribe(wavBuffer, language, trace, whisperPrompt || undefined)
       console.timeEnd('[pipeline] transcribe')
+      console.log(`[pipeline] RAW: ${rawTranscript}`)
       trace?.update({ input: rawTranscript })
       updateSession(session.id, { raw_transcript: rawTranscript })
 
@@ -411,17 +423,22 @@ async function runPipeline(
 
         sendStatus('processing', { sessionId: session.id })
         updateSession(session.id, { status: 'processing' })
+        const claudeVocabHint = buildClaudeVocabularyHint(vocabTerms)
         console.time('[pipeline] processTranscript')
         const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
         const [processed, page] = await Promise.all([
-          processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language),
+          processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language, claudeVocabHint || undefined),
           currentPagePromise
         ])
         currentPage = page
         console.timeEnd('[pipeline] processTranscript')
 
+        console.log(`[pipeline] CLAUDE: ${processed}`)
         console.time('[pipeline] dictionaryReplace')
-        final = applyDictionaryReplacements(processed)
+        const vocabCorrected = applyVocabularyCorrections(processed, vocabTerms)
+        if (vocabCorrected !== processed) console.log(`[pipeline] VOCAB-FIX: ${vocabCorrected}`)
+        final = applyDictionaryReplacements(vocabCorrected)
+        if (final !== vocabCorrected) console.log(`[pipeline] DICT-FIX: ${final}`)
         trace?.update({ output: final })
         console.timeEnd('[pipeline] dictionaryReplace')
       }
@@ -448,6 +465,8 @@ async function runPipeline(
         if (autoPaste !== 'false') {
           const currentWin = await getPlatform().getActiveWindow()
           await getPlatform().injectText(final, currentWin?.appId)
+          // Schedule background re-read to detect user corrections
+          scheduleCorrection(session.id, final, currentWin?.appId ?? '', activeWin?.appName)
         }
       }
       console.timeEnd('[pipeline] injectText')
@@ -565,10 +584,19 @@ async function runPipeline(
 export async function handleHotkeyToggle(): Promise<void> {
   if (getRecordingState()) {
     // Stop recording and run pipeline
+    // Final capture with Cmd+C fallback, targeting the app that was active during recording
+    const freshSelectedText = await getPlatform().getSelectedText(true, cachedActiveWindow?.appId)
+    if (freshSelectedText && !collectedSelections.includes(freshSelectedText)) {
+      collectedSelections.push(freshSelectedText)
+    }
     const activeWin = cachedActiveWindow
-    const clipboardCtx = cachedClipboardContext
+    // Use collected selections if any, otherwise fall back to clipboard
+    const clipboardCtx = collectedSelections.length > 0
+      ? collectedSelections.join('\n\n---\n\n')
+      : cachedClipboardContext
     cachedActiveWindow = null
     cachedClipboardContext = null
+    collectedSelections = []
     const durationMs = getRecordingDuration()
 
     cleanupRecordingState()
@@ -632,7 +660,25 @@ export async function handleHotkeyToggle(): Promise<void> {
       indicatorIPCSetup = true
     }
     cachedActiveWindow = await getPlatform().getActiveWindow()
+    // Capture any pre-existing selected text
+    collectedSelections = []
+    const initialSelection = await getPlatform().getSelectedText(true)
+    if (initialSelection) {
+      collectedSelections.push(initialSelection)
+    }
+    // Clipboard as last-resort fallback (only if no selections captured)
     cachedClipboardContext = clipboard.readText() || null
+
+    // Poll for new selections every 1.5s during recording (native addon, no side effects)
+    selectionPollInterval = setInterval(async () => {
+      try {
+        const text = await getPlatform().getSelectedText()
+        if (text && !collectedSelections.includes(text)) {
+          collectedSelections.push(text)
+          console.log(`[pipeline] New selection captured (${collectedSelections.length} total, ${text.length} chars)`)
+        }
+      } catch { /* ignore */ }
+    }, 1500)
 
     // Send hotkey info to indicator for tooltip display
     const hotkey = getSetting('hotkey') || 'Ctrl+Space'
@@ -652,6 +698,24 @@ export async function handleHotkeyToggle(): Promise<void> {
     playDictationStart()
     startRecording()
     showRecordingIndicator()
+
+    // Warning at 5:40
+    recordingWarningTimeout = setTimeout(() => {
+      console.log('[pipeline] Recording approaching max duration, showing warning')
+      recordingWarningTimeout = null
+      sendStateChange('time-warning')
+    }, RECORDING_WARNING_MS)
+
+    // Auto-stop after 6 minutes
+    recordingMaxDurationTimeout = setTimeout(() => {
+      console.log('[pipeline] Max recording duration reached (6 min), auto-stopping')
+      recordingMaxDurationTimeout = null
+      if (getRecordingState()) {
+        handleHotkeyToggle().catch((err) => {
+          console.error('[pipeline] Auto-stop failed:', err)
+        })
+      }
+    }, MAX_RECORDING_DURATION_MS)
     sendStateChange('recording')
     updateTrayRecordingState(true)
     repositionInterval = setInterval(repositionToActiveScreen, 500)

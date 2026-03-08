@@ -3,9 +3,13 @@
 import { motion } from 'framer-motion'
 import { CheckCircle, Download, ArrowRight } from 'lucide-react'
 import { ease } from '@/lib/animations'
-import Link from 'next/link'
+import { useQuery } from 'convex/react'
+import { api } from '../../../../../convex/_generated/api'
 
 export default function CheckoutSuccessPage() {
+  const profile = useQuery(api.registrations.getAuthUserProfile)
+  const firstName = profile?.name?.split(' ')[0]
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-6">
       <motion.div
@@ -25,25 +29,38 @@ export default function CheckoutSuccessPage() {
         </motion.div>
 
         <h1 className="text-3xl font-bold text-ink tracking-[-0.02em] mb-3">
-          You&apos;re all set!
+          {firstName ? `Thank you, ${firstName}!` : 'Thank you!'}
         </h1>
         <p className="text-ink-muted text-[1.05rem] mb-8 leading-relaxed">
-          Your subscription is active. Download Anna to start dictating with unlimited words.
+          Your Pro subscription is active. Enjoy unlimited dictation with Anna.
         </p>
 
-        {/* Download button */}
-        <Link
-          href="/download/mac"
+        {/* Open Anna button */}
+        <a
+          href="anna://open"
           className="inline-flex items-center justify-center gap-2.5 bg-primary text-white px-8 py-3.5 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_20px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 group"
         >
-          <Download className="w-4.5 h-4.5" />
-          <span>Download Anna for Mac</span>
+          <span>Open Anna</span>
           <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-        </Link>
+        </a>
 
-        <p className="mt-6 text-sm text-ink-faint">
-          Already have Anna installed? You&apos;re good to go — your plan updates automatically.
-        </p>
+        {/* Download links */}
+        <div className="mt-6 flex items-center justify-center gap-6">
+          <a
+            href="/download/mac"
+            className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download for Mac</span>
+          </a>
+          <a
+            href="/download/windows"
+            className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download for Windows</span>
+          </a>
+        </div>
       </motion.div>
     </div>
   )

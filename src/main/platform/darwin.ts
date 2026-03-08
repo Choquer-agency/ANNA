@@ -9,6 +9,28 @@ import type { PlatformAdapter, ActiveWindowInfo } from './types'
 
 const execFileAsync = promisify(execFile)
 
+// Native addon for reading selected text via Accessibility API
+// Runs in-process so it inherits Electron's accessibility permissions
+let nativeSelectedText: { getSelectedText: () => string | null; getFieldValue: () => string | null } | null = null
+try {
+  nativeSelectedText = require(
+    join(__dirname, '../../build/Release/selected_text.node')
+  )
+  console.log('[selectedText] Native addon loaded')
+} catch (err) {
+  console.warn('[selectedText] Native addon not available, selected text capture disabled:', err)
+}
+
+// Detect garbage AX output from web apps (Chrome/Google Docs return internal IDs)
+function looksLikeGarbage(text: string): boolean {
+  const trimmed = text.trim()
+  // Pure numbers (Chrome AX tree IDs like "1182340")
+  if (/^\d+$/.test(trimmed)) return true
+  // Very short non-word strings
+  if (trimmed.length <= 2 && !/[a-zA-Z]/.test(trimmed)) return true
+  return false
+}
+
 // ---------------------------------------------------------------------------
 // Helper path resolution
 // ---------------------------------------------------------------------------
@@ -101,6 +123,52 @@ export function createDarwinAdapter(): PlatformAdapter {
           appId: parsed.bundleId ?? '',
           title: ''
         }
+      } catch {
+        return null
+      }
+    },
+
+    async getSelectedText(allowCmdCFallback: boolean = false, targetAppId?: string): Promise<string | null> {
+      // Try native AX API first (works for native apps, no side effects)
+      if (nativeSelectedText) {
+        try {
+          const text = nativeSelectedText.getSelectedText()
+          console.log(`[selectedText] AX raw: ${text ? `"${text.slice(0, 50)}" (${text.length} chars, garbage=${looksLikeGarbage(text)})` : 'null'}`)
+          if (text && !looksLikeGarbage(text)) {
+            console.log(`[selectedText] AX captured ${text.length} chars`)
+            return text
+          }
+        } catch { /* fall through */ }
+      }
+
+      // Cmd+C fallback for web apps (Google Docs, Notion, etc.)
+      // Only used at recording start/stop, NOT during periodic polling
+      console.log(`[selectedText] Cmd+C fallback check: allowCmdCFallback=${allowCmdCFallback}, targetAppId=${targetAppId || 'none'}`)
+      if (!allowCmdCFallback) return null
+
+      try {
+        const saved = clipboard.readText()
+        // Use CGEvent-based Cmd+C via anna-helper (hardware-level, more reliable than osascript)
+        const args = targetAppId ? ['copy-from', targetAppId] : ['copy']
+        await execFileAsync(getAnnaHelperPath(), args, { timeout: 3000 })
+        await sleep(200)
+        const text = clipboard.readText()
+        console.log(`[selectedText] Cmd+C fallback: saved="${saved.slice(0, 30)}" after="${text.slice(0, 30)}" changed=${text !== saved}`)
+        clipboard.writeText(saved)
+        if (text && text !== saved) {
+          console.log(`[selectedText] Cmd+C fallback captured ${text.length} chars`)
+          return text
+        }
+        return null
+      } catch {
+        return null
+      }
+    },
+
+    getFieldValue(): string | null {
+      if (!nativeSelectedText) return null
+      try {
+        return nativeSelectedText.getFieldValue()
       } catch {
         return null
       }

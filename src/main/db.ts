@@ -140,6 +140,25 @@ function runMigrations(): void {
     db.exec(`ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'dictation'`)
     setSchemaVersion(8)
   }
+
+  if (version < 9) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS corrections (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        original_text TEXT NOT NULL,
+        corrected_text TEXT,
+        app_name TEXT,
+        app_bundle_id TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT (datetime('now')),
+        captured_at TEXT,
+        synced_at TEXT,
+        FOREIGN KEY (session_id) REFERENCES sessions(id)
+      )
+    `)
+    setSchemaVersion(9)
+  }
 }
 
 function getSchemaVersion(): number {
@@ -559,6 +578,51 @@ export function upsertBuiltinPack(key: string, packData: {
       insertTerm.run(randomUUID(), id, t.term, t.aliases ? JSON.stringify(t.aliases) : null, t.category ?? null)
     }
   }
+}
+
+// --- Corrections ---
+
+export interface CorrectionRecord {
+  id: string
+  session_id: string
+  original_text: string
+  corrected_text: string | null
+  app_name: string | null
+  app_bundle_id: string | null
+  status: string
+  created_at: string
+  captured_at: string | null
+  synced_at: string | null
+}
+
+export function insertCorrection(data: {
+  sessionId: string
+  originalText: string
+  appName?: string | null
+  appBundleId?: string | null
+}): string {
+  const id = randomUUID()
+  db.prepare(
+    'INSERT INTO corrections (id, session_id, original_text, app_name, app_bundle_id) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, data.sessionId, data.originalText, data.appName ?? null, data.appBundleId ?? null)
+  return id
+}
+
+export function updateCorrection(id: string, correctedText: string | null, status: string): void {
+  const capturedAt = correctedText ? new Date().toISOString().replace('T', ' ').slice(0, 19) : null
+  db.prepare(
+    'UPDATE corrections SET corrected_text = ?, status = ?, captured_at = ? WHERE id = ?'
+  ).run(correctedText, status, capturedAt, id)
+}
+
+export function getUnsyncedCorrections(): CorrectionRecord[] {
+  return db.prepare(
+    "SELECT * FROM corrections WHERE status = 'captured' AND synced_at IS NULL ORDER BY created_at ASC LIMIT 50"
+  ).all() as CorrectionRecord[]
+}
+
+export function markCorrectionSynced(id: string): void {
+  db.prepare("UPDATE corrections SET synced_at = datetime('now') WHERE id = ?").run(id)
 }
 
 // --- Close ---

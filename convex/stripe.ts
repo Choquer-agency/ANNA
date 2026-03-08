@@ -1,7 +1,7 @@
 "use node"
 
 import { action } from './_generated/server'
-import { internal } from './_generated/api'
+import { api, internal } from './_generated/api'
 import { v } from 'convex/values'
 import { getAuthUserId } from '@convex-dev/auth/server'
 import Stripe from 'stripe'
@@ -20,6 +20,7 @@ export const createCheckoutSession = action({
     successUrl: v.string(),
     cancelUrl: v.string(),
     isLifetime: v.optional(v.boolean()),
+    skipTrial: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx)
@@ -35,13 +36,16 @@ export const createCheckoutSession = action({
     let customerId = existingSub?.stripeCustomerId
 
     if (!customerId) {
-      // Get user email from registrations
+      // Get user email — prefer auth user (OAuth) over registration (may be placeholder)
+      const authProfile = await ctx.runQuery(api.registrations.getAuthUserProfile, {})
       const reg = await ctx.runQuery(internal.subscriptions.getRegistrationInternal, {
         userId: String(userId),
       })
+      const email = authProfile?.email || reg?.email || undefined
+      const isPlaceholder = email && email.includes('placeholder')
 
       const customer = await stripe.customers.create({
-        email: reg?.email || undefined,
+        email: isPlaceholder ? undefined : email,
         metadata: { userId: String(userId) },
       })
       customerId = customer.id
@@ -60,8 +64,8 @@ export const createCheckoutSession = action({
     } else {
       sessionConfig.mode = 'subscription'
       sessionConfig.subscription_data = {
-        trial_period_days: 7,
         metadata: { userId: String(userId) },
+        ...(args.skipTrial ? {} : { trial_period_days: 7 }),
       }
     }
 
@@ -94,5 +98,37 @@ export const createBillingPortalSession = action({
     })
 
     return { url: session.url }
+  },
+})
+
+export const getInvoices = action({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx)
+    if (!userId) throw new Error('Not authenticated')
+
+    const sub: any = await ctx.runQuery(internal.subscriptions.getSubscriptionInternal, {
+      userId: String(userId),
+    })
+
+    if (!sub?.stripeCustomerId) return { invoices: [] }
+
+    const stripe = getStripe()
+    const invoices = await stripe.invoices.list({
+      customer: sub.stripeCustomerId,
+      limit: 10,
+    })
+
+    return {
+      invoices: invoices.data.map((inv) => ({
+        id: inv.id,
+        date: inv.created ? new Date(inv.created * 1000).toISOString() : '',
+        amount: inv.amount_paid ?? 0,
+        currency: inv.currency ?? 'usd',
+        status: inv.status ?? 'unknown',
+        description: inv.lines?.data?.[0]?.description || 'ANNA Pro',
+        invoiceUrl: inv.hosted_invoice_url || null,
+      })),
+    }
   },
 })

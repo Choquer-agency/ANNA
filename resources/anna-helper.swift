@@ -36,12 +36,11 @@ func activateApp(bundleId: String) -> Bool {
     return false
 }
 
-func simulatePaste() {
+func simulateKeyWithCommand(keyCode: UInt16) {
     let src = CGEventSource(stateID: .hidSystemState)
 
-    // Key code 9 = 'v'
-    guard let keyDown = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: true),
-          let keyUp = CGEvent(keyboardEventSource: src, virtualKey: 9, keyDown: false) else {
+    guard let keyDown = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: true),
+          let keyUp = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: false) else {
         fputs("error: Failed to create CGEvent\n", stderr)
         exit(1)
     }
@@ -52,6 +51,14 @@ func simulatePaste() {
     keyDown.post(tap: .cghidEventTap)
     Thread.sleep(forTimeInterval: 0.05)
     keyUp.post(tap: .cghidEventTap)
+}
+
+func simulatePaste() {
+    simulateKeyWithCommand(keyCode: 9) // 'v'
+}
+
+func simulateCopy() {
+    simulateKeyWithCommand(keyCode: 8) // 'c'
 }
 
 func printFrontApp() {
@@ -93,6 +100,21 @@ case "paste-to":
         Thread.sleep(forTimeInterval: 0.05)
     }
     simulatePaste()
+
+case "copy":
+    simulateCopy()
+
+case "copy-from":
+    guard CommandLine.arguments.count >= 3 else {
+        fputs("Usage: anna-helper copy-from <bundleId>\n", stderr)
+        exit(1)
+    }
+    let copyBundleId = CommandLine.arguments[2]
+    let copyActivated = activateApp(bundleId: copyBundleId)
+    if copyActivated {
+        Thread.sleep(forTimeInterval: 0.05)
+    }
+    simulateCopy()
 
 case "frontapp":
     printFrontApp()

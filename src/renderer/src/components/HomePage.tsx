@@ -44,14 +44,19 @@ export function HomePage({
 
   // Load weekly usage for free users
   useEffect(() => {
-    window.annaAPI.getSubscriptionStatus().then((sub: any) => {
-      if (sub?.planId === 'free') {
-        setIsFreeUser(true)
-        window.annaAPI.getWeeklyUsage().then((usage: any) => {
-          if (usage) setWeeklyStats(usage)
-        })
-      }
-    })
+    const fetchSub = (): void => {
+      window.annaAPI.getSubscriptionStatus().then((sub: any) => {
+        const free = sub?.planId === 'free'
+        setIsFreeUser(free)
+        if (free) {
+          window.annaAPI.getWeeklyUsage().then((usage: any) => {
+            if (usage) setWeeklyStats(usage)
+          })
+        }
+      })
+    }
+    fetchSub()
+    window.annaAPI.onSubscriptionUpdated(fetchSub)
   }, [stats]) // Re-fetch when stats change (after dictation completes)
 
   useEffect(() => {

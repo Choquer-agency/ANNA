@@ -30,10 +30,17 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onNavigate, settingsOpen, onSettingsOpen }: SidebarProps): React.JSX.Element {
   const [version, setVersion] = useState('')
+  const [isPro, setIsPro] = useState(false)
   const { platform } = usePlatform()
 
   useEffect(() => {
     window.annaAPI.getAppVersion().then(setVersion).catch(() => {})
+    window.annaAPI.getSubscriptionStatus().then((sub) => {
+      setIsPro(sub.planId === 'pro' || sub.planId === 'lifetime')
+    }).catch(() => {})
+    window.annaAPI.onSubscriptionUpdated((sub: any) => {
+      setIsPro(sub?.planId === 'pro' || sub?.planId === 'lifetime')
+    })
   }, [])
 
   return (
@@ -51,9 +58,11 @@ export function Sidebar({ currentPage, onNavigate, settingsOpen, onSettingsOpen 
       >
         <div className="flex items-center gap-2">
           <AnnaLogo className="h-5 text-ink" />
-          <span className="text-[10px] font-semibold bg-primary text-white px-1.5 py-0.5 rounded-full">
-            Pro
-          </span>
+          {isPro && (
+            <span className="text-[10px] font-semibold bg-primary text-white px-1.5 py-0.5 rounded-full">
+              Pro
+            </span>
+          )}
           {import.meta.env.DEV && (
             <span className="text-[9px] font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
               Dev

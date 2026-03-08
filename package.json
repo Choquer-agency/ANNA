@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "description": "ANNA - AI Voice Dictation",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",
@@ -8,8 +8,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "rebuild": "npx @electron/rebuild -f -w better-sqlite3",
+    "postinstall": "electron-rebuild -f -w better-sqlite3 && electron-rebuild -f -w selected_text",
+    "rebuild": "npx @electron/rebuild -f -w better-sqlite3 && npx @electron/rebuild -f -w selected_text",
     "build:fn-helper": "bash scripts/build-fn-helper.sh",
     "build:accessibility-probe": "bash scripts/build-accessibility-probe.sh",
     "build:anna-helper": "bash scripts/build-anna-helper.sh",
@@ -20,7 +20,9 @@
     "build:win": "electron-vite build && electron-builder --win --config",
     "convex:dev": "npx convex dev",
     "convex:deploy": "npx convex deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "benchmark": "npx tsx scripts/benchmark.ts",
+    "benchmark:accent": "npx tsx scripts/benchmark.ts --test=accent"
   },
   "build": {
     "appId": "com.anna.dictation",
@@ -134,6 +136,7 @@
     "electron-updater": "^6.8.3",
     "langfuse": "^3.38.6",
     "lucide-react": "^0.574.0",
+    "node-addon-api": "^8.6.0",
     "openai": "^4.0.0",
     "posthog-js": "^1.352.0",
     "posthog-node": "^5.21.2",

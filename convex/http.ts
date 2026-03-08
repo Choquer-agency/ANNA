@@ -78,6 +78,7 @@ http.route({
     // Process relevant events
     const relevantEvents = [
       'checkout.session.completed',
+      'customer.subscription.created',
       'customer.subscription.updated',
       'customer.subscription.deleted',
       'invoice.payment_succeeded',

@@ -21,6 +21,8 @@ export interface PlatformAdapter {
   getSystemUsername(): string
   requestMicrophoneAccess(): Promise<boolean>
   checkMicrophoneAccess(): string
+  getSelectedText(allowCmdCFallback?: boolean, targetAppId?: string): Promise<string | null>
+  getFieldValue(): string | null
   startFnKeyMonitor?(onPress: () => void): Promise<boolean>
   stopFnKeyMonitor?(): void
   capabilities: PlatformCapabilities

@@ -88,6 +88,16 @@ export function createWin32Adapter(): PlatformAdapter {
       })
     },
 
+    async getSelectedText(): Promise<string | null> {
+      // TODO: implement via UIAutomation or PowerShell
+      return null
+    },
+
+    getFieldValue(): string | null {
+      // TODO: implement via UIAutomation on Windows
+      return null
+    },
+
     async checkAccessibility(): Promise<boolean> {
       // Windows has no equivalent accessibility permission gate
       return true

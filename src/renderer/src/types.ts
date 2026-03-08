@@ -68,6 +68,7 @@ declare global {
       updateProfileImage: (profileImageUrl: string) => Promise<void>
       refreshProfile: () => Promise<{ name: string; email: string; profileImageUrl?: string } | null>
       onAuthChanged: (cb: (data: { isAuthenticated: boolean }) => void) => void
+      onSubscriptionUpdated: (cb: (status: any) => void) => void
 
       // Platform info
       getPlatformInfo: () => Promise<{
@@ -117,6 +118,10 @@ declare global {
       }>
       openBillingPortal: () => Promise<void>
       openUpgrade: () => Promise<void>
+      createCheckout: (plan: string, interval: string) => Promise<void>
+      getInvoices: () => Promise<{ invoices: Array<{ id: string; date: string; amount: number; currency: string; status: string; description: string; invoiceUrl: string | null }> }>
+      openInvoice: (url: string) => Promise<void>
+      submitTeamWaitlist: (data: { name: string; email: string; company: string; teamSize: string }) => Promise<void>
       getWeeklyUsage: () => Promise<WeeklyStats>
       onPaywallLimitReached: (cb: (data: { wordCount: number; wordLimit: number; periodResetsAt: string }) => void) => void
       onPaywallApproachingLimit: (cb: (data: { wordCount: number; wordLimit: number; wordsRemaining: number; periodResetsAt: string }) => void) => void

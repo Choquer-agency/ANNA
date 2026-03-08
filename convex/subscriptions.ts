@@ -102,6 +102,7 @@ export const handleWebhookEvent = internalMutation({
         await handleCheckoutCompleted(ctx, data)
         break
       }
+      case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         await handleSubscriptionUpdated(ctx, data)
         break
@@ -148,6 +149,12 @@ async function handleCheckoutCompleted(
   if (session.mode === 'subscription') {
     const subscriptionId = session.subscription as string
 
+    // Determine billing interval from the price ID
+    const ANNUAL_PRICE_IDS = ['price_1T3rtHHlgz688d0xfG5ILqr7']
+    const lineItem = session.line_items?.data?.[0] || session.display_items?.[0]
+    const priceId = lineItem?.price?.id || ''
+    const billingInterval = ANNUAL_PRICE_IDS.includes(priceId) ? 'annual' : 'monthly'
+
     // Try to find existing subscription by userId or stripeCustomerId
     let existing = userId
       ? await ctx.db.query('subscriptions').withIndex('by_user', (q: any) => q.eq('userId', userId)).first()
@@ -161,8 +168,9 @@ async function handleCheckoutCompleted(
       email,
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
-      stripePriceId: '',
+      stripePriceId: priceId,
       planId: 'pro',
+      billingInterval,
       status: 'active',
       createdAt: now,
       updatedAt: now,

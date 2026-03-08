@@ -7,7 +7,11 @@ import {
   getEnabledVocabularyPacks,
   getBuiltinPackVersion,
   setBuiltinPackVersion,
-  upsertBuiltinPack
+  upsertBuiltinPack,
+  setVocabularyPackEnabled,
+  updateVocabularyPack,
+  getSetting,
+  setSetting,
 } from './db'
 
 interface BuiltinPackJson {
@@ -48,6 +52,8 @@ export function seedBuiltinPacks(): void {
       const currentVersion = getBuiltinPackVersion(pack.key)
       if (currentVersion !== null && currentVersion >= pack.version) continue
 
+      const isFirstSeed = currentVersion === null
+
       upsertBuiltinPack(pack.key, {
         name: pack.name,
         description: pack.description,
@@ -57,7 +63,16 @@ export function seedBuiltinPacks(): void {
         terms: pack.terms,
       })
       setBuiltinPackVersion(pack.key, pack.version)
-      console.log(`[vocabulary] Seeded pack "${pack.key}" v${pack.version}`)
+
+      // Auto-enable core packs on first install so users get value immediately
+      if (isFirstSeed && (pack.key === 'general-tech' || pack.key === 'developer')) {
+        const allPacks = getVocabularyPacks()
+        // builtin packs have unique names, match by name since builtin_key isn't hydrated
+        const inserted = allPacks.find((p) => p.is_builtin && p.name === pack.name)
+        if (inserted) setVocabularyPackEnabled(inserted.id, true)
+      }
+
+      console.log(`[vocabulary] Seeded pack "${pack.key}" v${pack.version}${isFirstSeed ? ' (auto-enabled)' : ''}`)
     } catch (err) {
       console.error(`[vocabulary] Failed to seed pack from ${file}:`, err)
     }
@@ -132,13 +147,29 @@ export function buildWhisperPrompt(terms: VocabularyTerm[], maxChars: number = 8
 }
 
 /**
- * Build a one-liner for Claude's system prompt listing known vocabulary terms.
- * Caps at 200 terms to keep the prompt lean.
+ * Build a vocabulary correction section for Claude's system prompt.
+ * Includes alias mappings so Claude knows what misheard forms map to which terms,
+ * plus contextual reasoning instructions for disambiguation.
  */
 export function buildClaudeVocabularyHint(terms: VocabularyTerm[]): string {
   if (terms.length === 0) return ''
-  const capped = terms.slice(0, 200)
-  return `\nVOCABULARY: Known terms — use exact spelling: ${capped.map((t) => t.term).join(', ')}`
+
+  const termsWithAliases = terms.filter((t) => t.aliases?.length).slice(0, 100)
+  if (termsWithAliases.length === 0) {
+    // No aliases — fall back to simple term list
+    const capped = terms.slice(0, 200)
+    return `\nVOCABULARY: Known terms — use exact spelling: ${capped.map((t) => t.term).join(', ')}`
+  }
+
+  const lines = termsWithAliases.map(
+    (t) => `${t.term} → ${t.aliases!.map((a) => `"${a}"`).join(', ')}`
+  )
+
+  return `\nVOCABULARY CORRECTION:
+The speech-to-text engine often mishears technical terms. Below are known terms with their common misheard forms. Use surrounding context to identify the speaker's likely intent — if someone is discussing a technical topic, ambiguous words should resolve to the matching technical term. When you encounter a misheard form (or something close to it), replace it with the correct term.
+
+Known terms (correct → misheard forms):
+${lines.join('\n')}`
 }
 
 function escapeRegex(s: string): string {
@@ -154,12 +185,81 @@ export function applyVocabularyCorrections(text: string, terms: VocabularyTerm[]
   const termsWithAliases = terms.filter((t) => t.aliases?.length)
   if (termsWithAliases.length === 0) return text
 
-  let result = text
+  // Sort by alias length descending so longer aliases match first (e.g., "high Q1" before "high")
+  const allAliases: { alias: string; term: string }[] = []
   for (const t of termsWithAliases) {
     for (const alias of t.aliases!) {
-      const pattern = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'gi')
-      result = result.replace(pattern, t.term)
+      allAliases.push({ alias, term: t.term })
     }
   }
+  allAliases.sort((a, b) => b.alias.length - a.alias.length)
+
+  let result = text
+  for (const { alias, term } of allAliases) {
+    // Normalize whitespace in alias to match flexible spacing in text
+    const escapedAlias = alias.split(/\s+/).map(escapeRegex).join('\\s+')
+    const pattern = new RegExp(`\\b${escapedAlias}\\b`, 'gi')
+    result = result.replace(pattern, term)
+  }
   return result
+}
+
+/**
+ * Apply approved vocabulary recommendations from Convex.
+ * Finds the best matching vocabulary pack for each recommendation and adds
+ * the original (misheard) word as an alias for the corrected term.
+ */
+export function applyApprovedCorrections(
+  recommendations: Array<{ originalWord: string; correctedWord: string; approvedAt?: string }>
+): number {
+  if (recommendations.length === 0) return 0
+
+  const allPacks = getVocabularyPacks()
+  let applied = 0
+
+  for (const rec of recommendations) {
+    // Find a pack that contains the corrected word as a term
+    let targetPack = null
+    let targetTermIndex = -1
+
+    for (const pack of allPacks) {
+      const idx = pack.terms.findIndex(
+        (t) => t.term.toLowerCase() === rec.correctedWord.toLowerCase()
+      )
+      if (idx !== -1) {
+        targetPack = pack
+        targetTermIndex = idx
+        break
+      }
+    }
+
+    if (!targetPack || targetTermIndex === -1) {
+      console.log(`[vocabulary] No pack found for corrected word "${rec.correctedWord}", skipping`)
+      continue
+    }
+
+    // Check if alias already exists
+    const term = targetPack.terms[targetTermIndex]
+    const existingAliases = term.aliases ?? []
+    if (existingAliases.some((a) => a.toLowerCase() === rec.originalWord.toLowerCase())) {
+      continue // Already has this alias
+    }
+
+    // Add the misheard form as a new alias
+    const updatedTerms = [...targetPack.terms]
+    updatedTerms[targetTermIndex] = {
+      ...term,
+      aliases: [...existingAliases, rec.originalWord],
+    }
+
+    updateVocabularyPack(targetPack.id, { terms: updatedTerms })
+    applied++
+    console.log(`[vocabulary] Added alias "${rec.originalWord}" → "${rec.correctedWord}" in pack "${targetPack.name}"`)
+  }
+
+  if (applied > 0) {
+    setSetting('last_correction_pull', new Date().toISOString())
+  }
+
+  return applied
 }

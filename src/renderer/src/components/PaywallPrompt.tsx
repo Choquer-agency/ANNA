@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { X } from 'lucide-react'
 import { PLANS, formatPrice } from '../../../shared/pricing'
 import { track } from '../lib/analytics'
+import { UpgradeModal } from './UpgradeModal'
 
 interface PaywallPromptProps {
   wordCount: number
@@ -10,6 +12,7 @@ interface PaywallPromptProps {
 }
 
 export function PaywallPrompt({ wordCount, wordLimit, periodResetsAt, onClose }: PaywallPromptProps): React.JSX.Element {
+  const [showUpgrade, setShowUpgrade] = useState(false)
   const resetDate = new Date(periodResetsAt)
   const resetLabel = resetDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -27,13 +30,16 @@ export function PaywallPrompt({ wordCount, wordLimit, periodResetsAt, onClose }:
 
   function handleUpgrade(): void {
     track('free_limit_upgrade_clicked', { source: 'paywall_modal' })
-    window.annaAPI.openUpgrade()
-    onClose()
+    setShowUpgrade(true)
   }
 
   function handleDismiss(): void {
     track('free_limit_dismissed', { wordCount, periodStart: '' })
     onClose()
+  }
+
+  if (showUpgrade) {
+    return <UpgradeModal onClose={() => { setShowUpgrade(false); onClose() }} />
   }
 
   return (

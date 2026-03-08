@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
+import { ExternalLink } from 'lucide-react'
 import { SettingsCard } from '../SettingsCard'
 import { SettingsRow } from '../SettingsRow'
 import { ChurnSurvey } from '../ChurnSurvey'
+import { UpgradeContent } from '../../UpgradeModal'
 import { PLANS } from '../../../../../shared/pricing'
 
 interface SubStatus {
@@ -13,21 +15,40 @@ interface SubStatus {
   trialEnd?: string
 }
 
+interface Invoice {
+  id: string
+  date: string
+  amount: number
+  currency: string
+  status: string
+  description: string
+  invoiceUrl: string | null
+}
+
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
   pro: 'Anna Pro',
   lifetime: 'Anna Lifetime',
 }
 
-const PRICE_LABELS: Record<string, Record<string, string>> = {
-  pro: { monthly: '$9/mo', annual: '$84/yr' },
-  lifetime: { lifetime: '$250 one-time' },
-  free: { monthly: '$0' },
+const INTERVAL_LABELS: Record<string, string> = {
+  monthly: 'Monthly',
+  annual: 'Annual',
+  lifetime: 'Lifetime',
+}
+
+function formatCurrency(amount: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: 2,
+  }).format(amount / 100)
 }
 
 export function SubscriptionTab(): React.JSX.Element {
   const [sub, setSub] = useState<SubStatus | null>(null)
   const [weeklyWords, setWeeklyWords] = useState(0)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loaded, setLoaded] = useState(false)
   const [showChurnSurvey, setShowChurnSurvey] = useState(false)
 
@@ -39,9 +60,18 @@ export function SubscriptionTab(): React.JSX.Element {
     setSub(status)
     setWeeklyWords((usage as any)?.weeklyWords ?? 0)
     setLoaded(true)
+
+    if (status.planId !== 'free') {
+      window.annaAPI.getInvoices().then((result) => {
+        setInvoices(result.invoices)
+      }).catch(() => {})
+    }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+    window.annaAPI.onSubscriptionUpdated(() => loadData())
+  }, [loadData])
 
   function formatDate(dateStr: string | undefined): string {
     if (!dateStr) return '—'
@@ -56,12 +86,25 @@ export function SubscriptionTab(): React.JSX.Element {
     }
   }
 
+  function formatShortDate(dateStr: string): string {
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    } catch {
+      return dateStr
+    }
+  }
+
   if (!loaded || !sub) return <div />
 
   const planLabel = PLAN_LABELS[sub.planId] || 'Free'
-  const priceLabel = PRICE_LABELS[sub.planId]?.[sub.billingInterval || 'monthly'] || '$0'
+  const intervalLabel = INTERVAL_LABELS[sub.billingInterval || 'monthly'] || 'Monthly'
   const isFree = sub.planId === 'free'
   const isTrialing = sub.status === 'trialing'
+  const isMonthly = sub.billingInterval === 'monthly' || !sub.billingInterval
 
   return (
     <div className="space-y-6">
@@ -69,7 +112,11 @@ export function SubscriptionTab(): React.JSX.Element {
         <SettingsRow label="Plan">
           <div className="flex items-baseline gap-2">
             <span className="text-sm font-semibold text-ink">{planLabel}</span>
-            <span className="text-sm text-ink-muted">{priceLabel}</span>
+            {!isFree && (
+              <span className="text-[11px] font-medium text-ink-muted bg-surface-alt px-2 py-0.5 rounded">
+                {intervalLabel}
+              </span>
+            )}
             {isTrialing && (
               <span className="text-xs font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
                 Trial
@@ -79,7 +126,7 @@ export function SubscriptionTab(): React.JSX.Element {
         </SettingsRow>
 
         {isFree && (
-          <SettingsRow label="Words this week">
+          <SettingsRow label="Words This Week">
             <div className="flex items-center gap-3">
               <div className="w-32 h-2 rounded-full bg-surface-alt overflow-hidden">
                 <div
@@ -95,7 +142,7 @@ export function SubscriptionTab(): React.JSX.Element {
         )}
 
         {!isFree && sub.currentPeriodEnd && (
-          <SettingsRow label={sub.cancelAtPeriodEnd ? 'Access until' : 'Next renewal'}>
+          <SettingsRow label={sub.cancelAtPeriodEnd ? 'Access Until' : 'Next Billing Date'}>
             <span className="text-sm text-ink-secondary">
               {formatDate(sub.currentPeriodEnd)}
             </span>
@@ -103,7 +150,7 @@ export function SubscriptionTab(): React.JSX.Element {
         )}
 
         {isTrialing && sub.trialEnd && (
-          <SettingsRow label="Trial ends">
+          <SettingsRow label="Trial Ends">
             <span className="text-sm text-ink-secondary">{formatDate(sub.trialEnd)}</span>
           </SettingsRow>
         )}
@@ -115,39 +162,72 @@ export function SubscriptionTab(): React.JSX.Element {
         )}
       </SettingsCard>
 
-      <div className="flex items-center justify-between px-1">
-        {isFree ? (
-          <button
-            onClick={() => window.annaAPI.openUpgrade()}
-            className="text-sm text-primary font-medium hover:underline"
-          >
-            Upgrade to Pro
-          </button>
-        ) : (
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => window.annaAPI.openBillingPortal()}
-              className="text-sm text-primary hover:underline"
-            >
-              Manage subscription
-            </button>
-            {!sub.cancelAtPeriodEnd && sub.planId !== 'lifetime' && (
+      {isFree ? (
+        <SettingsCard title="Upgrade">
+          <div className="p-4">
+            <UpgradeContent />
+          </div>
+        </SettingsCard>
+      ) : (
+        <>
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-4">
               <button
-                onClick={() => setShowChurnSurvey(true)}
-                className="text-xs text-ink-muted hover:text-accent-red"
+                onClick={() => window.annaAPI.openBillingPortal()}
+                className="text-sm font-medium text-primary hover:underline cursor-pointer"
               >
-                Cancel subscription
+                Manage Subscription
+              </button>
+              {!sub.cancelAtPeriodEnd && sub.planId !== 'lifetime' && (
+                <button
+                  onClick={() => setShowChurnSurvey(true)}
+                  className="text-sm font-medium text-ink-muted hover:text-accent-red cursor-pointer"
+                >
+                  Cancel Subscription
+                </button>
+              )}
+            </div>
+            {!isFree && isMonthly && sub.planId !== 'lifetime' && (
+              <button
+                onClick={() => window.annaAPI.createCheckout('pro', 'annual')}
+                className="text-sm font-medium text-primary hover:underline cursor-pointer"
+              >
+                Save 22% with Annual
               </button>
             )}
           </div>
-        )}
-        <button
-          onClick={() => window.annaAPI.openWeb('pricing')}
-          className="text-xs text-ink-muted hover:text-ink"
-        >
-          View pricing
-        </button>
-      </div>
+
+          {invoices.length > 0 && (
+            <SettingsCard title="Billing History">
+              {invoices.map((inv) => (
+                <SettingsRow key={inv.id} label={formatShortDate(inv.date)}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-ink-secondary">
+                      {formatCurrency(inv.amount, inv.currency)}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      inv.status === 'paid'
+                        ? 'text-green-700 bg-green-100'
+                        : 'text-ink-muted bg-surface-alt'
+                    }`}>
+                      {inv.status === 'paid' ? 'Paid' : inv.status}
+                    </span>
+                    {inv.invoiceUrl && (
+                      <button
+                        onClick={() => window.annaAPI.openInvoice(inv.invoiceUrl!)}
+                        className="text-ink-muted hover:text-ink cursor-pointer"
+                        title="View invoice"
+                      >
+                        <ExternalLink size={13} />
+                      </button>
+                    )}
+                  </div>
+                </SettingsRow>
+              ))}
+            </SettingsCard>
+          )}
+        </>
+      )}
 
       {showChurnSurvey && (
         <ChurnSurvey
@@ -163,7 +243,7 @@ export function SubscriptionTab(): React.JSX.Element {
           }}
           onSwitchToAnnual={() => {
             setShowChurnSurvey(false)
-            window.annaAPI.openUpgrade()
+            window.annaAPI.createCheckout('pro', 'annual')
           }}
           onCancel={() => setShowChurnSurvey(false)}
         />

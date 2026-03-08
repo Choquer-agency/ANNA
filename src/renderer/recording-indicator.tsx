@@ -138,6 +138,16 @@ container.innerHTML = `
 
     .cancelled-content { display: none; align-items: center; gap: 10px; }
     .cancelled-content.visible { display: flex; }
+
+    .time-warning-tooltip {
+      position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
+      background: #1C1C1E; color: rgba(255,158,25,0.9); font-size: 11px; font-weight: 500;
+      padding: 6px 14px; border-radius: 100px; white-space: nowrap;
+      pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .time-warning-tooltip.visible { opacity: 1; }
     .cancelled-icon {
       width: 16px; height: 16px; border-radius: 50%;
       background: rgba(255,59,48,0.2); display: flex;
@@ -303,6 +313,7 @@ container.innerHTML = `
     <div class="ambient-glow" id="ambient-glow"></div>
     <div class="snake-border" id="snake-border">
       <div class="idle-tooltip" id="idle-tooltip">Press <span id="hotkey-label">\u2303 \u2423</span> to dictate</div>
+      <div class="time-warning-tooltip" id="time-warning-tooltip">Reaching 10 min limit</div>
       <div class="pill" id="pill">
         <!-- Recording state: colored waveform bars -->
         <div class="recording-content hidden" id="recording-content">
@@ -345,6 +356,7 @@ const glowWrap = document.getElementById('glow-wrap')!
 const recordingContent = document.getElementById('recording-content')!
 const processingContent = document.getElementById('processing-content')!
 const cancelledContent = document.getElementById('cancelled-content')!
+const timeWarningTooltip = document.getElementById('time-warning-tooltip')!
 const bars = Array.from({ length: NUM_BARS }, (_, i) => document.getElementById(`bar-${i}`)!)
 
 // ─── Button wiring ───
@@ -357,6 +369,8 @@ document.getElementById('undo-btn')?.addEventListener('click', () => window.reco
 function setState(state: string): void {
   const isIdle = state === 'idle'
   const isProcessing = state === 'processing' || state === 'slow'
+  const isTimeWarning = state === 'time-warning'
+  const isRecording = state === 'recording' || isTimeWarning
 
   pill.classList.toggle('idle', isIdle)
   pill.classList.toggle('circle', isProcessing)
@@ -365,11 +379,12 @@ function setState(state: string): void {
   snakeBorder.classList.toggle('circle-border', isProcessing)
   glowWrap.classList.toggle('idle-wrap', isIdle)
   ambientGlow.classList.toggle('hidden', isIdle)
-  recordingContent.classList.toggle('hidden', state !== 'recording')
+  recordingContent.classList.toggle('hidden', !isRecording)
   processingContent.classList.toggle('visible', isProcessing)
   cancelledContent.classList.toggle('visible', state === 'cancelled')
+  timeWarningTooltip.classList.toggle('visible', isTimeWarning)
 
-  if (state !== 'recording') glowWrap.style.filter = 'none'
+  if (!isRecording) glowWrap.style.filter = 'none'
 }
 
 // ─── Click-through: window ignores mouse on transparent areas,
@@ -406,11 +421,11 @@ function animateAmbientGlow(time: number): void {
 }
 
 function animate(level: number, time: number): void {
-  if (currentState === 'recording' || currentState === 'processing' || currentState === 'slow') {
+  if (currentState === 'recording' || currentState === 'processing' || currentState === 'slow' || currentState === 'time-warning') {
     animateAmbientGlow(time)
   }
 
-  if (currentState === 'recording') {
+  if (currentState === 'recording' || currentState === 'time-warning') {
     for (let i = 0; i < NUM_BARS; i++) {
       const phase = (i / NUM_BARS) * Math.PI * 2
       const wave = Math.sin(time * 6 + phase) * 0.25 + 0.75

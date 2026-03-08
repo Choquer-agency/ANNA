@@ -6,6 +6,15 @@ import { getSetting, setSetting } from './db'
 import { ensureClient } from './convex'
 import { isAuthenticated, isTokenExpired } from './auth'
 import { anyApi } from 'convex/server'
+import { appendFileSync } from 'fs'
+import { join } from 'path'
+
+function subLog(msg: string): void {
+  const logPath = join(process.env.HOME || '/tmp', 'Library/Application Support/anna/sub-debug.log')
+  const line = `${new Date().toISOString()} | ${msg}\n`
+  try { appendFileSync(logPath, line) } catch {}
+  console.log(msg)
+}
 
 const api = anyApi
 
@@ -25,6 +34,12 @@ const DEFAULT_STATUS: SubscriptionStatus = {
 
 let cachedStatus: SubscriptionStatus = DEFAULT_STATUS
 let refreshInterval: ReturnType<typeof setInterval> | null = null
+let onStatusChange: ((status: SubscriptionStatus) => void) | null = null
+
+/** Register a callback for when subscription status changes */
+export function onSubscriptionChange(cb: (status: SubscriptionStatus) => void): void {
+  onStatusChange = cb
+}
 
 /** Load cached subscription from local settings */
 export function loadCachedSubscription(): SubscriptionStatus {
@@ -42,23 +57,25 @@ export function loadCachedSubscription(): SubscriptionStatus {
 
 /** Fetch subscription status from Convex and cache locally */
 export async function refreshSubscription(): Promise<SubscriptionStatus> {
+  subLog(`[sub] refreshSubscription called. isAuth=${isAuthenticated()}, isExpired=${isTokenExpired()}, cached=${cachedStatus.planId}`)
+
   if (!isAuthenticated()) {
-    cachedStatus = DEFAULT_STATUS
+    subLog('[sub] Not authenticated, returning cached: ' + cachedStatus.planId)
     return cachedStatus
   }
 
-  // Don't query server with expired token — it returns "free" for unauthenticated
-  // users which would overwrite a valid cached paid subscription
   if (isTokenExpired()) {
-    console.log('[subscription] Token expired, using cached status')
+    subLog('[sub] Token expired, returning cached: ' + cachedStatus.planId)
     return cachedStatus
   }
 
   try {
     const client = ensureClient()
+    subLog('[sub] Querying Convex...')
     const sub = await client.query(api.subscriptions.getSubscription, {})
+    subLog(`[sub] Convex returned: planId=${sub.planId}, status=${sub.status}`)
 
-    cachedStatus = {
+    const serverStatus: SubscriptionStatus = {
       planId: (sub.planId || 'free') as SubscriptionStatus['planId'],
       status: (sub.status || 'active') as SubscriptionStatus['status'],
       billingInterval: sub.billingInterval as SubscriptionStatus['billingInterval'],
@@ -67,12 +84,12 @@ export async function refreshSubscription(): Promise<SubscriptionStatus> {
       trialEnd: sub.trialEnd,
     }
 
-    // Cache locally for offline access
+    cachedStatus = serverStatus
     setSetting('subscription_status', JSON.stringify(cachedStatus))
-    console.log('[subscription] Refreshed:', cachedStatus.planId, cachedStatus.status)
+    subLog('[sub] Saved to DB: ' + cachedStatus.planId)
+    onStatusChange?.(cachedStatus)
   } catch (err) {
-    console.error('[subscription] Failed to refresh:', err)
-    // Fall back to cached version
+    subLog('[sub] Error: ' + String(err))
     loadCachedSubscription()
   }
 

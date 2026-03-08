@@ -37,6 +37,13 @@ function sanitizeOutput(output: string, rawTranscript: string): SanitizeResult {
   const looksLikeAIResponse = AI_RESPONSE_PATTERNS.some((p) => p.test(trimmed))
 
   if (looksLikeAIResponse) {
+    // If the raw transcript starts with the same word, the user actually said it — not an AI response
+    const rawTrimmed = rawTranscript.replace(/^\[silence\]\s*/i, '').trim()
+    const firstWord = trimmed.split(/[\s,]/)[0].toLowerCase()
+    const rawFirstWord = rawTrimmed.split(/[\s,]/)[0].toLowerCase()
+    if (firstWord === rawFirstWord) {
+      return { text: trimmed, sanitized: false }
+    }
     return {
       text: rawTranscript,
       sanitized: true,
@@ -54,7 +61,8 @@ export async function processTranscript(
   styleAddendum?: string,
   trace?: ReturnType<Langfuse['trace']>,
   customPrompt?: string,
-  language?: string
+  language?: string,
+  vocabularyHint?: string
 ): Promise<string> {
   const appContextStr = appContext
     ? `${appContext.appName || 'an unknown app'}${appContext.windowTitle ? ` (window: "${appContext.windowTitle}")` : ''}`
@@ -80,8 +88,14 @@ CLEANING:
 - Fix grammar, punctuation, capitalization. Convert run-ons to proper sentences.
 - Numbers: spell out 1-9, digits for 10+. Reconstruct URLs and emails dictated aloud. Preserve technical terms and proper nouns.
 - Paragraphs only at clear topic shifts. Lists only when speaker signals them and context supports markdown.
-- NEVER add or remove meaningful content. When in doubt, preserve the speaker's words.
-${styleAddendum ? `\nSTYLE: ${styleAddendum}` : ''}${customPrompt ? `\nONE-TIME INSTRUCTION: ${customPrompt}` : ''}`
+- Do not add new meaningful content. Fix errors and clean up speech artifacts, but keep the speaker's intended message.
+
+ERROR CORRECTION:
+- Speech-to-text often mishears words. Use context to fix likely errors (e.g., "they start shaving the project" → "they start shaping the project").
+- If a word sounds similar to a known vocabulary term, use the correct term.
+- Common accent-related mishearings: dropped consonants, vowel shifts, word boundary errors. Fix these based on what makes sense in context.
+- Preserve the speaker's intended meaning — fix garbled words, but never add new ideas.
+${styleAddendum ? `\nSTYLE: ${styleAddendum}` : ''}${vocabularyHint ? vocabularyHint : ''}${customPrompt ? `\nONE-TIME INSTRUCTION: ${customPrompt}` : ''}`
 
   const userMessage = `<transcript>${rawTranscript}</transcript>`
 
@@ -93,13 +107,13 @@ ${styleAddendum ? `\nSTYLE: ${styleAddendum}` : ''}${customPrompt ? `\nONE-TIME 
       { role: 'user', content: userMessage },
       { role: 'assistant', content: PREFILL }
     ],
-    modelParameters: { max_tokens: 1024, temperature: 0.2 }
+    modelParameters: { max_tokens: 2048, temperature: 0.2 }
   })
 
   try {
     const message = await getClient().messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 2048,
       temperature: 0.2,
       system: systemPrompt,
       // Layer 2: Assistant prefill forces model into output mode
@@ -117,7 +131,7 @@ ${styleAddendum ? `\nSTYLE: ${styleAddendum}` : ''}${customPrompt ? `\nONE-TIME 
       outputText = outputText.replace(/^Here is the cleaned text:\s*/, '')
     }
 
-    // Point 5: stop_reason check — if max_tokens on a short transcript, likely injection
+    // Safety net: stop_reason check — if max_tokens on a short transcript, likely injection
     if (message.stop_reason === 'max_tokens' && rawTranscript.length < 100) {
       console.warn('[process] Hit max_tokens on short transcript, likely injection')
       generation?.end({
@@ -135,7 +149,7 @@ ${styleAddendum ? `\nSTYLE: ${styleAddendum}` : ''}${customPrompt ? `\nONE-TIME 
       return rawTranscript
     }
 
-    // Point 6: Token ratio check — output tokens wildly disproportionate to input
+    // Token ratio check — output tokens wildly disproportionate to input
     const tokenRatio = message.usage.output_tokens / message.usage.input_tokens
     if (tokenRatio > 3) {
       console.warn(`[process] Suspicious token ratio (${tokenRatio.toFixed(1)}x), likely injection`)
@@ -158,7 +172,6 @@ ${styleAddendum ? `\nSTYLE: ${styleAddendum}` : ''}${customPrompt ? `\nONE-TIME 
     const result = sanitizeOutput(outputText, rawTranscript)
 
     if (result.sanitized) {
-      // Point 2 & 7: Log to Langfuse with WARNING level + trace metadata
       console.warn(`[process] ${result.reason}, falling back to raw transcript`)
       generation?.end({
         output: result.text,
@@ -221,7 +234,7 @@ RULES:
 
   const generation = trace?.generation({
     name: 'claude-command-processing',
-    model: 'claude-sonnet-4-6-20250514',
+    model: 'claude-haiku-4-5-20251001',
     input: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: command }
@@ -231,7 +244,7 @@ RULES:
 
   try {
     const message = await getClient().messages.create({
-      model: 'claude-sonnet-4-6-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       temperature: 0.3,
       system: systemPrompt,

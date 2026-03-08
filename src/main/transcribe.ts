@@ -169,14 +169,15 @@ async function getContext(): Promise<WhisperContext> {
 export async function transcribe(
   wavBuffer: Buffer,
   language: string = 'auto',
-  trace?: ReturnType<Langfuse['trace']>
+  trace?: ReturnType<Langfuse['trace']>,
+  promptHint?: string
 ): Promise<string> {
   const tempPath = join(tmpdir(), `anna-${randomUUID()}.wav`)
 
   const generation = trace?.generation({
     name: 'whisper-transcription',
     model: 'whisper.cpp/base',
-    input: { audioSizeBytes: wavBuffer.length, language }
+    input: { audioSizeBytes: wavBuffer.length, language, promptHint: !!promptHint }
   })
 
   try {
@@ -187,6 +188,7 @@ export async function transcribe(
       language: language === 'auto' ? undefined : language,
       temperature: 0.0,
       maxThreads: 4,
+      ...(promptHint ? { prompt: promptHint } : {}),
     })
 
     const result = await promise
