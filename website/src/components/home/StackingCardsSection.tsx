@@ -1,7 +1,19 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(true)
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)')
+    setIsDesktop(mql.matches)
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+  return isDesktop
+}
 
 const steps = [
   {
@@ -36,9 +48,11 @@ const steps = [
 function StackCard({
   step,
   index,
+  isDesktop,
 }: {
   step: (typeof steps)[0]
   index: number
+  isDesktop: boolean
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const { scrollYProgress } = useScroll({
@@ -54,14 +68,17 @@ function StackCard({
     <div
       ref={cardRef}
       className="flex items-start justify-center"
-      style={{
+      style={isDesktop ? {
         position: 'sticky',
         top: `calc(50vh - 180px + ${index * 30}px)`,
+        zIndex: index + 10,
+      } : {
+        position: 'relative',
         zIndex: index + 10,
       }}
     >
       <motion.div
-        style={{ scale, opacity, rotate }}
+        style={isDesktop ? { scale, opacity, rotate } : {}}
         className="w-full max-w-[520px] mx-auto rounded-[24px] border-[2.5px] border-white bg-white overflow-hidden shadow-[0_4px_40px_rgba(0,0,0,0.06)]"
       >
         {/* Gradient top area */}
@@ -90,21 +107,16 @@ function StackCard({
 
 export function StackingCardsSection() {
   const sectionRef = useRef<HTMLDivElement>(null)
+  const isDesktop = useIsDesktop()
 
   return (
     <section ref={sectionRef} className="pt-16 md:pt-24 pb-0">
       <div className="mx-auto max-w-[1400px] px-6 md:px-10">
-        {/*
-          Single container — heading + cards are siblings so they share the
-          same CSS containing block and un-stick at exactly the same scroll
-          position (heading height 230px is tuned so that
-          sticky-top + height == last-card-sticky-top + card-height).
-        */}
         <div>
-          {/* Sticky heading — vertically centered via translate */}
+          {/* Heading — sticky on desktop, static on mobile */}
           <div
-            className="sticky top-[50vh] -translate-y-1/2 z-0 text-center overflow-visible"
-            style={{ height: '230px' }}
+            className={`z-0 text-center overflow-visible ${isDesktop ? 'sticky top-[50vh] -translate-y-1/2' : ''}`}
+            style={isDesktop ? { height: '230px' } : {}}
           >
             <p className="text-primary text-sm uppercase tracking-[0.15em] font-medium mb-5">
               How it works
@@ -112,7 +124,7 @@ export function StackingCardsSection() {
             <h2
               className="text-ink max-w-[900px] mx-auto"
               style={{
-                fontSize: 'clamp(1.75rem, 3vw + 0.75rem, 3.25rem)',
+                fontSize: 'clamp(1.5rem, 3vw + 0.5rem, 3.25rem)',
                 lineHeight: 1.15,
                 letterSpacing: '-0.03em',
                 fontWeight: 500,
@@ -124,16 +136,18 @@ export function StackingCardsSection() {
             </h2>
           </div>
 
-          {/* Spacer — pushes cards below so they scroll up over the heading */}
-          <div className="h-[55vh]" />
+          {/* Spacer — only on desktop for the sticky scroll-over effect */}
+          {isDesktop && <div className="h-[55vh]" />}
 
-          {/* Cards — siblings of heading, share same containing block */}
-          {steps.map((step, i) => (
-            <StackCard key={step.number} step={step} index={i} />
-          ))}
+          {/* Cards */}
+          <div className={isDesktop ? '' : 'flex flex-col gap-6 mt-10'}>
+            {steps.map((step, i) => (
+              <StackCard key={step.number} step={step} index={i} isDesktop={isDesktop} />
+            ))}
+          </div>
 
-          {/* Minimal spacer — just enough for last card to land, then everything scrolls */}
-          <div className="h-[2vh]" />
+          {/* Minimal spacer — desktop only */}
+          {isDesktop && <div className="h-[2vh]" />}
         </div>
       </div>
     </section>

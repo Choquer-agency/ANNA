@@ -42,6 +42,17 @@
   --color-promo-end: #FCEAFF;
 }
 
+/* ─── Gradient compat — override Tailwind v4 "in oklab" interpolation
+   for older browsers that don't understand colorspace hints ─── */
+.bg-gradient-to-r  { --tw-gradient-position: to right; }
+.bg-gradient-to-l  { --tw-gradient-position: to left; }
+.bg-gradient-to-t  { --tw-gradient-position: to top; }
+.bg-gradient-to-b  { --tw-gradient-position: to bottom; }
+.bg-gradient-to-br { --tw-gradient-position: to bottom right; }
+.bg-gradient-to-bl { --tw-gradient-position: to bottom left; }
+.bg-gradient-to-tr { --tw-gradient-position: to top right; }
+.bg-gradient-to-tl { --tw-gradient-position: to top left; }
+
 /* ─── Base ─── */
 html {
   scroll-behavior: auto; /* Lenis handles this */
@@ -66,28 +77,28 @@ body {
 
 /* ─── Fluid typography ─── */
 .hero-heading {
-  font-size: clamp(3rem, 6vw + 1rem, 6rem);
+  font-size: clamp(2rem, 5vw + 0.5rem, 6rem);
   line-height: 1;
   letter-spacing: -0.035em;
   font-weight: 500;
 }
 
 .heading-xl {
-  font-size: clamp(3rem, 6vw + 1rem, 6rem);
+  font-size: clamp(2rem, 5vw + 0.5rem, 6rem);
   line-height: 0.95;
   letter-spacing: -0.04em;
   font-weight: 800;
 }
 
 .heading-lg {
-  font-size: clamp(2.5rem, 4vw + 1rem, 4.5rem);
+  font-size: clamp(1.75rem, 3.5vw + 0.5rem, 4.5rem);
   line-height: 0.98;
   letter-spacing: -0.035em;
   font-weight: 500;
 }
 
 .heading-md {
-  font-size: clamp(1.75rem, 3vw + 0.5rem, 3rem);
+  font-size: clamp(1.5rem, 2.5vw + 0.5rem, 3rem);
   line-height: 1.05;
   letter-spacing: -0.03em;
   font-weight: 500;
@@ -189,13 +200,13 @@ body {
 
 /* ─── Fluid spacing ─── */
 .section-py {
-  padding-top: clamp(5rem, 10vw, 10rem);
-  padding-bottom: clamp(5rem, 10vw, 10rem);
+  padding-top: clamp(3rem, 8vw, 10rem);
+  padding-bottom: clamp(3rem, 8vw, 10rem);
 }
 
 .section-py-sm {
-  padding-top: clamp(3rem, 6vw, 6rem);
-  padding-bottom: clamp(3rem, 6vw, 6rem);
+  padding-top: clamp(2rem, 5vw, 6rem);
+  padding-bottom: clamp(2rem, 5vw, 6rem);
 }
 
 /* ─── Entrance animations ─── */

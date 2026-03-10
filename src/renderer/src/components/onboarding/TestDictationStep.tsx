@@ -2,40 +2,40 @@ import { useState, useEffect, useRef } from 'react'
 import { Mic, RotateCcw, MousePointerClick } from 'lucide-react'
 import type { PipelineStatus } from '../../types'
 import { usePlasmaHover } from '../../hooks/usePlasmaHover'
+import { usePlatform } from '../../hooks/usePlatform'
 import { track } from '../../lib/analytics'
 
 interface TestDictationStepProps {
   onComplete: () => void
 }
 
-function parseHotkeyLabel(hk: string): string {
+function parseHotkeyLabel(hk: string, isMac: boolean): string {
   if (hk === 'fn') return 'fn'
   return hk.split('+').map((part) => {
-    const map: Record<string, string> = {
-      'CommandOrControl': '\u2318',
-      'Alt': '\u2325',
-      'Shift': '\u21E7',
-      'Ctrl': '\u2303',
-      'Space': 'Space'
-    }
+    const map: Record<string, string> = isMac
+      ? { 'CommandOrControl': '\u2318', 'Alt': '\u2325', 'Shift': '\u21E7', 'Ctrl': '\u2303', 'Space': 'Space' }
+      : { 'CommandOrControl': 'Ctrl', 'Alt': 'Alt', 'Shift': 'Shift', 'Ctrl': 'Ctrl', 'Space': 'Space' }
     return map[part] || part
-  }).join(' ')
+  }).join(isMac ? ' ' : ' + ')
 }
 
 export function TestDictationStep({ onComplete }: TestDictationStepProps): React.JSX.Element {
   const { onMouseMove } = usePlasmaHover()
+  const { platform, capabilities } = usePlatform()
+  const isMac = platform === 'darwin'
   const [status, setStatus] = useState<string>('idle')
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [hotkeyLabel, setHotkeyLabel] = useState('\u2303 Space')
+  const [hotkeyLabel, setHotkeyLabel] = useState('')
   const attemptTracked = useRef(false)
   const completionTracked = useRef(false)
 
   useEffect(() => {
     window.annaAPI.getSetting('hotkey').then((val) => {
-      if (val) setHotkeyLabel(parseHotkeyLabel(val))
+      const hk = val || capabilities.defaultHotkey
+      setHotkeyLabel(parseHotkeyLabel(hk, isMac))
     })
-  }, [])
+  }, [capabilities.defaultHotkey, isMac])
 
   useEffect(() => {
     window.annaAPI.onPipelineStatus((data: PipelineStatus) => {

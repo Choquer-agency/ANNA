@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { ease } from '@/lib/animations'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
-import { usePlatformDetect, getPlatformLabel } from '@/hooks/usePlatformDetect'
+import { usePlatformDetect, getPlatformLabel, getDownloadPath } from '@/hooks/usePlatformDetect'
 
 const typewriterWords = [
   'Gmail',
@@ -110,7 +110,7 @@ export function HeroSection() {
 
   return (
     <section ref={containerRef} className="relative min-h-screen bg-mesh overflow-hidden">
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 pt-[clamp(7rem,13vh,10.5rem)] pb-[clamp(4rem,8vh,8rem)]">
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10 pt-[clamp(5rem,12vh,10.5rem)] pb-[clamp(3rem,7vh,8rem)]">
         <motion.div style={{ y: textY }} className="text-center">
           {/* Pill badge */}
           <motion.div
@@ -157,7 +157,7 @@ export function HeroSection() {
             className="mt-10 flex justify-center"
           >
             <a
-              href="/signup"
+              href={getDownloadPath(platform)}
               className="inline-flex items-center gap-2.5 bg-primary text-white px-8 py-4 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_24px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 group"
             >
               Download for {getPlatformLabel(platform)}

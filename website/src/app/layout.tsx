@@ -15,7 +15,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 
 export const metadata: Metadata = {
-  title: 'Anna — AI Voice Dictation for macOS',
+  title: 'Anna — AI Voice Dictation for macOS & Windows',
   description:
     'AI-powered voice dictation for macOS. Press a shortcut, speak naturally, and watch polished text appear anywhere you type.',
   icons: {
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'Anna — AI Voice Dictation for macOS',
+    title: 'Anna — AI Voice Dictation for macOS & Windows',
     description:
       'Press a shortcut, speak naturally, and watch polished text appear anywhere you type.',
     type: 'website',
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Anna — AI Voice Dictation for macOS',
+    title: 'Anna — AI Voice Dictation for macOS & Windows',
     description:
       'Press a shortcut, speak naturally, and watch polished text appear anywhere you type.',
   },
@@ -54,7 +54,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','${GTM_ID}');`}
       </Script>
-      <body className="font-sans antialiased bg-surface text-ink">
+      <body className="font-sans antialiased bg-surface text-ink overflow-x-hidden">
         <noscript>
           <iframe
             src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}

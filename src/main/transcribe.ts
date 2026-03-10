@@ -1,5 +1,5 @@
 import type { WhisperContext } from '@fugood/whisper.node'
-import { writeFileSync, unlinkSync, existsSync, createWriteStream, mkdirSync, statSync } from 'fs'
+import { writeFileSync, unlinkSync, existsSync, createWriteStream, mkdirSync, statSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
@@ -166,18 +166,121 @@ async function getContext(): Promise<WhisperContext> {
   }
 }
 
+// ─── Cloud Whisper via OpenAI API ───────────────────────────────────────────
+
+function shouldUseCloud(): boolean {
+  // Use cloud Whisper on Windows (local is CPU-only and very slow)
+  // and on Intel Macs (x64, no GPU acceleration)
+  if (!process.env.OPENAI_API_KEY) return false
+  if (process.platform === 'win32') return true
+  if (process.platform === 'darwin' && process.arch === 'x64') return true
+  return false
+}
+
+async function transcribeCloud(
+  wavBuffer: Buffer,
+  language: string,
+  promptHint?: string
+): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY!
+
+  // Build multipart/form-data manually to avoid dependency on OpenAI SDK
+  const boundary = `----AnnaWhisper${randomUUID().replace(/-/g, '')}`
+  const parts: Buffer[] = []
+
+  function addField(name: string, value: string): void {
+    parts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+    ))
+  }
+
+  function addFile(name: string, filename: string, contentType: string, data: Buffer): void {
+    parts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`
+    ))
+    parts.push(data)
+    parts.push(Buffer.from('\r\n'))
+  }
+
+  addFile('file', 'audio.wav', 'audio/wav', wavBuffer)
+  addField('model', 'whisper-1')
+  addField('response_format', 'text')
+  if (language !== 'auto') addField('language', language)
+  if (promptHint) addField('prompt', promptHint)
+
+  parts.push(Buffer.from(`--${boundary}--\r\n`))
+
+  const body = Buffer.concat(parts)
+
+  const url = new URL('https://api.openai.com/v1/audio/transcriptions')
+
+  return new Promise((resolve, reject) => {
+    const https = require('https')
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
+      },
+    }, (res: any) => {
+      const chunks: Buffer[] = []
+      res.on('data', (chunk: Buffer) => chunks.push(chunk))
+      res.on('end', () => {
+        const responseBody = Buffer.concat(chunks).toString('utf-8')
+        if (res.statusCode !== 200) {
+          reject(new Error(`OpenAI Whisper API error (${res.statusCode}): ${responseBody}`))
+          return
+        }
+        resolve(responseBody.trim())
+      })
+    })
+
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+}
+
+// ─── Public API ─────────────────────────────────────────────────────────────
+
 export async function transcribe(
   wavBuffer: Buffer,
   language: string = 'auto',
   trace?: ReturnType<Langfuse['trace']>,
   promptHint?: string
 ): Promise<string> {
+  const useCloud = shouldUseCloud()
+
+  if (useCloud) {
+    console.log('[transcribe] Using OpenAI Whisper API (cloud)')
+    const generation = trace?.generation({
+      name: 'whisper-transcription',
+      model: 'whisper-1',
+      input: { audioSizeBytes: wavBuffer.length, language, promptHint: !!promptHint, mode: 'cloud' }
+    })
+
+    try {
+      const text = await transcribeCloud(wavBuffer, language, promptHint)
+      generation?.end({ output: text, level: 'DEFAULT' })
+      return text
+    } catch (err) {
+      console.warn('[transcribe] Cloud transcription failed, falling back to local:', err)
+      generation?.end({ level: 'ERROR', statusMessage: String(err) })
+      // Fall through to local transcription
+    }
+  }
+
+  // Local Whisper transcription
+  console.log('[transcribe] Using local Whisper')
   const tempPath = join(tmpdir(), `anna-${randomUUID()}.wav`)
 
   const generation = trace?.generation({
     name: 'whisper-transcription',
     model: 'whisper.cpp/base',
-    input: { audioSizeBytes: wavBuffer.length, language, promptHint: !!promptHint }
+    input: { audioSizeBytes: wavBuffer.length, language, promptHint: !!promptHint, mode: 'local' }
   })
 
   try {

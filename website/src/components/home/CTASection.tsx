@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react'
 import { FadeIn } from '@/components/ui/FadeIn'
 import { usePlasmaHover } from '@/hooks/usePlasmaHover'
-import { usePlatformDetect, getPlatformLabel } from '@/hooks/usePlatformDetect'
+import { usePlatformDetect, getPlatformLabel, getDownloadPath } from '@/hooks/usePlatformDetect'
 
 export function CTASection() {
   const { onMouseMove } = usePlasmaHover()
@@ -28,7 +28,7 @@ export function CTASection() {
           <FadeIn delay={0.2}>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <a
-                href="/signup"
+                href={getDownloadPath(platform)}
                 onMouseMove={onMouseMove}
                 className="inline-flex items-center gap-2.5 bg-primary text-white px-8 py-4 rounded-full text-[0.95rem] font-semibold hover:shadow-[0_0_24px_rgba(255,158,25,0.35)] hover:bg-primary-hover transition-all duration-300 group"
               >

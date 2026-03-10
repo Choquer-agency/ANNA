@@ -10,7 +10,7 @@ export default function MarketingLayout({
   return (
     <SmoothScroll>
       <Navbar />
-      <main className="relative z-10 bg-surface">{children}</main>
+      <main className="relative z-10 bg-surface min-h-screen overflow-x-hidden">{children}</main>
       <Footer />
     </SmoothScroll>
   )

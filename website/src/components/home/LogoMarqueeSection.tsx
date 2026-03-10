@@ -116,7 +116,7 @@ export function LogoMarqueeSection() {
         <h2 className="heading-lg text-ink">
           Works everywhere
           <br />
-          <span className="text-ink-muted">on your Mac.</span>
+          <span className="text-ink-muted">on your Mac & PC.</span>
         </h2>
       </FadeIn>
       <div className="flex flex-col gap-4">

@@ -13,7 +13,7 @@ function AIAutoEditsIllustration() {
   const inView = useInView(ref, { once: true, margin: '-100px' })
 
   return (
-    <div ref={ref} className="relative w-full aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FDF5FF]">
+    <div ref={ref} className="relative w-full aspect-[4/3] md:aspect-[4/3.5] rounded-[24px] overflow-hidden bg-[#FDF5FF]">
       {/* Blurred background */}
       <div
         className="absolute inset-0"
@@ -431,7 +431,7 @@ function SpeedComparison() {
         <h2
           className="text-ink max-w-[700px] mx-auto"
           style={{
-            fontSize: 'clamp(1.75rem, 3vw + 0.75rem, 3.25rem)',
+            fontSize: 'clamp(1.5rem, 3vw + 0.5rem, 3.25rem)',
             lineHeight: 1.15,
             letterSpacing: '-0.03em',
             fontWeight: 500,
@@ -627,17 +627,17 @@ function SpeedComparison() {
         {/* Stats row — same width as race panels */}
         <FadeIn delay={0.3}>
           <div className="mt-10 grid grid-cols-3 gap-3 md:gap-4">
-            <div className="text-center py-8 md:py-10">
-              <p className="text-5xl md:text-7xl font-bold text-primary tracking-tight">4.9x</p>
-              <p className="text-xs md:text-sm text-ink-muted mt-3">Faster than typing</p>
+            <div className="text-center py-6 md:py-10">
+              <p className="text-3xl sm:text-5xl md:text-7xl font-bold text-primary tracking-tight">4.9x</p>
+              <p className="text-xs md:text-sm text-ink-muted mt-2 md:mt-3">Faster than typing</p>
             </div>
-            <div className="text-center py-8 md:py-10">
-              <p className="text-5xl md:text-7xl font-bold text-primary tracking-tight">99.2%</p>
-              <p className="text-xs md:text-sm text-ink-muted mt-3">Accuracy</p>
+            <div className="text-center py-6 md:py-10">
+              <p className="text-3xl sm:text-5xl md:text-7xl font-bold text-primary tracking-tight">99.2%</p>
+              <p className="text-xs md:text-sm text-ink-muted mt-2 md:mt-3">Accuracy</p>
             </div>
-            <div className="text-center py-8 md:py-10">
-              <p className="text-5xl md:text-7xl font-bold text-primary tracking-tight">220+</p>
-              <p className="text-xs md:text-sm text-ink-muted mt-3">Words per minute</p>
+            <div className="text-center py-6 md:py-10">
+              <p className="text-3xl sm:text-5xl md:text-7xl font-bold text-primary tracking-tight">220+</p>
+              <p className="text-xs md:text-sm text-ink-muted mt-2 md:mt-3">Words per minute</p>
             </div>
           </div>
         </FadeIn>
@@ -675,7 +675,7 @@ function FeatureRow({
           <h3
             className="text-ink mb-5"
             style={{
-              fontSize: 'clamp(1.75rem, 2.5vw + 0.75rem, 2.75rem)',
+              fontSize: 'clamp(1.4rem, 2.5vw + 0.5rem, 2.75rem)',
               lineHeight: 1.1,
               letterSpacing: '-0.03em',
               fontWeight: 500,

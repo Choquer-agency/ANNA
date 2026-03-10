@@ -175,12 +175,14 @@ export function LiveUsersSection() {
           </div>
         </FadeIn>
 
-        {/* Single row of 9 avatars */}
+        {/* Single row of avatars — 5 on mobile, all 9 on md+ */}
         <FadeIn delay={0.15}>
-          <div className="flex items-center justify-center gap-5 sm:gap-6">
+          <div className="flex items-center justify-center gap-4 sm:gap-5 md:gap-6">
             <AnimatePresence mode="sync">
-              {visibleUsers.map((user) => (
-                <AvatarBubble key={user.id} user={user} />
+              {visibleUsers.map((user, i) => (
+                <div key={user.id} className={i >= 5 ? 'hidden md:block' : ''}>
+                  <AvatarBubble user={user} />
+                </div>
               ))}
             </AnimatePresence>
           </div>
