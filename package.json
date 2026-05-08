@@ -1,6 +1,6 @@
 {
   "name": "anna",
-  "version": "1.0.43",
+  "version": "1.0.44",
   "description": "ANNA - AI Voice Dictation",
   "main": "./out/main/index.js",
   "author": "Bryce Choquer",
@@ -84,7 +84,9 @@
         }
       ],
       "icon": "buildResources/icon.ico",
-      "publisherName": "Choquer Creative Corp."
+      "signtoolOptions": {
+        "publisherName": "Choquer Creative Corp."
+      }
     },
     "nsis": {
       "oneClick": false,
