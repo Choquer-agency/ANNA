@@ -120,6 +120,17 @@ export function sendStateChange(state: string): void {
   }
 }
 
+/**
+ * Push a live transcript snippet to the indicator. Used for Deepgram's
+ * partial results during recording, and for streamed Claude output during
+ * post-processing. The renderer can display this as a preview caption.
+ */
+export function sendLiveText(text: string, source: 'partial' | 'cleaned'): void {
+  if (indicatorWindow) {
+    indicatorWindow.webContents.send('recording:live-text', { text, source })
+  }
+}
+
 export function sendHotkeyInfo(hotkey: string): void {
   if (indicatorWindow) {
     indicatorWindow.webContents.send('recording:hotkey-info', hotkey)

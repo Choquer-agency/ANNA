@@ -67,6 +67,7 @@ import { initConvex, enableSync, disableSync, getConvexStatus, syncSession, runC
 import { isAuthenticated as isAuthValid, isTokenExpired, storeAuthTokens, clearAuthTokens } from './auth'
 import { getSubscriptionStatus, startSubscriptionRefresh, refreshSubscription, loadCachedSubscription, onSubscriptionChange } from './subscription'
 import { seedBuiltinPacks } from './vocabulary'
+import { registerLocalModelIpc } from './transcribe/providers/local'
 import { PLANS } from '../shared/pricing'
 import { api } from '../../convex/_generated/api'
 import { anyApi } from 'convex/server'
@@ -473,6 +474,7 @@ app.whenReady().then(async () => {
   }
 
   // IPC handlers — registered BEFORE hotkey so renderer can call them immediately
+  registerLocalModelIpc()
   ipcMain.handle('sessions:get-all', () => getSessions())
 
   ipcMain.handle('session:retry', async (_event, sessionId: string, customPrompt?: string) => {

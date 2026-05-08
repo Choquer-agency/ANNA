@@ -168,6 +168,19 @@ contextBridge.exposeInMainWorld('annaAPI', {
     ipcRenderer.removeAllListeners('dictation:append-to-note')
   },
 
+  // Local STT model management
+  listLocalModels: (): Promise<Array<{ key: string; label: string; downloaded: boolean }>> =>
+    ipcRenderer.invoke('transcribe:list-local-models'),
+  downloadLocalModel: (key: string): Promise<{ ok: boolean; alreadyDownloaded?: boolean }> =>
+    ipcRenderer.invoke('transcribe:download-local-model', key),
+  onLocalModelDownloadProgress: (
+    callback: (data: { modelKey: string; percent: number; downloaded: number; total: number }) => void
+  ): (() => void) => {
+    const handler = (_event: unknown, data: { modelKey: string; percent: number; downloaded: number; total: number }): void => callback(data)
+    ipcRenderer.on('transcribe:model-download-progress', handler)
+    return () => ipcRenderer.removeListener('transcribe:model-download-progress', handler)
+  },
+
   onPipelineStatus: (callback: (data: unknown) => void): void => {
     ipcRenderer.on('pipeline:status', (_event, data) => callback(data))
   },

@@ -147,6 +147,23 @@ export function buildWhisperPrompt(terms: VocabularyTerm[], maxChars: number = 8
 }
 
 /**
+ * Build a hard-keyterm array for streaming providers that support keyterm
+ * boosting (Deepgram: 100 terms, AssemblyAI: 1000 terms, ElevenLabs: ~32).
+ * Prioritizes terms with aliases (most error-prone), then sorts by length so
+ * longer multi-word terms win over their substrings.
+ */
+export function buildKeytermArray(terms: VocabularyTerm[], maxCount: number = 100): string[] {
+  if (terms.length === 0) return []
+  const sorted = [...terms].sort((a, b) => {
+    const aHas = a.aliases?.length ? 0 : 1
+    const bHas = b.aliases?.length ? 0 : 1
+    if (aHas !== bHas) return aHas - bHas
+    return b.term.length - a.term.length
+  })
+  return sorted.slice(0, maxCount).map((t) => t.term)
+}
+
+/**
  * Build a vocabulary correction section for Claude's system prompt.
  * Includes alias mappings so Claude knows what misheard forms map to which terms,
  * plus contextual reasoning instructions for disambiguation.

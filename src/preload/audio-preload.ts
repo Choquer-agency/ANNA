@@ -10,10 +10,15 @@ contextBridge.exposeInMainWorld('audioAPI', {
   sendWavData: (buffer: ArrayBuffer): void => {
     ipcRenderer.send('audio:wav-data', Buffer.from(buffer))
   },
-  sendRecordingStatus: (recording: boolean): void => {
-    ipcRenderer.send('audio:recording-status', recording)
+  sendRecordingStatus: (recording: boolean, sampleRate?: number): void => {
+    ipcRenderer.send('audio:recording-status', recording, sampleRate)
   },
   sendAudioLevel: (level: number): void => {
     ipcRenderer.send('audio:level', level)
-  }
+  },
+  // Live PCM chunks for streaming providers (Int16 little-endian, mono, at the
+  // sample rate reported in the recording-status event).
+  sendPcmChunk: (buffer: ArrayBuffer): void => {
+    ipcRenderer.send('audio:pcm-chunk', Buffer.from(buffer))
+  },
 })

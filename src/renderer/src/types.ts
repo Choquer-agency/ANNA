@@ -44,6 +44,13 @@ declare global {
       setSetting: (key: string, value: string) => Promise<void>
       getEnvStatus: () => Promise<{ hasOpenAI: boolean; hasAnthropic: boolean }>
 
+      // Local STT model management
+      listLocalModels: () => Promise<Array<{ key: string; label: string; downloaded: boolean }>>
+      downloadLocalModel: (key: string) => Promise<{ ok: boolean; alreadyDownloaded?: boolean }>
+      onLocalModelDownloadProgress: (
+        cb: (data: { modelKey: string; percent: number; downloaded: number; total: number }) => void
+      ) => () => void
+
       // Notes
       getNotes: () => Promise<Note[]>
       createNote: () => Promise<Note>

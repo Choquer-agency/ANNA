@@ -146,6 +146,26 @@ async function transcribeCloud(audioBuffer: Buffer): Promise<{ text: string; tim
   return { text: response.text.trim(), timeMs }
 }
 
+async function transcribeGroq(audioBuffer: Buffer): Promise<{ text: string; timeMs: number }> {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) throw new Error('GROQ_API_KEY not set')
+
+  // Groq is OpenAI-compatible. The OpenAI SDK works against Groq's endpoint
+  // when we override baseURL. whisper-large-v3-turbo is ~9x cheaper, ~2x faster.
+  const groq = new OpenAI({ apiKey, baseURL: 'https://api.groq.com/openai/v1' })
+  const file = await toFile(audioBuffer, 'audio.mp3', { type: 'audio/mpeg' })
+
+  const start = performance.now()
+  const response = await groq.audio.transcriptions.create({
+    model: 'whisper-large-v3-turbo',
+    file,
+    temperature: 0.0
+  })
+  const timeMs = performance.now() - start
+
+  return { text: response.text.trim(), timeMs }
+}
+
 // ── Post-Processing Models ───────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a voice dictation post-processor. Clean up raw speech-to-text inside <transcript> tags into polished written text.
@@ -277,19 +297,55 @@ async function main(): Promise<void> {
   const audioBuffer = readFileSync(audioPath)
   const referenceTranscript: string = ref.transcript
 
-  const transcribeMode = useCloud ? 'Cloud (whisper-1)' : `Local (${modelName})`
+  const transcribeMode = useCloud ? 'Cloud (Groq Turbo + whisper-1 head-to-head)' : `Local (${modelName})`
   console.log(`\n=== ANNA BENCHMARK — MULTI-MODEL [${testName.toUpperCase()}] ===`)
   console.log(`Transcription: ${transcribeMode}`)
   console.log(`Audio: ${ref.description}`)
   console.log(`Audio size: ${(audioBuffer.length / 1024).toFixed(0)} KB`)
   console.log(`Reference: ${normalize(referenceTranscript).length} words\n`)
 
-  // Step 1: Transcribe
+  // Step 1: Transcribe — when --cloud, run both Groq and OpenAI for direct comparison.
   console.log('Transcribing...')
   let transcription: { text: string; timeMs: number }
 
   if (useCloud) {
-    transcription = await transcribeCloud(audioBuffer)
+    const cloudProviders: Array<{ name: string; fn: () => Promise<{ text: string; timeMs: number }> }> = []
+    if (process.env.GROQ_API_KEY) {
+      cloudProviders.push({ name: 'Groq · whisper-large-v3-turbo', fn: () => transcribeGroq(audioBuffer) })
+    }
+    if (process.env.OPENAI_API_KEY) {
+      cloudProviders.push({ name: 'OpenAI · whisper-1', fn: () => transcribeCloud(audioBuffer) })
+    }
+    if (cloudProviders.length === 0) {
+      console.error('No cloud STT API keys found (set GROQ_API_KEY and/or OPENAI_API_KEY)')
+      process.exit(1)
+    }
+
+    console.log(`\n  ${'─'.repeat(75)}`)
+    console.log(`  ${'STT Provider'.padEnd(40)} ${'Time'.padStart(10)} ${'Accuracy'.padStart(10)} ${'WER'.padStart(8)}`)
+    console.log(`  ${'─'.repeat(75)}`)
+
+    const cloudResults: Array<{ name: string; text: string; timeMs: number; wer: WERResult }> = []
+    for (const p of cloudProviders) {
+      try {
+        const r = await p.fn()
+        const w = computeWER(referenceTranscript, r.text)
+        cloudResults.push({ name: p.name, text: r.text, timeMs: r.timeMs, wer: w })
+        console.log(`  ${p.name.padEnd(40)} ${(r.timeMs.toFixed(0) + 'ms').padStart(10)} ${(w.accuracyPercent.toFixed(1) + '%').padStart(10)} ${w.wer.toFixed(3).padStart(8)}`)
+      } catch (err) {
+        console.log(`  ${p.name.padEnd(40)} FAILED: ${String(err).slice(0, 50)}`)
+      }
+    }
+    console.log(`  ${'─'.repeat(75)}\n`)
+
+    if (cloudResults.length === 0) {
+      console.error('All cloud providers failed')
+      process.exit(1)
+    }
+    // Use the fastest non-failing provider for downstream LLM cleanup comparison
+    cloudResults.sort((a, b) => a.timeMs - b.timeMs)
+    transcription = { text: cloudResults[0].text, timeMs: cloudResults[0].timeMs }
+    console.log(`Using ${cloudResults[0].name} for downstream LLM benchmark\n`)
   } else {
     const modelPaths = [
       join(process.env.HOME || '', 'Library/Application Support/anna/models', modelName),
@@ -301,9 +357,8 @@ async function main(): Promise<void> {
       process.exit(1)
     }
     transcription = await transcribeLocal(audioPath, modelPath)
+    console.log(`Transcription: ${transcription.timeMs.toFixed(0)}ms\n`)
   }
-
-  console.log(`Transcription: ${transcription.timeMs.toFixed(0)}ms\n`)
 
   const rawWER = computeWER(referenceTranscript, transcription.text)
   console.log(`Raw transcript accuracy: ${rawWER.accuracyPercent.toFixed(1)}% (WER: ${rawWER.wer.toFixed(3)})`)

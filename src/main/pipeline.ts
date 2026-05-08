@@ -3,7 +3,9 @@ import { syncSession } from './convex'
 import { join } from 'path'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { getPlatform } from './platform'
-import { startRecording, stopRecording, getRecordingState, getRecordingDuration } from './audio'
+import { startRecording, stopRecording, getRecordingState, getRecordingDuration, setPcmChunkConsumer, getRecordingSampleRate } from './audio'
+import { resolveStreamingProvider } from './transcribe'
+import type { STTStreamSession } from './transcribe/providers'
 import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions, getStats, getWeeklyStats } from './db'
 import { syncWordCount } from './convex'
 import { transcribe } from './transcribe'
@@ -18,16 +20,53 @@ import {
   setupRecordingIndicatorIPC,
   sendStateChange,
   sendHotkeyInfo,
-  sendMicrophoneInfo
+  sendMicrophoneInfo,
+  sendLiveText
 } from './recordingIndicator'
 import { updateTrayRecordingState } from './tray'
 import { trackMainEvent } from './analytics'
 import { playDictationStart, playDictationStop } from './sounds'
-import { getActiveVocabularyTerms, buildWhisperPrompt, buildClaudeVocabularyHint, applyVocabularyCorrections } from './vocabulary'
+import { getActiveVocabularyTerms, buildWhisperPrompt, buildClaudeVocabularyHint, applyVocabularyCorrections, buildKeytermArray } from './vocabulary'
 import { scheduleCorrection } from './correctionTracker'
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// ─── Fast path: skip Claude on short, clean utterances ─────────────────────
+//
+// For very short transcripts that don't contain fillers or dictation commands,
+// Claude's cleanup is minimal (mostly capitalization) and the ~500ms-1s round
+// trip is the dominant latency. Skip the LLM and apply lightweight cleanup.
+//
+// Disabled if the user sets `skip_short_processing` = 'false'.
+
+const FILLER_PATTERN = /\b(um|uh|er+|hmm+|like|you know|basically|i mean)\b/i
+const DICTATION_COMMAND_PATTERN = /\b(new line|new paragraph|delete that|scratch that|period|comma|question mark|exclamation|semicolon)\b/i
+const SKIP_CLAUDE_MAX_WORDS = 5
+
+function shouldSkipClaude(transcript: string): boolean {
+  if (getSetting('skip_short_processing') === 'false') return false
+  const trimmed = transcript.trim()
+  if (!trimmed) return false
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length
+  if (wordCount === 0 || wordCount > SKIP_CLAUDE_MAX_WORDS) return false
+  if (FILLER_PATTERN.test(trimmed)) return false
+  if (DICTATION_COMMAND_PATTERN.test(trimmed)) return false
+  return true
+}
+
+/**
+ * Lightweight, deterministic cleanup that runs in place of Claude on short
+ * clean utterances: capitalize first letter, trim whitespace, normalize
+ * doubled spaces. Intentionally does NOT add punctuation — adding a period
+ * to "Hi there" might be wrong for chat or code-editor contexts.
+ */
+function quickClean(transcript: string): string {
+  let s = transcript.trim().replace(/\s+/g, ' ')
+  if (!s) return s
+  s = s[0].toUpperCase() + s.slice(1)
+  return s
 }
 
 function expandSnippets(text: string): string {
@@ -51,6 +90,46 @@ function applyDictionaryReplacements(text: string): string {
     result = result.replace(pattern, e.replacement)
   }
   return result
+}
+
+// Rolling buffer of recent dictation results for contextual accuracy.
+// Kept small — extra context helps less than it costs in latency.
+const recentDictations: Array<{ text: string; timestamp: number }> = []
+const MAX_CONTEXT_ITEMS = 3
+const MAX_CONTEXT_AGE_MS = 5 * 60 * 1000
+const CONTEXT_MAX_ITEMS_RETURNED = 2
+const CONTEXT_MAX_CHARS = 500
+
+function getRecentContext(): string[] {
+  const now = Date.now()
+  while (recentDictations.length > 0 && now - recentDictations[0].timestamp > MAX_CONTEXT_AGE_MS) {
+    recentDictations.shift()
+  }
+  const entries: string[] = []
+  let totalChars = 0
+  for (let i = recentDictations.length - 1; i >= 0 && entries.length < CONTEXT_MAX_ITEMS_RETURNED; i--) {
+    const text = recentDictations[i].text
+    if (totalChars + text.length > CONTEXT_MAX_CHARS) break
+    entries.unshift(text)
+    totalChars += text.length
+  }
+  return entries
+}
+
+// Keep only dictionary entries that plausibly match the transcript, to shrink the Claude prompt.
+// Always include all entries when the dictionary is small.
+function filterDictionaryForTranscript(
+  entries: Array<{ phrase: string; replacement: string }>,
+  transcript: string
+): Array<{ phrase: string; replacement: string }> {
+  if (entries.length <= 15) return entries
+  const lower = transcript.toLowerCase()
+  const relevant = entries.filter(e => {
+    const words = e.phrase.toLowerCase().split(/\s+/).filter(w => w.length >= 3)
+    if (words.length === 0) return true
+    return words.some(w => lower.includes(w))
+  })
+  return relevant.length > 0 ? relevant.slice(0, 50) : entries.slice(0, 20)
 }
 
 const DEFAULT_TRIGGER_PHRASES = ['hey anna', 'anna']
@@ -125,6 +204,12 @@ let cancelledWavBuffer: Buffer | null = null
 let cancelledActiveWindow: ActiveWindowInfo | null = null
 let cancelledDurationMs = 0
 let cancelUndoTimeout: ReturnType<typeof setTimeout> | null = null
+
+// Live streaming session — opened at recording start when a streaming-capable
+// provider is configured (e.g. Deepgram). Receives PCM chunks live via
+// setPcmChunkConsumer(); finalized on recording stop to get the transcript.
+let streamingSession: STTStreamSession | null = null
+let streamingProviderId: string | null = null
 let recordingMaxDurationTimeout: ReturnType<typeof setTimeout> | null = null
 let recordingWarningTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -164,7 +249,8 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     const language = getSetting('language') ?? 'auto'
     const vocabTerms = getActiveVocabularyTerms(session.app_name, session.app_bundle_id)
     const whisperPrompt = buildWhisperPrompt(vocabTerms)
-    const rawTranscript = await transcribe(wavBuffer, language, trace, whisperPrompt || undefined)
+    const retryKeyterms = buildKeytermArray(vocabTerms, 100)
+    const rawTranscript = await transcribe(wavBuffer, language, trace, whisperPrompt || undefined, retryKeyterms)
     trace?.update({ input: rawTranscript })
     updateSession(sessionId, { raw_transcript: rawTranscript })
 
@@ -179,11 +265,20 @@ export async function retrySession(sessionId: string, customPrompt?: string): Pr
     const styleProfile = getStyleProfileForApp(session.app_name ?? null, session.app_bundle_id ?? null)
     const claudeVocabHint = buildClaudeVocabularyHint(vocabTerms)
 
+    // Build dictionary hint for Claude — filter against this transcript to shrink the prompt.
+    const dictEntries = getDictionaryEntries()
+    const relevantDict = filterDictionaryForTranscript(dictEntries, rawTranscript)
+    const dictHint = relevantDict.length > 0
+      ? relevantDict.map(e => `"${e.phrase}" → "${e.replacement}"`).join(', ')
+      : undefined
+
+    const recentContext = getRecentContext()
+
     sendStatus('processing', { sessionId })
     const processed = await processTranscript(expanded, {
       appName: session.app_name ?? undefined,
       windowTitle: session.window_title ?? undefined
-    }, styleProfile?.prompt_addendum, trace, customPrompt, language, claudeVocabHint || undefined)
+    }, styleProfile?.prompt_addendum, trace, customPrompt, language, claudeVocabHint || undefined, recentContext.length > 0 ? recentContext : undefined, dictHint)
 
     const vocabCorrected = applyVocabularyCorrections(processed, vocabTerms)
     const final = applyDictionaryReplacements(vocabCorrected)
@@ -239,6 +334,44 @@ function cleanupRecordingState(): void {
 }
 
 /**
+ * Try to open a live streaming session. Best-effort — failure is silent and
+ * the pipeline falls back to batch transcription on the buffered WAV.
+ */
+async function tryStartStreamingSession(activeWin: ActiveWindowInfo | null): Promise<void> {
+  const provider = resolveStreamingProvider()
+  if (!provider || !provider.startStream) return
+  try {
+    const language = getSetting('language') ?? 'auto'
+    const vocabTerms = getActiveVocabularyTerms(activeWin?.appName, activeWin?.appId)
+    const keyterms = buildKeytermArray(vocabTerms, 100)
+    const sampleRate = getRecordingSampleRate()
+    const session = await provider.startStream({
+      language,
+      keyterms,
+      sampleRate,
+      onPartial: (text) => sendLiveText(text, 'partial'),
+    })
+    streamingSession = session
+    streamingProviderId = provider.id
+    setPcmChunkConsumer((chunk) => session.pushAudio(chunk))
+    console.log(`[pipeline] Streaming session opened: ${provider.label} @ ${sampleRate}Hz, ${keyterms.length} keyterms`)
+  } catch (err) {
+    console.warn('[pipeline] Failed to open streaming session, will fall back to batch:', err)
+    streamingSession = null
+    streamingProviderId = null
+  }
+}
+
+function abortStreamingSession(): void {
+  if (streamingSession) {
+    try { streamingSession.abort() } catch { /* ignore */ }
+    streamingSession = null
+    streamingProviderId = null
+  }
+  setPcmChunkConsumer(null)
+}
+
+/**
  * Handle cancel: stop recording, discard, show cancelled state with undo option
  */
 async function handleCancel(): Promise<void> {
@@ -246,6 +379,7 @@ async function handleCancel(): Promise<void> {
 
   playDictationStop()
   cleanupRecordingState()
+  abortStreamingSession()
   sendStatus('idle')
 
   console.time('[pipeline] stopRecording (cancel)')
@@ -301,12 +435,17 @@ async function handleUndoCancel(): Promise<void> {
 /**
  * Core pipeline: transcribe, process, paste.
  * Used by both normal stop and undo-cancel flows.
+ *
+ * If `preTranscribed` is non-null, the transcribe step is skipped — used when
+ * a live streaming session has already produced a final transcript by the time
+ * recording stops. The wavBuffer is still saved (for retry/audio-file feature).
  */
 async function runPipeline(
   wavBuffer: Buffer,
   activeWin: ActiveWindowInfo | null,
   durationMs: number,
-  clipboardContext: string | null
+  clipboardContext: string | null,
+  preTranscribed?: string | null
 ): Promise<void> {
   const t0 = performance.now()
 
@@ -371,10 +510,28 @@ async function runPipeline(
       const whisperPrompt = buildWhisperPrompt(vocabTerms)
       if (whisperPrompt) console.log(`[pipeline] Whisper prompt hint: ${whisperPrompt.length} chars`)
 
+      // Run DB reads and context prep in parallel with transcription — all needed for Claude step.
+      const prepPromise = Promise.resolve().then(() => ({
+        styleProfile: getStyleProfileForApp(activeWin?.appName ?? null, activeWin?.appId ?? null),
+        dictEntries: getDictionaryEntries(),
+        claudeVocabHint: buildClaudeVocabularyHint(vocabTerms),
+        recentContext: getRecentContext()
+      }))
+
       console.time('[pipeline] transcribe')
       const tTranscribe = performance.now()
-      const rawTranscript = await transcribe(wavBuffer, language, trace, whisperPrompt || undefined)
+      const batchKeyterms = buildKeytermArray(vocabTerms, 100)
+      const transcribePromise: Promise<string> = preTranscribed != null
+        ? Promise.resolve(preTranscribed)
+        : transcribe(wavBuffer, language, trace, whisperPrompt || undefined, batchKeyterms)
+      const [rawTranscript, prep] = await Promise.all([
+        transcribePromise,
+        prepPromise
+      ])
       const transcribeMs = performance.now() - tTranscribe
+      if (preTranscribed != null) {
+        console.log(`[pipeline] Using streamed transcript (saved ~${transcribeMs.toFixed(0)}ms by overlapping with recording)`)
+      }
       console.timeEnd('[pipeline] transcribe')
       console.log(`[pipeline] RAW: ${rawTranscript}`)
       trace?.update({ input: rawTranscript })
@@ -421,27 +578,60 @@ async function runPipeline(
         // Dictation mode: existing flow
         console.time('[pipeline] snippets+style')
         const expanded = expandSnippets(rawTranscript)
-        const styleProfile = getStyleProfileForApp(
-          activeWin?.appName ?? null,
-          activeWin?.appId ?? null
-        )
+        const { styleProfile, dictEntries, claudeVocabHint, recentContext } = prep
         console.timeEnd('[pipeline] snippets+style')
 
-        sendStatus('processing', { sessionId: session.id })
-        updateSession(session.id, { status: 'processing' })
-        const claudeVocabHint = buildClaudeVocabularyHint(vocabTerms)
-        console.time('[pipeline] processTranscript')
-        const tProcess = performance.now()
-        const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
-        const [processed, page] = await Promise.all([
-          processTranscript(expanded, activeWin, styleProfile?.prompt_addendum, trace, undefined, language, claudeVocabHint || undefined),
-          currentPagePromise
-        ])
-        currentPage = page
-        processMs = performance.now() - tProcess
-        console.timeEnd('[pipeline] processTranscript')
+        // Fast path: short clean utterances skip the LLM entirely.
+        // Saves ~500ms-1s on the most common dictation case (a few words).
+        const skipClaude = shouldSkipClaude(expanded)
+        let processed: string
+        let page = ''
 
-        console.log(`[pipeline] CLAUDE: ${processed}`)
+        if (skipClaude) {
+          console.log('[pipeline] Fast path: skipping Claude for short utterance')
+          processed = quickClean(expanded)
+          processMs = 0
+          trace?.update({ metadata: { fastPath: true, mode: 'dictation' } })
+          page = mainWindowRef?.isFocused() ? await getCurrentPage() : ''
+          sendStatus('processing', { sessionId: session.id, fastPath: true })
+          updateSession(session.id, { status: 'processing' })
+        } else {
+          sendStatus('processing', { sessionId: session.id })
+          updateSession(session.id, { status: 'processing' })
+
+          // Filter dictionary against the transcript so Claude only sees relevant entries.
+          const relevantDict = filterDictionaryForTranscript(dictEntries, rawTranscript)
+          const dictHint = relevantDict.length > 0
+            ? relevantDict.map(e => `"${e.phrase}" → "${e.replacement}"`).join(', ')
+            : undefined
+
+          console.time('[pipeline] processTranscript')
+          const tProcess = performance.now()
+          const currentPagePromise = mainWindowRef?.isFocused() ? getCurrentPage() : Promise.resolve('')
+          const [claudeOut, claudePage] = await Promise.all([
+            processTranscript(
+              expanded,
+              activeWin,
+              styleProfile?.prompt_addendum,
+              trace,
+              undefined,
+              language,
+              claudeVocabHint || undefined,
+              recentContext.length > 0 ? recentContext : undefined,
+              dictHint,
+              (_delta, accumulated) => sendLiveText(accumulated, 'cleaned')
+            ),
+            currentPagePromise
+          ])
+          processed = claudeOut
+          page = claudePage
+          processMs = performance.now() - tProcess
+          console.timeEnd('[pipeline] processTranscript')
+          console.log(`[pipeline] CLAUDE: ${processed}`)
+        }
+
+        currentPage = page
+
         console.time('[pipeline] dictionaryReplace')
         const vocabCorrected = applyVocabularyCorrections(processed, vocabTerms)
         if (vocabCorrected !== processed) console.log(`[pipeline] VOCAB-FIX: ${vocabCorrected}`)
@@ -449,6 +639,12 @@ async function runPipeline(
         if (final !== vocabCorrected) console.log(`[pipeline] DICT-FIX: ${final}`)
         trace?.update({ output: final })
         console.timeEnd('[pipeline] dictionaryReplace')
+      }
+
+      // Add to rolling context buffer for future dictations
+      if (final.trim()) {
+        recentDictations.push({ text: final, timestamp: Date.now() })
+        if (recentDictations.length > MAX_CONTEXT_ITEMS) recentDictations.shift()
       }
 
       const wordCount = final.split(/\s+/).filter(Boolean).length
@@ -624,7 +820,28 @@ export async function handleHotkeyToggle(): Promise<void> {
     const wavBuffer = await stopRecording()
     console.timeEnd('[pipeline] stopRecording')
 
-    await runPipeline(wavBuffer, activeWin, durationMs, clipboardCtx)
+    // Stop forwarding chunks to the stream (recording is over).
+    setPcmChunkConsumer(null)
+
+    // If a streaming session was active, await its final transcript instead
+    // of running batch transcription on the buffered WAV.
+    let streamedTranscript: string | null = null
+    if (streamingSession) {
+      console.time('[pipeline] streamFinish')
+      try {
+        streamedTranscript = await streamingSession.finish()
+        console.log(`[pipeline] Streamed transcript (${streamingProviderId}): ${streamedTranscript}`)
+      } catch (err) {
+        console.warn('[pipeline] Streaming finish failed, falling back to batch:', err)
+        streamedTranscript = null
+      } finally {
+        streamingSession = null
+        streamingProviderId = null
+      }
+      console.timeEnd('[pipeline] streamFinish')
+    }
+
+    await runPipeline(wavBuffer, activeWin, durationMs, clipboardCtx, streamedTranscript)
   } else {
     // Paywall check — block recording if free user exceeds weekly word limit
     try {
@@ -713,6 +930,10 @@ export async function handleHotkeyToggle(): Promise<void> {
     playDictationStart()
     startRecording()
     showRecordingIndicator()
+
+    // Best-effort: open a streaming STT session in parallel with recording.
+    // Failure is silent — we'll fall back to batch on the buffered WAV.
+    void tryStartStreamingSession(cachedActiveWindow)
 
     // Warning at 5:40
     recordingWarningTimeout = setTimeout(() => {

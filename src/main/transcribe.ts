@@ -1,312 +1,148 @@
-import type { WhisperContext } from '@fugood/whisper.node'
-import { writeFileSync, unlinkSync, existsSync, createWriteStream, mkdirSync, statSync, readFileSync } from 'fs'
-import { join } from 'path'
-import { tmpdir } from 'os'
-import { randomUUID } from 'crypto'
-import { app } from 'electron'
-import { get } from 'https'
 import type Langfuse from 'langfuse'
+import { getSetting } from './db'
+import type { STTProvider } from './transcribe/providers'
+import { groqProvider } from './transcribe/providers/groq'
+import { openaiProvider } from './transcribe/providers/openai'
+import { localProvider } from './transcribe/providers/local'
+import { deepgramProvider } from './transcribe/providers/deepgram'
+import { elevenlabsProvider } from './transcribe/providers/elevenlabs'
 
-// Load the platform-specific native whisper binary directly.
-// We bypass @fugood/whisper.node's binding.js because its dynamic import()
-// pattern fails to resolve inside Electron's asar archive.
+// ─── Orchestrator ───────────────────────────────────────────────────────────
 //
-// Lazy-loaded to avoid crashing the app at startup on older macOS versions
-// where the native binary may be incompatible (e.g. libc++ symbol mismatches).
-type WhisperNative = { WhisperContext: new (opts: { filePath: string; useGpu?: boolean }) => WhisperContext }
-let _whisperNative: WhisperNative | null = null
+// Picks an STT provider based on the user's `stt_provider` setting and the
+// available API keys, then runs transcription with automatic fallback to the
+// next available provider on error.
+//
+// Setting values:
+//   • 'auto'    — Groq → OpenAI for cloud platforms, local for arm64 Mac
+//   • 'groq'    — only Groq (fail if unavailable)
+//   • 'openai'  — only OpenAI (fail if unavailable)
+//   • 'local'   — only local Whisper
 
-function loadWhisperNative(): WhisperNative {
-  if (_whisperNative) return _whisperNative
+const PROVIDERS: Record<string, STTProvider> = {
+  groq: groqProvider,
+  openai: openaiProvider,
+  local: localProvider,
+  deepgram: deepgramProvider,
+  elevenlabs: elevenlabsProvider,
+}
 
-  const pkg = `@fugood/node-whisper-${process.platform}-${process.arch}`
+/** Public access to the provider registry — used by the pipeline to start streaming sessions. */
+export function getProvider(id: string): STTProvider | undefined {
+  return PROVIDERS[id]
+}
 
-  // 1. Standard require (works in development)
-  try { _whisperNative = require(pkg); return _whisperNative! } catch {}
+function isAccuracyMode(): boolean {
+  return getSetting('accuracy_mode') === 'true'
+}
 
-  // 2. Explicit .node file resolution
-  try { _whisperNative = require(require.resolve(`${pkg}/index.node`)); return _whisperNative! } catch {}
+function isEnglish(language: string): boolean {
+  // 'auto' is treated as English for routing — most users dictate in English
+  // and Whisper-family providers handle 'auto' fine. If the user specifies a
+  // non-en code, we route to the multilingual-strong provider.
+  return language === 'auto' || language === 'en' || language.startsWith('en-')
+}
 
-  // 3. Direct path to app.asar.unpacked (packaged app fallback)
-  try {
-    const unpackedPath = join(
-      process.resourcesPath ?? '',
-      'app.asar.unpacked', 'node_modules', '@fugood',
-      `node-whisper-${process.platform}-${process.arch}`, 'index.node'
-    )
-    _whisperNative = require(unpackedPath)
-    return _whisperNative!
-  } catch (err) {
-    throw new Error(
-      `Failed to load whisper native module for ${process.platform}-${process.arch}: ${err}`
-    )
+/** Resolve the streaming-capable provider to use, based on settings. Returns null if none. */
+export function resolveStreamingProvider(): STTProvider | null {
+  const setting = (getSetting('stt_provider') ?? 'auto').toLowerCase()
+  // Explicit picks short-circuit only if streaming-capable
+  if (setting !== 'auto') {
+    const p = PROVIDERS[setting]
+    return p?.capabilities.streaming && p.isAvailable() ? p : null
   }
-}
 
-const MODEL_NAME = 'ggml-base.bin'
-const MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_NAME}`
-const MODEL_MIN_SIZE = 147_000_000 // actual size is ~148MB, anything under is corrupt/partial
-
-const INIT_TIMEOUT_MS = 30_000
-
-let whisperContext: WhisperContext | null = null
-
-function getModelDir(): string {
-  const dir = join(app.getPath('userData'), 'models')
-  mkdirSync(dir, { recursive: true })
-  return dir
-}
-
-function getModelPath(): string {
-  return join(getModelDir(), MODEL_NAME)
-}
-
-function isModelValid(path: string): boolean {
-  try {
-    const stat = statSync(path)
-    return stat.size >= MODEL_MIN_SIZE
-  } catch {
-    return false
+  // In accuracy mode with non-English, ElevenLabs (batch) wins over streaming.
+  // Skip streaming so we use ElevenLabs at the batch fallback path.
+  const language = getSetting('language') ?? 'auto'
+  if (isAccuracyMode() && !isEnglish(language) && elevenlabsProvider.isAvailable()) {
+    return null
   }
+
+  // Auto: prefer Deepgram for streaming if a key is set
+  if (deepgramProvider.isAvailable()) return deepgramProvider
+  return null
 }
 
-function downloadModel(dest: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    console.log(`[transcribe] Downloading model to ${dest}...`)
-    const file = createWriteStream(dest)
-    const request = (url: string) => {
-      get(url, (res) => {
-        if (res.statusCode === 301 || res.statusCode === 302) {
-          request(res.headers.location!)
-          return
-        }
-        if (res.statusCode !== 200) {
-          reject(new Error(`Download failed with status ${res.statusCode}`))
-          return
-        }
-        const total = parseInt(res.headers['content-length'] || '0', 10)
-        let downloaded = 0
-        res.on('data', (chunk: Buffer) => {
-          downloaded += chunk.length
-          if (total > 0) {
-            const pct = Math.round((downloaded / total) * 100)
-            process.stdout.write(`\r[transcribe] Downloading model: ${pct}%`)
-          }
-        })
-        res.pipe(file)
-        file.on('finish', () => {
-          file.close()
-          console.log('\n[transcribe] Model download complete')
-          resolve()
-        })
-      }).on('error', (err) => {
-        reject(err)
-      })
+/**
+ * Resolve which providers to try, in order. The first is the primary; the rest
+ * are used only when an earlier provider throws.
+ */
+function resolveProviderChain(): STTProvider[] {
+  const setting = (getSetting('stt_provider') ?? 'auto').toLowerCase()
+
+  if (setting === 'groq') return PROVIDERS.groq.isAvailable() ? [PROVIDERS.groq] : []
+  if (setting === 'openai') return PROVIDERS.openai.isAvailable() ? [PROVIDERS.openai] : []
+  if (setting === 'local') return PROVIDERS.local.isAvailable() ? [PROVIDERS.local] : []
+  if (setting === 'deepgram') return PROVIDERS.deepgram.isAvailable() ? [PROVIDERS.deepgram] : []
+  if (setting === 'elevenlabs') return PROVIDERS.elevenlabs.isAvailable() ? [PROVIDERS.elevenlabs] : []
+
+  // 'auto': route based on accuracy mode + language.
+  const accuracy = isAccuracyMode()
+  const language = getSetting('language') ?? 'auto'
+  const english = isEnglish(language)
+
+  const chain: STTProvider[] = []
+  const push = (p: STTProvider): void => {
+    if (p.isAvailable() && !chain.includes(p)) chain.push(p)
+  }
+
+  if (accuracy) {
+    // Max-accuracy mode. Prefer ElevenLabs for non-English (best multilingual
+    // WER), Deepgram for English (best keyterm-aware accuracy + streaming).
+    if (english) {
+      push(deepgramProvider)
+      push(elevenlabsProvider)
+    } else {
+      push(elevenlabsProvider)
+      push(deepgramProvider)
     }
-    request(MODEL_URL)
-  })
+    // Then the speed-optimized cloud chain as fallback.
+    push(groqProvider)
+    push(openaiProvider)
+    push(localProvider)
+  } else {
+    // Speed-optimized default. Groq Turbo is the cheapest + fastest cloud
+    // option that still beats whisper-1 on accuracy.
+    push(groqProvider)
+    push(deepgramProvider)
+    push(openaiProvider)
+    push(localProvider)
+  }
+
+  return chain
 }
-
-async function getContext(): Promise<WhisperContext> {
-  if (whisperContext) return whisperContext
-
-  const modelPath = getModelPath()
-
-  // Download model if missing or corrupted (partial download)
-  if (!existsSync(modelPath) || !isModelValid(modelPath)) {
-    if (existsSync(modelPath)) {
-      console.warn('[transcribe] Model file appears corrupted, re-downloading...')
-      try { unlinkSync(modelPath) } catch { /* ignore */ }
-    }
-    await downloadModel(modelPath)
-  }
-
-  const useGpu = process.arch === 'arm64'
-  console.log(`[transcribe] Platform: ${process.platform}, Arch: ${process.arch}, GPU: ${useGpu}`)
-  console.log(`[transcribe] Loading whisper model from ${modelPath}...`)
-
-  const whisperNative = loadWhisperNative()
-
-  // Init whisper with timeout — prevents indefinite hangs
-  function initWithTimeout(opts: { filePath: string; useGpu: boolean }): Promise<WhisperContext> {
-    return Promise.race([
-      Promise.resolve(new whisperNative.WhisperContext(opts)),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Whisper initialization timed out after 30s')), INIT_TIMEOUT_MS)
-      )
-    ])
-  }
-
-  // Try with GPU first, fall back to CPU if initialization fails
-  try {
-    whisperContext = await initWithTimeout({
-      filePath: modelPath,
-      useGpu,
-    })
-    console.log(`[transcribe] Whisper model loaded (GPU: ${useGpu})`)
-    return whisperContext
-  } catch (err) {
-    if (useGpu) {
-      console.warn(`[transcribe] GPU init failed, retrying with CPU only:`, err)
-      try {
-        whisperContext = await initWithTimeout({
-          filePath: modelPath,
-          useGpu: false,
-        })
-        console.log('[transcribe] Whisper model loaded (CPU fallback)')
-        return whisperContext
-      } catch (cpuErr) {
-        console.error('[transcribe] CPU fallback also failed:', cpuErr)
-        throw cpuErr
-      }
-    }
-    console.error(`[transcribe] Failed to load whisper. Platform: ${process.platform}, Arch: ${process.arch}`)
-    console.error('[transcribe] Error:', err)
-    throw err
-  }
-}
-
-// ─── Cloud Whisper via OpenAI API ───────────────────────────────────────────
-
-function shouldUseCloud(): boolean {
-  // Use cloud Whisper on Windows (local is CPU-only and very slow)
-  // and on Intel Macs (x64, no GPU acceleration)
-  if (!process.env.OPENAI_API_KEY) return false
-  if (process.platform === 'win32') return true
-  if (process.platform === 'darwin' && process.arch === 'x64') return true
-  return false
-}
-
-async function transcribeCloud(
-  wavBuffer: Buffer,
-  language: string,
-  promptHint?: string
-): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY!
-
-  // Build multipart/form-data manually to avoid dependency on OpenAI SDK
-  const boundary = `----AnnaWhisper${randomUUID().replace(/-/g, '')}`
-  const parts: Buffer[] = []
-
-  function addField(name: string, value: string): void {
-    parts.push(Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
-    ))
-  }
-
-  function addFile(name: string, filename: string, contentType: string, data: Buffer): void {
-    parts.push(Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`
-    ))
-    parts.push(data)
-    parts.push(Buffer.from('\r\n'))
-  }
-
-  addFile('file', 'audio.wav', 'audio/wav', wavBuffer)
-  addField('model', 'whisper-1')
-  addField('response_format', 'text')
-  if (language !== 'auto') addField('language', language)
-  if (promptHint) addField('prompt', promptHint)
-
-  parts.push(Buffer.from(`--${boundary}--\r\n`))
-
-  const body = Buffer.concat(parts)
-
-  const url = new URL('https://api.openai.com/v1/audio/transcriptions')
-
-  return new Promise((resolve, reject) => {
-    const https = require('https')
-    const req = https.request({
-      hostname: url.hostname,
-      path: url.pathname,
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': body.length,
-      },
-    }, (res: any) => {
-      const chunks: Buffer[] = []
-      res.on('data', (chunk: Buffer) => chunks.push(chunk))
-      res.on('end', () => {
-        const responseBody = Buffer.concat(chunks).toString('utf-8')
-        if (res.statusCode !== 200) {
-          reject(new Error(`OpenAI Whisper API error (${res.statusCode}): ${responseBody}`))
-          return
-        }
-        resolve(responseBody.trim())
-      })
-    })
-
-    req.on('error', reject)
-    req.write(body)
-    req.end()
-  })
-}
-
-// ─── Public API ─────────────────────────────────────────────────────────────
 
 export async function transcribe(
   wavBuffer: Buffer,
   language: string = 'auto',
   trace?: ReturnType<Langfuse['trace']>,
-  promptHint?: string
+  promptHint?: string,
+  keyterms?: string[]
 ): Promise<string> {
-  const useCloud = shouldUseCloud()
+  const chain = resolveProviderChain()
+  if (chain.length === 0) {
+    throw new Error('No STT provider available — set GROQ_API_KEY, OPENAI_API_KEY, DEEPGRAM_API_KEY, or ELEVENLABS_API_KEY, or use local mode on macOS arm64')
+  }
 
-  if (useCloud) {
-    console.log('[transcribe] Using OpenAI Whisper API (cloud)')
-    const generation = trace?.generation({
-      name: 'whisper-transcription',
-      model: 'whisper-1',
-      input: { audioSizeBytes: wavBuffer.length, language, promptHint: !!promptHint, mode: 'cloud' }
-    })
-
+  let lastErr: unknown = null
+  for (const provider of chain) {
     try {
-      const text = await transcribeCloud(wavBuffer, language, promptHint)
-      generation?.end({ output: text, level: 'DEFAULT' })
+      console.log(`[transcribe] Using provider: ${provider.label}`)
+      const text = await provider.transcribe({
+        audio: wavBuffer,
+        language,
+        promptHint,
+        // Only pass keyterms to providers that support them — for others it's
+        // a no-op but the type signature expects it to be optional anyway.
+        keyterms: provider.capabilities.keyterms ? keyterms : undefined,
+        trace,
+      })
       return text
     } catch (err) {
-      console.warn('[transcribe] Cloud transcription failed, falling back to local:', err)
-      generation?.end({ level: 'ERROR', statusMessage: String(err) })
-      // Fall through to local transcription
+      console.warn(`[transcribe] ${provider.label} failed, trying next provider:`, err)
+      lastErr = err
     }
   }
-
-  // Local Whisper transcription
-  console.log('[transcribe] Using local Whisper')
-  const tempPath = join(tmpdir(), `anna-${randomUUID()}.wav`)
-
-  const generation = trace?.generation({
-    name: 'whisper-transcription',
-    model: 'whisper.cpp/base',
-    input: { audioSizeBytes: wavBuffer.length, language, promptHint: !!promptHint, mode: 'local' }
-  })
-
-  try {
-    writeFileSync(tempPath, wavBuffer)
-
-    const ctx = await getContext()
-    const { promise } = ctx.transcribeFile(tempPath, {
-      language: language === 'auto' ? undefined : language,
-      temperature: 0.0,
-      maxThreads: 4,
-      ...(promptHint ? { prompt: promptHint } : {}),
-    })
-
-    const result = await promise
-    const text = result.result.trim()
-
-    generation?.end({ output: text, level: 'DEFAULT' })
-    return text
-  } catch (err) {
-    generation?.end({ level: 'ERROR', statusMessage: String(err) })
-    throw err
-  } finally {
-    try {
-      unlinkSync(tempPath)
-    } catch {
-      // ignore cleanup errors
-    }
-  }
+  throw lastErr instanceof Error ? lastErr : new Error('All STT providers failed')
 }

@@ -7,6 +7,19 @@ let hiddenWindow: BrowserWindow | null = null
 let recording = false
 let recordingStartTime = 0
 let onWavData: ((buffer: Buffer) => void) | null = null
+let currentSampleRate = 48000
+
+// Live PCM consumer — pipeline registers a callback when streaming is active.
+// Set to null when no consumer is registered (we still capture for the WAV).
+let onPcmChunk: ((chunk: Buffer) => void) | null = null
+
+export function setPcmChunkConsumer(cb: ((chunk: Buffer) => void) | null): void {
+  onPcmChunk = cb
+}
+
+export function getRecordingSampleRate(): number {
+  return currentSampleRate
+}
 
 export function createAudioWindow(): void {
   hiddenWindow = new BrowserWindow({
@@ -27,16 +40,21 @@ export function createAudioWindow(): void {
     hiddenWindow.loadFile(join(__dirname, '../renderer/audio-capture.html'))
   }
 
-  ipcMain.on('audio:recording-status', (_event, isRecording: boolean) => {
+  ipcMain.on('audio:recording-status', (_event, isRecording: boolean, sampleRate?: number) => {
     recording = isRecording
     if (isRecording) {
       recordingStartTime = Date.now()
+      if (typeof sampleRate === 'number') currentSampleRate = sampleRate
     }
-    console.log('[audio] Recording status:', isRecording)
+    console.log('[audio] Recording status:', isRecording, 'sample rate:', sampleRate ?? 'unchanged')
   })
 
   ipcMain.on('audio:level', (_event, level: number) => {
     sendAudioLevel(level)
+  })
+
+  ipcMain.on('audio:pcm-chunk', (_event, chunk: Buffer) => {
+    onPcmChunk?.(chunk)
   })
 
   ipcMain.on('audio:wav-data', (_event, buffer: Buffer) => {
