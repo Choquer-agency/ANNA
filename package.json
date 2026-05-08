@@ -115,7 +115,8 @@
       "provider": "github",
       "owner": "Choquer-agency",
       "repo": "ANNA",
-      "private": false
+      "private": false,
+      "releaseType": "release"
     },
     "afterAllArtifactBuild": "scripts/notarize-dmg.js",
     "extraResources": [
