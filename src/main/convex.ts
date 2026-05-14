@@ -6,7 +6,7 @@ import { readFileSync } from 'fs'
 import { getRecordingState } from './audio'
 import { hostname } from 'os'
 import type { Session } from '../shared/types'
-import { getStoredToken, isAuthenticated as isAuthValid, applyAuthToClient } from './auth'
+import { getStoredToken, isAuthenticated as isAuthValid, applyAuthToClient, getEffectiveUserId } from './auth'
 
 const CATCH_UP_DELAY_MS = 500
 const INITIAL_SYNC_DEFER_MS = 10_000
@@ -65,22 +65,16 @@ export function isSyncEnabled(): boolean {
   return client !== null && getSetting('convex_sync_enabled') === 'true'
 }
 
-function getUserId(): string {
-  let userId = getSetting('convex_user_id')
-  if (!userId) {
-    const { randomUUID } = require('crypto')
-    userId = randomUUID()
-    setSetting('convex_user_id', userId!)
-  }
-  return userId!
-}
-
 export async function syncSession(session: Session): Promise<void> {
   if (!isSyncEnabled() || !client) return
 
   try {
-    // Only pass userId as fallback when not authenticated — server prefers auth context
-    const userId = isAuthValid() ? undefined : getUserId()
+    // Always pass a stable userId. The server prefers its own auth context
+    // and only falls back to args.userId when that check returns null —
+    // which can happen silently after Convex team/deployment migrations
+    // even when the local token still looks valid. This way sync survives
+    // those transitions without any user action.
+    const userId = getEffectiveUserId()
 
     await client.mutation(api.sessions.upsert, {
       localId: session.id,
@@ -120,7 +114,7 @@ export async function syncCorrections(): Promise<void> {
 
   console.log(`[convex] Syncing ${unsynced.length} corrections`)
 
-  const userId = isAuthValid() ? undefined : getUserId()
+  const userId = getEffectiveUserId()
 
   for (const correction of unsynced) {
     if (getRecordingState()) break
@@ -207,7 +201,7 @@ export async function uploadFlaggedAudio(
   if (!client) return
 
   try {
-    const userId = isAuthValid() ? undefined : getUserId()
+    const userId = getEffectiveUserId()
 
     // Step 1: Get upload URL from Convex
     const uploadUrl: string = await client.mutation(api.sessions.generateUploadUrl, {})
@@ -279,7 +273,7 @@ export async function registerUserInConvex(data: {
 
   const { app } = require('electron')
   await client.mutation(api.registrations.register, {
-    userId: isAuthValid() ? undefined : data.userId,
+    userId: getEffectiveUserId() || data.userId,
     name: data.name,
     email: data.email,
     consentedAt: data.consentedAt,
