@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Home,
+  Users,
   BookOpen,
   FileText,
   Type,
@@ -11,10 +12,11 @@ import {
 import { AnnaLogo } from './AnnaLogo'
 import { usePlatform } from '../hooks/usePlatform'
 
-export type Page = 'home' | 'dictionary' | 'snippets' | 'style' | 'notes' | 'help'
+export type Page = 'home' | 'meetings' | 'dictionary' | 'snippets' | 'style' | 'notes' | 'help'
 
 const navItems: { id: Page; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Home', icon: Home },
+  { id: 'meetings', label: 'Meetings', icon: Users },
   { id: 'dictionary', label: 'Dictionary', icon: BookOpen },
   { id: 'snippets', label: 'Snippets', icon: FileText },
   { id: 'style', label: 'Style', icon: Type },

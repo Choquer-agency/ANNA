@@ -4,6 +4,7 @@ import { authTables } from '@convex-dev/auth/server'
 
 export default defineSchema({
   ...authTables,
+  speechTokenGrants: defineTable({ userId: v.string(), windowStart: v.number(), count: v.number() }).index('by_user', ['userId']),
 
   sessions: defineTable({
     // Identity

@@ -12,6 +12,8 @@ function getClient(): Anthropic {
 // Users can override via the post_llm_model / command_llm_model settings.
 const DEFAULT_POST_LLM = 'claude-haiku-4-5-20251001'
 const DEFAULT_COMMAND_LLM = 'claude-haiku-4-5-20251001'
+// Keep the existing one-hour API setting compatible with this SDK's older types.
+const PROMPT_CACHE_CONTROL = { type: 'ephemeral' as const, ttl: '1h' as const }
 
 function getPostLLMModel(): string {
   const v = getSetting('post_llm_model')
@@ -171,7 +173,7 @@ ${languageSection}${vocabularyHint ? vocabularyHint + '\n' : ''}${dictionarySect
       // Stable prefix is cached; volatile suffix is regenerated per call.
       // Explicit 1h TTL — Anthropic dropped the default to 5m in March 2026.
       system: [
-        { type: 'text', text: STABLE_SYSTEM_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } },
+        { type: 'text', text: STABLE_SYSTEM_PROMPT, cache_control: PROMPT_CACHE_CONTROL },
         { type: 'text', text: volatileSystem }
       ],
       messages: [
@@ -313,7 +315,7 @@ ${language && language !== 'auto' && language !== 'en' ? `- Language: Respond in
       max_tokens: 4096,
       temperature: 0.2,
       system: [
-        { type: 'text', text: STABLE_COMMAND_SYSTEM_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } },
+        { type: 'text', text: STABLE_COMMAND_SYSTEM_PROMPT, cache_control: PROMPT_CACHE_CONTROL },
         { type: 'text', text: volatileSystem }
       ],
       messages: [{ role: 'user', content: command }]

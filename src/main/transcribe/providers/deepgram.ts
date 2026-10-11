@@ -1,10 +1,12 @@
+import WebSocket from 'ws'
+import { deepgramAuthorization, hasDeepgramAccess } from '../../speech-auth'
+import { getSetting } from '../../db'
 import type { STTProvider, STTStreamSession, StreamOpts, TranscribeOpts } from './index'
 
 // ─── Deepgram Nova-3 provider ───────────────────────────────────────────────
 //
-// Streaming-first STT with hard keyterm boosting (up to 100 terms). ~300ms
-// median end-to-end latency makes this the best fit when the user is
-// dictating in English with heavy domain jargon.
+// Streaming-first STT with optional paid keyterm boosting (up to 100 terms).
+// Keyterms require an explicit opt-in for both streaming and batch fallback.
 //
 // Two modes:
 //   • startStream() — WebSocket session, accepts PCM chunks during recording.
@@ -29,7 +31,7 @@ function buildStreamUrl(opts: StreamOpts): string {
   })
   if (opts.language && opts.language !== 'auto') params.set('language', opts.language)
   // Deepgram accepts repeated keyterm params for hard biasing.
-  if (opts.keyterms?.length) {
+  if (getSetting('deepgram_keyterms_enabled') === 'true' && opts.keyterms?.length) {
     for (const term of opts.keyterms.slice(0, KEYTERM_LIMIT)) {
       params.append('keyterm', term)
     }
@@ -40,7 +42,7 @@ function buildStreamUrl(opts: StreamOpts): string {
 function buildBatchUrl(language: string, keyterms?: string[]): string {
   const params = new URLSearchParams({ model: MODEL, smart_format: 'true' })
   if (language && language !== 'auto') params.set('language', language)
-  if (keyterms?.length) {
+  if (getSetting('deepgram_keyterms_enabled') === 'true' && keyterms?.length) {
     for (const term of keyterms.slice(0, KEYTERM_LIMIT)) {
       params.append('keyterm', term)
     }
@@ -48,114 +50,112 @@ function buildBatchUrl(language: string, keyterms?: string[]): string {
   return `${BATCH_URL}?${params.toString()}`
 }
 
-function startDeepgramStream(opts: StreamOpts): Promise<STTStreamSession> {
-  const apiKey = process.env.DEEPGRAM_API_KEY
-  if (!apiKey) throw new Error('DEEPGRAM_API_KEY not set')
+async function startDeepgramStream(opts: StreamOpts): Promise<STTStreamSession> {
+  const authorization = await deepgramAuthorization()
 
   const generation = opts.trace?.generation({
     name: 'deepgram-stream',
     model: MODEL,
-    input: { language: opts.language, sampleRate: opts.sampleRate, keyterms: opts.keyterms?.length ?? 0 }
+    input: { language: opts.language, sampleRate: opts.sampleRate, keyterms: getSetting('deepgram_keyterms_enabled') === 'true' ? Math.min(opts.keyterms?.length ?? 0, KEYTERM_LIMIT) : 0 }
   })
 
   return new Promise((resolve, reject) => {
-    // Deepgram supports auth via the Sec-WebSocket-Protocol header (browser-/
-    // Node-WebSocket-compatible). Spec: ['token', '<api-key>'].
-    const ws = new WebSocket(buildStreamUrl(opts), ['token', apiKey])
-
-    let finalParts: string[] = []
+    // Use an explicit Node client: Electron 33's Node 20 has no global WebSocket.
+    const ws = new WebSocket(buildStreamUrl(opts), {
+      headers: { Authorization: authorization },
+      handshakeTimeout: 3000,
+    })
+    const finalParts: string[] = []
     let lastPartial = ''
     let opened = false
+    let aborted = false
+    let failure: Error | null = null
+    let finishPromise: Promise<string> | null = null
     let finishResolve: ((text: string) => void) | null = null
     let finishReject: ((err: Error) => void) | null = null
-    let aborted = false
-    let pendingChunks: Buffer[] = []
+    let completed = false
 
-    ws.addEventListener('open', () => {
-      opened = true
-      // Drain any chunks queued before the socket opened.
-      for (const c of pendingChunks) ws.send(c)
-      pendingChunks = []
-      resolve(session)
-    })
-
-    ws.addEventListener('error', (event: Event) => {
-      const err = new Error(`Deepgram WebSocket error: ${(event as ErrorEvent).message ?? 'unknown'}`)
+    const fail = (err: Error): void => {
+      if (failure || aborted || completed) return
+      failure = err
       generation?.end({ level: 'ERROR', statusMessage: err.message })
       if (!opened) reject(err)
-      else if (finishReject) finishReject(err)
-    })
-
-    ws.addEventListener('message', (event: MessageEvent) => {
-      try {
-        const payload = JSON.parse(typeof event.data === 'string' ? event.data : event.data.toString())
-        if (payload.type === 'Results') {
-          const transcript: string = payload.channel?.alternatives?.[0]?.transcript ?? ''
-          if (!transcript) return
-          if (payload.is_final) {
-            finalParts.push(transcript)
-            lastPartial = ''
-          } else {
-            lastPartial = transcript
-            opts.onPartial?.(finalParts.concat(transcript).join(' '))
-          }
-        } else if (payload.type === 'Metadata' || payload.type === 'SpeechStarted') {
-          // ignore
-        } else if (payload.type === 'Error') {
-          const err = new Error(`Deepgram error: ${payload.description ?? JSON.stringify(payload)}`)
-          generation?.end({ level: 'ERROR', statusMessage: err.message })
-          if (finishReject) finishReject(err)
-        }
-      } catch {
-        // ignore malformed messages
-      }
-    })
-
-    ws.addEventListener('close', () => {
-      if (aborted) return
-      const text = finalParts.join(' ').trim() || lastPartial.trim()
-      if (finishResolve) {
-        generation?.end({ output: text, level: 'DEFAULT' })
-        finishResolve(text)
-      }
-    })
+      finishReject?.(err)
+      ws.terminate()
+    }
 
     const session: STTStreamSession = {
-      pushAudio(chunk: Buffer | Uint8Array) {
-        if (aborted) return
-        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-        if (!opened) {
-          pendingChunks.push(buf)
-        } else if (ws.readyState === WebSocket.OPEN) {
-          ws.send(buf)
+      pushAudio(chunk) {
+        if (failure) throw failure
+        if (aborted || ws.readyState !== WebSocket.OPEN) {
+          throw new Error('Deepgram stream is no longer open')
         }
+        ws.send(chunk)
       },
       finish() {
-        return new Promise<string>((res, rej) => {
+        if (failure) return Promise.reject(failure)
+        if (finishPromise) return finishPromise
+        if (aborted || ws.readyState !== WebSocket.OPEN) {
+          return Promise.reject(new Error('Deepgram stream closed before finalization'))
+        }
+        finishPromise = new Promise<string>((res, rej) => {
           finishResolve = res
           finishReject = rej
-          if (ws.readyState === WebSocket.OPEN) {
-            // Tell Deepgram to flush + close
-            ws.send(JSON.stringify({ type: 'CloseStream' }))
-          } else {
-            // Already closed — return whatever we have
-            const text = finalParts.join(' ').trim() || lastPartial.trim()
-            res(text)
-          }
+          // CloseStream flushes remaining audio, sends final results, then closes.
+          ws.send(JSON.stringify({ type: 'CloseStream' }))
         })
+        return finishPromise
       },
       abort() {
+        if (aborted || completed) return
         aborted = true
-        try { ws.close() } catch { /* ignore */ }
-        generation?.end({ level: 'WARNING', statusMessage: 'Aborted by caller' })
+        const err = new Error('Deepgram stream aborted')
+        if (!opened) reject(err)
+        finishReject?.(err)
+        ws.terminate()
+        if (!failure) generation?.end({ level: 'WARNING', statusMessage: err.message })
       },
     }
+
+    ws.on('open', () => {
+      opened = true
+      resolve(session)
+    })
+    ws.on('error', fail)
+    ws.on('message', (data) => {
+      if (aborted || failure) return
+      let payload: any
+      try { payload = JSON.parse(data.toString()) } catch { return }
+      if (payload.type === 'Results') {
+        const transcript: string = payload.channel?.alternatives?.[0]?.transcript ?? ''
+        if (payload.is_final) {
+          if (transcript) finalParts.push(transcript)
+          lastPartial = ''
+        } else {
+          lastPartial = transcript
+        }
+        if (transcript) opts.onPartial?.([...finalParts, lastPartial].filter(Boolean).join(' '))
+      } else if (payload.type === 'Error') {
+        fail(new Error(`Deepgram error: ${payload.description ?? JSON.stringify(payload)}`))
+      }
+    })
+    ws.on('close', (code) => {
+      if (aborted || failure) return
+      // Never treat a dropped socket or an interim tail as a complete recording.
+      if (!finishResolve || code !== 1000 || lastPartial) {
+        fail(new Error(`Deepgram stream ended without a complete final transcript (close ${code})`))
+        return
+      }
+      completed = true
+      const text = finalParts.join(' ').trim()
+      generation?.end({ output: text, level: 'DEFAULT' })
+      finishResolve(text)
+    })
   })
 }
 
 async function transcribeBatch(opts: TranscribeOpts): Promise<string> {
-  const apiKey = process.env.DEEPGRAM_API_KEY
-  if (!apiKey) throw new Error('DEEPGRAM_API_KEY not set')
+  const authorization = await deepgramAuthorization()
 
   const generation = opts.trace?.generation({
     name: 'whisper-transcription',
@@ -167,10 +167,10 @@ async function transcribeBatch(opts: TranscribeOpts): Promise<string> {
     const res = await fetch(buildBatchUrl(opts.language, opts.keyterms), {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${apiKey}`,
+        'Authorization': authorization,
         'Content-Type': 'audio/wav',
       },
-      body: opts.audio,
+      body: new Uint8Array(opts.audio),
     })
     if (!res.ok) {
       const err = new Error(`Deepgram batch error (${res.status}): ${await res.text()}`)
@@ -197,7 +197,7 @@ export const deepgramProvider: STTProvider = {
     offline: false,
   },
   isAvailable() {
-    return !!process.env.DEEPGRAM_API_KEY
+    return hasDeepgramAccess()
   },
   transcribe: transcribeBatch,
   startStream: startDeepgramStream,

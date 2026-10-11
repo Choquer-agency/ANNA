@@ -1,7 +1,9 @@
+export {}
+
 declare global {
   interface Window {
     audioAPI: {
-      onStartRecording: (cb: () => void) => void
+      onStartRecording: (cb: (deviceId: string) => void) => void
       onStopRecording: (cb: () => void) => void
       sendWavData: (buffer: ArrayBuffer) => void
       sendRecordingStatus: (recording: boolean, sampleRate?: number) => void
@@ -170,7 +172,7 @@ async function ensureAudioContext(): Promise<AudioContext> {
   return audioContext
 }
 
-window.audioAPI.onStartRecording(async () => {
+window.audioAPI.onStartRecording(async (deviceId) => {
   try {
     chunks = []
     chunkRms = []
@@ -182,6 +184,7 @@ window.audioAPI.onStartRecording(async () => {
     const [stream, ctx] = await Promise.all([
       navigator.mediaDevices.getUserMedia({
         audio: {
+          ...(deviceId && deviceId !== 'default' ? { deviceId: { exact: deviceId } } : {}),
           channelCount: { exact: 1 },
           echoCancellation: false,
           noiseSuppression: false,
@@ -191,6 +194,8 @@ window.audioAPI.onStartRecording(async () => {
       ensureAudioContext(),
     ])
     mediaStream = stream
+    const track = stream.getAudioTracks()[0]
+    console.log('[audio-capture] Microphone:', track?.label, 'muted:', track?.muted)
 
     sourceNode = ctx.createMediaStreamSource(mediaStream)
     workletNode = new AudioWorkletNode(ctx, 'recorder-processor')

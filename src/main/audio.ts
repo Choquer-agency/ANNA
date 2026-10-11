@@ -1,13 +1,15 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain, systemPreferences } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { sendAudioLevel } from './recordingIndicator'
+import { getSetting } from './db'
 
 let hiddenWindow: BrowserWindow | null = null
 let recording = false
 let recordingStartTime = 0
 let onWavData: ((buffer: Buffer) => void) | null = null
 let currentSampleRate = 48000
+let recordingReady: ((sampleRate: number) => void) | null = null
 
 // Live PCM consumer — pipeline registers a callback when streaming is active.
 // Set to null when no consumer is registered (we still capture for the WAV).
@@ -22,6 +24,17 @@ export function getRecordingSampleRate(): number {
 }
 
 export function createAudioWindow(): void {
+  if (process.platform === 'darwin') {
+    console.log('[audio] Permissions:', {
+      microphone: systemPreferences.getMediaAccessStatus('microphone'),
+      accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+    })
+    if (is.dev && systemPreferences.getMediaAccessStatus('microphone') === 'not-determined') {
+      void systemPreferences.askForMediaAccess('microphone').then((granted) => {
+        console.log('[audio] Microphone permission request:', granted ? 'granted' : 'denied')
+      }).catch((err) => console.warn('[audio] Microphone permission request failed:', err))
+    }
+  }
   hiddenWindow = new BrowserWindow({
     show: false,
     width: 1,
@@ -32,6 +45,9 @@ export function createAudioWindow(): void {
       nodeIntegration: false,
       contextIsolation: true
     }
+  })
+  hiddenWindow.webContents.on('console-message', (_event, _level, message) => {
+    if (message.startsWith('[audio-capture] Microphone:')) console.log(message)
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -45,6 +61,8 @@ export function createAudioWindow(): void {
     if (isRecording) {
       recordingStartTime = Date.now()
       if (typeof sampleRate === 'number') currentSampleRate = sampleRate
+      recordingReady?.(currentSampleRate)
+      recordingReady = null
     }
     console.log('[audio] Recording status:', isRecording, 'sample rate:', sampleRate ?? 'unchanged')
   })
@@ -66,9 +84,29 @@ export function createAudioWindow(): void {
   })
 }
 
-export function startRecording(): void {
-  if (!hiddenWindow) return
-  hiddenWindow.webContents.send('audio:start-recording')
+export async function startRecording(): Promise<number> {
+  if (process.platform === 'darwin') {
+    console.log('[audio] Microphone permission:', systemPreferences.getMediaAccessStatus('microphone'))
+    if (systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+      const granted = await systemPreferences.askForMediaAccess('microphone')
+      if (!granted) throw new Error('Allow Electron microphone access in System Settings → Privacy & Security → Microphone.')
+    }
+  }
+  return new Promise((resolve, reject) => {
+    if (!hiddenWindow) {
+      reject(new Error('Audio capture window is unavailable'))
+      return
+    }
+    const timeout = setTimeout(() => {
+      recordingReady = null
+      reject(new Error('Microphone did not start within 3 seconds'))
+    }, 3000)
+    recordingReady = (sampleRate) => {
+      clearTimeout(timeout)
+      resolve(sampleRate)
+    }
+    hiddenWindow.webContents.send('audio:start-recording', getSetting('microphone_device') ?? 'default')
+  })
 }
 
 export function stopRecording(): Promise<Buffer> {

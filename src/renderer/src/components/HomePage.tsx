@@ -41,6 +41,30 @@ export function HomePage({
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null)
   const [isFreeUser, setIsFreeUser] = useState(false)
+  const [testProvider, setTestProvider] = useState<string | null>(null)
+  const [switchingModel, setSwitchingModel] = useState(false)
+  const [testError, setTestError] = useState('')
+
+  useEffect(() => {
+    void window.annaAPI.getSetting('stt_test_panel').then(async enabled => {
+      if (enabled === 'true') {
+        setTestProvider((await window.annaAPI.getSetting('stt_provider')) ?? 'auto')
+      }
+    })
+  }, [])
+
+  const switchTestModel = async (provider: string): Promise<void> => {
+    setSwitchingModel(true)
+    setTestError('')
+    try {
+      await window.annaAPI.setSetting('stt_provider', provider)
+      setTestProvider(provider)
+    } catch {
+      setTestError('Could not switch models. Please try again.')
+    } finally {
+      setSwitchingModel(false)
+    }
+  }
 
   // Load weekly usage for free users
   useEffect(() => {
@@ -63,16 +87,18 @@ export function HomePage({
     window.annaAPI.getSetting('hotkey').then((val) => {
       if (val) setHotkey(val)
     })
-    Promise.all([
-      window.annaAPI.checkMicrophone(),
-      window.annaAPI.checkAccessibility()
-    ]).then(([mic, acc]) => {
-      const missing = mic !== 'granted' || !acc
-      setPermissionsMissing(missing)
-      if (missing) {
-        track('permission_banner_shown')
-      }
-    })
+    const checkPermissions = (): void => {
+      void Promise.all([
+        window.annaAPI.checkMicrophone(),
+        window.annaAPI.checkAccessibility()
+      ]).then(([mic, acc]) => {
+        const missing = mic !== 'granted' || !acc
+        setPermissionsMissing(missing)
+        if (missing) track('permission_banner_shown')
+      }).catch(() => setPermissionsMissing(true))
+    }
+    checkPermissions()
+    window.addEventListener('focus', checkPermissions)
 
     // Daily active event — fire once per calendar day
     const today = new Date().toISOString().slice(0, 10)
@@ -81,6 +107,7 @@ export function HomePage({
       localStorage.setItem('anna_daily_active_date', today)
       track('daily_active')
     }
+    return () => window.removeEventListener('focus', checkPermissions)
   }, [])
 
   const filteredSessions = searchQuery.trim()
@@ -92,6 +119,30 @@ export function HomePage({
 
   return (
     <>
+      {testProvider !== null && (
+        <div className="mb-4 p-4 rounded-xl border border-primary/20 bg-primary/5">
+          <p className="text-sm font-semibold text-ink mb-3">Dictation model test</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { id: 'deepgram', name: 'Deepgram Nova-3', description: 'Test 1 · transcribes while you speak' },
+              { id: 'openai-gpt-transcribe', name: 'OpenAI GPT-Transcribe', description: 'Test 2 · transcribes after you stop' },
+              { id: 'groq', name: 'Groq Whisper Large V3 Turbo', description: 'Test 3 · transcribes after you stop' },
+              { id: 'nvidia', name: 'NVIDIA Parakeet v3', description: 'Test 4 · runs locally after you stop' },
+              { id: 'nvidia-nemotron', name: 'NVIDIA Nemotron 3.5', description: 'Test 5 · runs locally while you speak' }
+            ].map(model => (
+              <button key={model.id} type="button"
+                disabled={switchingModel || pipelineStatus !== 'idle'}
+                aria-pressed={testProvider === model.id}
+                onClick={() => void switchTestModel(model.id)}
+                className={`text-left p-3 rounded-lg border disabled:opacity-60 ${testProvider === model.id ? 'border-primary bg-white' : 'border-primary/10'}`}>
+                <span className="block text-sm font-semibold text-ink">{model.name}{testProvider === model.id ? ' · Active' : ''}</span>
+                <span className="block text-xs text-ink-muted mt-1">{model.description}</span>
+              </button>
+            ))}
+          </div>
+          {testError && <p className="text-xs text-ink-muted mt-2" role="alert">{testError}</p>}
+        </div>
+      )}
       {/* Pipeline status indicator */}
       {pipelineStatus !== 'idle' && (
         <div className="flex items-center gap-2 mb-4">

@@ -11,3 +11,15 @@ out
 resources/fn-key-helper
 .next
 .vercel
+# Generated native addon outputs (the build directory also contains tracked icons).
+/bin/
+/build/Makefile
+/build/Release/
+/build/binding.Makefile
+/build/config.gypi
+/build/gyp-mac-tool
+/build/selected_text.target.mk
+/ios/build/
+/ios/build-device/
+/ios/**/*.xcuserstate
+/ios/**/xcuserdata/

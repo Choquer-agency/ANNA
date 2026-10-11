@@ -3,10 +3,11 @@ import { syncSession } from './convex'
 import { join } from 'path'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { getPlatform } from './platform'
-import { startRecording, stopRecording, getRecordingState, getRecordingDuration, setPcmChunkConsumer, getRecordingSampleRate } from './audio'
+import { startRecording, stopRecording, getRecordingState, getRecordingDuration, setPcmChunkConsumer } from './audio'
 import { resolveStreamingProvider } from './transcribe'
-import type { STTStreamSession } from './transcribe/providers'
+import { StreamingCapture } from './transcribe/streaming-capture'
 import { createSession, updateSession, getSessionById, getSnippets, getDictionaryEntries, getStyleProfileForApp, getSetting, setSetting, getSessions, getStats, getWeeklyStats } from './db'
+import { isMeetingRecording } from './meetings'
 import { syncWordCount } from './convex'
 import { transcribe } from './transcribe'
 import { processTranscript, processCommand } from './process'
@@ -208,14 +209,14 @@ let cancelUndoTimeout: ReturnType<typeof setTimeout> | null = null
 // Live streaming session — opened at recording start when a streaming-capable
 // provider is configured (e.g. Deepgram). Receives PCM chunks live via
 // setPcmChunkConsumer(); finalized on recording stop to get the transcript.
-let streamingSession: STTStreamSession | null = null
+let streamingSession: StreamingCapture | null = null
 let streamingProviderId: string | null = null
 let recordingMaxDurationTimeout: ReturnType<typeof setTimeout> | null = null
 let recordingWarningTimeout: ReturnType<typeof setTimeout> | null = null
 
-// Maximum recording duration (10 minutes) and warning (9:40)
-const MAX_RECORDING_DURATION_MS = 600_000
-const RECORDING_WARNING_MS = 580_000
+// Warn 30 seconds before the 15-minute recording limit.
+const MAX_RECORDING_DURATION_MS = 900_000
+const RECORDING_WARNING_MS = MAX_RECORDING_DURATION_MS - 30_000
 // Processing timeout (3 minutes)
 const PROCESSING_TIMEOUT_MS = 180_000
 // "Taking longer" notice threshold
@@ -337,29 +338,32 @@ function cleanupRecordingState(): void {
  * Try to open a live streaming session. Best-effort — failure is silent and
  * the pipeline falls back to batch transcription on the buffered WAV.
  */
-async function tryStartStreamingSession(activeWin: ActiveWindowInfo | null): Promise<void> {
+function tryStartStreamingSession(activeWin: ActiveWindowInfo | null, recordingStarted: Promise<number>): void {
   const provider = resolveStreamingProvider()
   if (!provider || !provider.startStream) return
-  try {
-    const language = getSetting('language') ?? 'auto'
-    const vocabTerms = getActiveVocabularyTerms(activeWin?.appName, activeWin?.appId)
-    const keyterms = buildKeytermArray(vocabTerms, 100)
-    const sampleRate = getRecordingSampleRate()
-    const session = await provider.startStream({
+  const language = getSetting('language') ?? 'auto'
+  const vocabTerms = getActiveVocabularyTerms(activeWin?.appName, activeWin?.appId)
+  const keyterms = provider.id === 'deepgram' && getSetting('deepgram_keyterms_enabled') !== 'true'
+    ? []
+    : buildKeytermArray(vocabTerms, 100)
+  const capture = new StreamingCapture(async () => {
+    const sampleRate = await recordingStarted
+    if (streamingSession !== capture) throw new Error('Recording ended before streaming started')
+    const session = await provider.startStream!({
       language,
       keyterms,
       sampleRate,
-      onPartial: (text) => sendLiveText(text, 'partial'),
+      onPartial: (text) => {
+        if (streamingSession === capture) sendLiveText(text, 'partial')
+      },
     })
-    streamingSession = session
-    streamingProviderId = provider.id
-    setPcmChunkConsumer((chunk) => session.pushAudio(chunk))
     console.log(`[pipeline] Streaming session opened: ${provider.label} @ ${sampleRate}Hz, ${keyterms.length} keyterms`)
-  } catch (err) {
-    console.warn('[pipeline] Failed to open streaming session, will fall back to batch:', err)
-    streamingSession = null
-    streamingProviderId = null
-  }
+    return session
+  })
+  streamingSession = capture
+  streamingProviderId = provider.id
+  // Register immediately, before the microphone or network connection is ready.
+  setPcmChunkConsumer((chunk) => capture.pushAudio(chunk))
 }
 
 function abortStreamingSession(): void {
@@ -445,7 +449,8 @@ async function runPipeline(
   activeWin: ActiveWindowInfo | null,
   durationMs: number,
   clipboardContext: string | null,
-  preTranscribed?: string | null
+  preTranscribed?: string | null,
+  stoppedAt?: number
 ): Promise<void> {
   const t0 = performance.now()
 
@@ -454,6 +459,11 @@ async function runPipeline(
     console.log('[pipeline] Empty recording, skipping')
     trackMainEvent('dictation_cancelled', { reason: 'empty_recording' })
     sendStatus('idle')
+    hideRecordingIndicator()
+    return
+  }
+  if (wavBuffer.subarray(44).every((byte) => byte === 0)) {
+    sendError('Your microphone recorded silence. Check microphone access and choose an input in Settings → General → Microphone.')
     hideRecordingIndicator()
     return
   }
@@ -675,7 +685,8 @@ async function runPipeline(
       }
       console.timeEnd('[pipeline] injectText')
 
-      const totalMs = performance.now() - t0
+      // Include microphone shutdown and stream finalization in the user-visible wait.
+      const totalMs = performance.now() - (stoppedAt ?? t0)
       trace?.update({ metadata: { status: 'completed', wordCount } })
       sendComplete(session.id, {
         timing: {
@@ -793,7 +804,9 @@ async function runPipeline(
 }
 
 export async function handleHotkeyToggle(): Promise<void> {
+  if (isMeetingRecording()) return
   if (getRecordingState()) {
+    const stoppedAt = performance.now()
     // Stop recording and run pipeline
     // Final capture with Cmd+C fallback, targeting the app that was active during recording
     const freshSelectedText = await getPlatform().getSelectedText(true, cachedActiveWindow?.appId)
@@ -841,7 +854,7 @@ export async function handleHotkeyToggle(): Promise<void> {
       console.timeEnd('[pipeline] streamFinish')
     }
 
-    await runPipeline(wavBuffer, activeWin, durationMs, clipboardCtx, streamedTranscript)
+    await runPipeline(wavBuffer, activeWin, durationMs, clipboardCtx, streamedTranscript, stoppedAt)
   } else {
     // Paywall check — block recording if free user exceeds weekly word limit
     try {
@@ -928,23 +941,24 @@ export async function handleHotkeyToggle(): Promise<void> {
     }
 
     playDictationStart()
-    startRecording()
+    const recordingStarted = startRecording()
+    void recordingStarted.catch((err) => console.warn('[pipeline] Microphone startup failed:', err))
     showRecordingIndicator()
 
     // Best-effort: open a streaming STT session in parallel with recording.
     // Failure is silent — we'll fall back to batch on the buffered WAV.
-    void tryStartStreamingSession(cachedActiveWindow)
+    tryStartStreamingSession(cachedActiveWindow, recordingStarted)
 
-    // Warning at 5:40
+    // Warning at 14:30, leaving 30 seconds to wrap up.
     recordingWarningTimeout = setTimeout(() => {
       console.log('[pipeline] Recording approaching max duration, showing warning')
       recordingWarningTimeout = null
       sendStateChange('time-warning')
     }, RECORDING_WARNING_MS)
 
-    // Auto-stop after 6 minutes
+    // Auto-stop after 15 minutes.
     recordingMaxDurationTimeout = setTimeout(() => {
-      console.log('[pipeline] Max recording duration reached (6 min), auto-stopping')
+      console.log('[pipeline] Max recording duration reached (15 min), auto-stopping')
       recordingMaxDurationTimeout = null
       if (getRecordingState()) {
         handleHotkeyToggle().catch((err) => {

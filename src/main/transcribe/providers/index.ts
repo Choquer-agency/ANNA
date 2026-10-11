@@ -56,7 +56,7 @@ export interface STTStreamSession {
 
 export interface STTProvider {
   /** Stable id used in settings (`stt_provider`) and traces. */
-  id: 'groq' | 'openai' | 'local' | 'deepgram' | 'assemblyai' | 'elevenlabs' | 'openai-realtime'
+  id: 'groq' | 'openai' | 'openai-gpt-transcribe' | 'nvidia' | 'nvidia-nemotron' | 'local' | 'deepgram' | 'assemblyai' | 'elevenlabs' | 'openai-realtime'
   /** Human label for logs and UI. */
   label: string
   capabilities: STTCapabilities

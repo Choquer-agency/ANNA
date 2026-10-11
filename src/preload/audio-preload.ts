@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('audioAPI', {
-  onStartRecording: (callback: () => void): void => {
-    ipcRenderer.on('audio:start-recording', () => callback())
+  onStartRecording: (callback: (deviceId: string) => void): void => {
+    ipcRenderer.on('audio:start-recording', (_event, deviceId: string) => callback(deviceId))
   },
   onStopRecording: (callback: () => void): void => {
     ipcRenderer.on('audio:stop-recording', () => callback())

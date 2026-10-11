@@ -1,11 +1,20 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron'
+import { ANNA_MENU_BAR_ICON } from './menu-bar-icon'
 
 let tray: Tray | null = null
 let isRecording = false
 let onToggleRecordingRef: (() => void) | null = null
 let mainWindowRef: BrowserWindow | null = null
+let onShowRef: (() => void) | null = null
+let onMeetingRef: (() => void) | null = null
 
 function createIcon(filled: boolean): Electron.NativeImage {
+  if (process.platform === 'darwin') {
+    const img = nativeImage.createEmpty()
+    img.addRepresentation({ scaleFactor: 2, buffer: Buffer.from(ANNA_MENU_BAR_ICON, 'base64') })
+    img.setTemplateImage(true)
+    return img
+  }
   const size = 16
   const buf = Buffer.alloc(size * size * 4, 0)
 
@@ -47,9 +56,6 @@ function createIcon(filled: boolean): Electron.NativeImage {
   for (let x = 5; x <= 10; x++) set(x, 13)
 
   const img = nativeImage.createFromBitmap(buf, { width: size, height: size })
-  if (process.platform === 'darwin') {
-    img.setTemplateImage(true)
-  }
   return img
 }
 
@@ -59,10 +65,12 @@ function buildMenu(): Menu {
       label: isRecording ? 'Stop Recording' : 'Start Recording',
       click: () => { onToggleRecordingRef?.() }
     },
+    { label: 'Start Meeting', enabled: !isRecording, click: () => { onMeetingRef?.() } },
     { type: 'separator' },
     {
       label: 'Show ANNA',
       click: () => {
+        if (onShowRef) { onShowRef(); return }
         if (mainWindowRef && !mainWindowRef.isDestroyed()) {
           mainWindowRef.show()
           mainWindowRef.focus()
@@ -78,12 +86,14 @@ function buildMenu(): Menu {
   ])
 }
 
-export function createTray(mainWindow: BrowserWindow, onToggleRecording: () => void): void {
+export function createTray(mainWindow: BrowserWindow, onToggleRecording: () => void, onShow?: () => void, onMeeting?: () => void): void {
   mainWindowRef = mainWindow
   onToggleRecordingRef = onToggleRecording
+  onShowRef = onShow ?? null
+  onMeetingRef = onMeeting ?? null
   try {
     tray = new Tray(createIcon(false))
-    tray.setToolTip('ANNA')
+    tray.setToolTip('ANNA · Start recording or a meeting')
     tray.setContextMenu(buildMenu())
     console.log('[tray] Created successfully')
   } catch (err) {

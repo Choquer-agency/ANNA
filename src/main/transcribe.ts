@@ -3,6 +3,8 @@ import { getSetting } from './db'
 import type { STTProvider } from './transcribe/providers'
 import { groqProvider } from './transcribe/providers/groq'
 import { openaiProvider } from './transcribe/providers/openai'
+import { openaiGPTTranscribeProvider } from './transcribe/providers/openai-gpt-transcribe'
+import { nvidiaProvider, nemotronProvider } from './transcribe/providers/nvidia'
 import { localProvider } from './transcribe/providers/local'
 import { deepgramProvider } from './transcribe/providers/deepgram'
 import { elevenlabsProvider } from './transcribe/providers/elevenlabs'
@@ -22,6 +24,9 @@ import { elevenlabsProvider } from './transcribe/providers/elevenlabs'
 const PROVIDERS: Record<string, STTProvider> = {
   groq: groqProvider,
   openai: openaiProvider,
+  'openai-gpt-transcribe': openaiGPTTranscribeProvider,
+  nvidia: nvidiaProvider,
+  'nvidia-nemotron': nemotronProvider,
   local: localProvider,
   deepgram: deepgramProvider,
   elevenlabs: elevenlabsProvider,
@@ -72,7 +77,10 @@ function resolveProviderChain(): STTProvider[] {
   const setting = (getSetting('stt_provider') ?? 'auto').toLowerCase()
 
   if (setting === 'groq') return PROVIDERS.groq.isAvailable() ? [PROVIDERS.groq] : []
+  if (setting === 'nvidia') return nvidiaProvider.isAvailable() ? [nvidiaProvider] : []
+  if (setting === 'nvidia-nemotron') return nemotronProvider.isAvailable() ? [nemotronProvider] : []
   if (setting === 'openai') return PROVIDERS.openai.isAvailable() ? [PROVIDERS.openai] : []
+  if (setting === 'openai-gpt-transcribe') return openaiGPTTranscribeProvider.isAvailable() ? [openaiGPTTranscribeProvider] : []
   if (setting === 'local') return PROVIDERS.local.isAvailable() ? [PROVIDERS.local] : []
   if (setting === 'deepgram') return PROVIDERS.deepgram.isAvailable() ? [PROVIDERS.deepgram] : []
   if (setting === 'elevenlabs') return PROVIDERS.elevenlabs.isAvailable() ? [PROVIDERS.elevenlabs] : []

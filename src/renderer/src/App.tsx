@@ -6,6 +6,7 @@ import { useTheme } from './hooks/useTheme'
 import { Sidebar } from './components/Sidebar'
 import type { Page } from './components/Sidebar'
 import { HomePage } from './components/HomePage'
+import { MeetingsPage } from './components/MeetingsPage'
 import { DictionaryPage } from './components/DictionaryPage'
 import { SnippetsPage } from './components/SnippetsPage'
 import { StylePage } from './components/StylePage'
@@ -27,6 +28,12 @@ function App(): React.JSX.Element {
   const [feedbackSessionId, setFeedbackSessionId] = useState<string | null>(null)
   const [dictationText, setDictationText] = useState<string | null>(null)
   useTheme()
+  useEffect(() => window.annaAPI.onAppNavigate(data => {
+    if (data.page === 'meetings') {
+      setCurrentPage('meetings')
+      if (data.startMeeting) window.dispatchEvent(new Event('anna:start-meeting'))
+    }
+  }), [])
 
   // Initialize analytics + check auth + onboarding status on mount
   useEffect(() => {
@@ -261,7 +268,8 @@ function App(): React.JSX.Element {
 
         {/* Content card */}
         <div className="flex-1 bg-surface-raised rounded-[20px] overflow-y-auto overflow-x-hidden px-10 py-8 shadow-medium">
-          {renderPage()}
+          <MeetingsPage visible={currentPage === 'meetings'} />
+          {currentPage !== 'meetings' && renderPage()}
         </div>
       </div>
 

@@ -23,6 +23,7 @@ import type * as lib_periods from "../lib/periods.js";
 import type * as migrations from "../migrations.js";
 import type * as registrations from "../registrations.js";
 import type * as sessions from "../sessions.js";
+import type * as speech from "../speech.js";
 import type * as stripe from "../stripe.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as userSettings from "../userSettings.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   registrations: typeof registrations;
   sessions: typeof sessions;
+  speech: typeof speech;
   stripe: typeof stripe;
   subscriptions: typeof subscriptions;
   userSettings: typeof userSettings;

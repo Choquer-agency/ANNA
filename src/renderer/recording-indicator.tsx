@@ -55,7 +55,7 @@ const barLevels: number[] = new Array(NUM_BARS).fill(BAR_BASE_HEIGHT)
 // ─── Button HTML ───
 function cancelButtonHTML(): string {
   return `<div class="icon-btn-wrap">
-    <button class="icon-btn cancel-btn" id="cancel-btn">
+    <button class="icon-btn cancel-btn" id="cancel-btn" aria-label="Cancel recording" title="Cancel recording">
       <svg width="10" height="10" viewBox="0 0 14 14" fill="none">
         <path d="M1 1L13 13M13 1L1 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
       </svg>
@@ -64,24 +64,9 @@ function cancelButtonHTML(): string {
   </div>`
 }
 
-function stopButtonHTML(): string {
-  return `<div class="icon-btn-wrap">
-    <button class="icon-btn stop-btn" id="stop-btn">
-      <div class="stop-icon"></div>
-    </button>
-    <div class="hover-label">Finish and paste</div>
-  </div>`
-}
-
 const container = document.getElementById('root')!
 container.innerHTML = `
   <style>
-    @property --snake-angle {
-      syntax: '<angle>';
-      initial-value: 0deg;
-      inherits: false;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { width: 100%; height: 100%; }
 
@@ -115,10 +100,6 @@ container.innerHTML = `
     .icon-btn:active { transform: scale(0.9); }
     .cancel-btn { background: rgba(255,255,255,0.1); }
     .cancel-btn:hover { background: rgba(255,255,255,0.18); }
-    .stop-btn { background: #FF3B30; }
-    .stop-btn:hover { background: #FF453A; }
-    .stop-icon { width: 10px; height: 10px; border-radius: 2px; background: white; flex-shrink: 0; }
-
     .hover-label {
       position: absolute; bottom: calc(100% + 16px); left: 50%; transform: translateX(-50%);
       background: #1C1C1E; color: white; font-size: 11px; font-weight: 500;
@@ -161,109 +142,20 @@ container.innerHTML = `
     }
     .undo-btn:hover { background: rgba(255,158,25,0.3); }
 
-    /* ─── Snake Stroke Border ─── */
-    .snake-border {
-      position: relative;
-      padding: 2px;
-      border-radius: 100px;
-      background: conic-gradient(
-        from var(--snake-angle),
-        transparent 0deg,
-        transparent 155deg,
-        rgba(255,107,157,0.05) 162deg,
-        rgba(255,107,157,0.2) 170deg,
-        rgba(255,107,157,0.5) 180deg,
-        #FF6B9D 195deg,
-        #FF8FA8 220deg,
-        #FFB8A0 250deg,
-        #FFC48A 275deg,
-        #FF9E19 300deg,
-        #FF9E19 330deg,
-        rgba(255,158,25,0.8) 338deg,
-        transparent 345deg,
-        transparent 360deg
-      );
-      animation: snake-orbit 2.5s linear infinite;
-      transition: border-radius 0.3s ease;
+    .indicator-shell { position: relative; border-radius: 100px; }
+    .glow-wrap.idle-wrap { display: none; }
+    .recording-content > .icon-btn-wrap {
+      width: 0; opacity: 0; overflow: hidden; pointer-events: none;
+      transition: width 0.15s ease, opacity 0.15s ease, margin 0.15s ease;
     }
-    .snake-border.no-spin { animation: none; background: rgba(255,255,255,0.15); }
-    .snake-border.idle-border { padding: 1px; }
-    .snake-border.idle-border::before,
-    .snake-border.idle-border::after { display: none; }
-
-    /* Idle hotkey tooltip */
-    .idle-tooltip {
-      position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
-      background: #1C1C1E; color: white; font-size: 11px; font-weight: 500;
-      padding: 6px 14px; border-radius: 100px; white-space: nowrap;
-      pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    .recording-content:hover > .icon-btn-wrap {
+      width: 28px; opacity: 1; margin-right: 10px; pointer-events: auto;
     }
-    .idle-tooltip.visible { opacity: 1; }
-
-    .snake-border.circle-border { border-radius: 50%; }
-    .snake-border.circle-border::before { border-radius: 50%; }
-    .snake-border.circle-border::after { border-radius: 50%; }
-
-    /* Tight colored glow — perpendicular (top + bottom) glow from the snake stroke */
-    .snake-border::before {
-      content: '';
-      position: absolute;
-      inset: -8px -4px;
-      border-radius: 100px;
-      background: conic-gradient(
-        from var(--snake-angle),
-        transparent 0deg,
-        transparent 155deg,
-        rgba(255,107,157,0.15) 170deg,
-        rgba(255,107,157,0.5) 190deg,
-        rgba(255,107,157,0.7) 210deg,
-        rgba(255,180,130,0.7) 240deg,
-        rgba(255,158,25,0.8) 270deg,
-        rgba(255,158,25,0.95) 300deg,
-        rgba(255,158,25,1.0) 325deg,
-        rgba(255,158,25,0.6) 340deg,
-        transparent 350deg,
-        transparent 360deg
-      );
-      filter: blur(12px);
-      z-index: -1;
-      pointer-events: none;
-    }
-
-    /* Wide bloom glow — extends further top and bottom for neon-tube effect */
-    .snake-border::after {
-      content: '';
-      position: absolute;
-      inset: -20px -8px;
-      border-radius: 100px;
-      background: conic-gradient(
-        from var(--snake-angle),
-        transparent 0deg,
-        transparent 165deg,
-        rgba(255,107,157,0.1) 185deg,
-        rgba(255,107,157,0.25) 210deg,
-        rgba(255,180,130,0.3) 250deg,
-        rgba(255,158,25,0.4) 290deg,
-        rgba(255,158,25,0.5) 320deg,
-        rgba(255,158,25,0.25) 340deg,
-        transparent 352deg,
-        transparent 360deg
-      );
-      filter: blur(24px);
-      z-index: -2;
-      pointer-events: none;
-    }
-
-    .snake-border.no-spin::before,
-    .snake-border.no-spin::after { display: none; }
-
-    @keyframes snake-orbit {
-      0% { --snake-angle: 0deg; }
-      100% { --snake-angle: 360deg; }
-    }
-
+    .recording-content { gap: 0; }
+    .pill:not(.idle):not(.circle) { padding: 3.3875px 12.26px; min-width: 66.12px; min-height: 26.775px; }
+    .recording-content > .icon-btn-wrap { justify-content: center; }
+    .recording-content .cancel-btn { width: 20px; height: 20px; }
+    .recording-content .waveform-wrap { padding: 0 2.8px; }
     .glow-wrap {
       position: relative; display: flex; flex-direction: column; align-items: center;
       transition: filter 0.3s ease, padding 0.3s ease, margin 0.3s ease;
@@ -279,7 +171,7 @@ container.innerHTML = `
       z-index: -3;
       pointer-events: none;
       filter: blur(28px);
-      opacity: 0.7;
+      opacity: 0.56;
       transition: opacity 0.3s ease;
     }
     .ambient-glow.hidden { opacity: 0; }
@@ -311,9 +203,8 @@ container.innerHTML = `
 
   <div class="glow-wrap" id="glow-wrap">
     <div class="ambient-glow" id="ambient-glow"></div>
-    <div class="snake-border" id="snake-border">
-      <div class="idle-tooltip" id="idle-tooltip">Press <span id="hotkey-label">\u2303 \u2423</span> to dictate</div>
-      <div class="time-warning-tooltip" id="time-warning-tooltip">Reaching 10 min limit</div>
+    <div class="indicator-shell" id="indicator-shell">
+      <div class="time-warning-tooltip" id="time-warning-tooltip">30 seconds left · 15 minute limit</div>
       <div class="pill" id="pill">
         <!-- Recording state: colored waveform bars -->
         <div class="recording-content hidden" id="recording-content">
@@ -323,7 +214,6 @@ container.innerHTML = `
               ${Array.from({ length: NUM_BARS }, (_, i) => `<div class="bar" id="bar-${i}"></div>`).join('')}
             </div>
           </div>
-          ${stopButtonHTML()}
         </div>
         <!-- Processing state: loading wave animation -->
         <div class="processing-content" id="processing-content">
@@ -351,7 +241,7 @@ container.innerHTML = `
 // ─── Element refs ───
 const ambientGlow = document.getElementById('ambient-glow')!
 const pill = document.getElementById('pill')!
-const snakeBorder = document.getElementById('snake-border')!
+const indicatorShell = document.getElementById('indicator-shell')!
 const glowWrap = document.getElementById('glow-wrap')!
 const recordingContent = document.getElementById('recording-content')!
 const processingContent = document.getElementById('processing-content')!
@@ -361,7 +251,6 @@ const bars = Array.from({ length: NUM_BARS }, (_, i) => document.getElementById(
 
 // ─── Button wiring ───
 document.getElementById('cancel-btn')?.addEventListener('click', () => window.recordingAPI.cancelRecording())
-document.getElementById('stop-btn')?.addEventListener('click', () => window.recordingAPI.stopRecording())
 document.getElementById('undo-btn')?.addEventListener('click', () => window.recordingAPI.undoCancel())
 
 // ─── State ───
@@ -374,9 +263,6 @@ function setState(state: string): void {
 
   pill.classList.toggle('idle', isIdle)
   pill.classList.toggle('circle', isProcessing)
-  snakeBorder.classList.toggle('no-spin', state === 'cancelled')
-  snakeBorder.classList.toggle('idle-border', isIdle)
-  snakeBorder.classList.toggle('circle-border', isProcessing)
   glowWrap.classList.toggle('idle-wrap', isIdle)
   ambientGlow.classList.toggle('hidden', isIdle)
   recordingContent.classList.toggle('hidden', !isRecording)
@@ -389,18 +275,11 @@ function setState(state: string): void {
 
 // ─── Click-through: window ignores mouse on transparent areas,
 //     but captures on visible content via mouseenter/mouseleave ───
-const idleTooltip = document.getElementById('idle-tooltip')!
-const hotkeyLabel = document.getElementById('hotkey-label')!
-
-snakeBorder.addEventListener('mouseenter', () => {
-  window.recordingAPI.setIgnoreMouseEvents(false, false)
-  if (currentState === 'idle') {
-    idleTooltip.classList.add('visible')
-  }
+indicatorShell.addEventListener('mouseenter', () => {
+  if (currentState !== 'idle') window.recordingAPI.setIgnoreMouseEvents(false, false)
 })
-snakeBorder.addEventListener('mouseleave', () => {
+indicatorShell.addEventListener('mouseleave', () => {
   window.recordingAPI.setIgnoreMouseEvents(true, true)
-  idleTooltip.classList.remove('visible')
 })
 
 // ─── Animation ───
@@ -476,7 +355,6 @@ window.recordingAPI.onStateChange((state: string) => {
 
 window.recordingAPI.onHotkeyInfo((hotkey: string) => {
   hotkeyDisplay = parseHotkeyForDisplay(hotkey)
-  hotkeyLabel.textContent = hotkeyDisplay
 })
 
 window.recordingAPI.onMicrophoneInfo((_micName: string) => {})

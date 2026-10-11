@@ -1,4 +1,5 @@
 import type { Session, Stats, WeeklyStats, DictionaryEntry, Snippet, StyleProfile, Note } from '../../shared/types'
+import type { Meeting, MeetingProvider, MeetingResult } from '../../shared/meetings'
 
 export type { Session, Stats, WeeklyStats, DictionaryEntry, Snippet, StyleProfile, Note }
 
@@ -16,6 +17,13 @@ export interface Toast {
 declare global {
   interface Window {
     annaAPI: {
+      onAppNavigate: (callback: (data: { page: string; startMeeting?: boolean }) => void) => () => void
+      listMeetings: () => Promise<Meeting[]>
+      startMeeting: (title: string) => Promise<Meeting>
+      appendMeetingAudio: (id: string, bytes: ArrayBuffer, duration: number) => Promise<void>
+      finishMeeting: (id: string) => Promise<Meeting>
+      processMeeting: (id: string, provider: MeetingProvider) => Promise<Meeting>
+      editMeeting: (id: string, provider: MeetingProvider, result: MeetingResult) => Promise<Meeting>
       getSessions: () => Promise<Session[]>
       retrySession: (id: string, customPrompt?: string) => Promise<void>
       deleteSession: (id: string) => Promise<void>

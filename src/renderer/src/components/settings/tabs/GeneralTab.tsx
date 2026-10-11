@@ -61,7 +61,8 @@ export function GeneralTab(): React.JSX.Element {
   useEffect(() => {
     async function loadDevices(): Promise<void> {
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true })
+        const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        permissionStream.getTracks().forEach((track) => track.stop())
         const allDevices = await navigator.mediaDevices.enumerateDevices()
         const audioInputs = allDevices.filter((d) => d.kind === 'audioinput')
         setDevices(audioInputs)

@@ -36,6 +36,7 @@ process.on('unhandledRejection', (reason) => {
 })
 
 import { config } from 'dotenv'
+import { registerMeetingIpc, isMeetingRecording } from './meetings'
 import { app, BrowserWindow, ipcMain, dialog, nativeImage, utilityProcess } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
@@ -56,6 +57,7 @@ import {
   getVocabularyPacks, setVocabularyPackEnabled, addVocabularyPack, updateVocabularyPack, deleteVocabularyPack
 } from './db'
 import { createAudioWindow, destroyAudioWindow } from './audio'
+import { warmNvidiaProvider } from './transcribe/providers/nvidia'
 import { registerHotkey, unregisterHotkeys, reregisterHotkey } from './hotkey'
 import { handleHotkeyToggle, setPipelineMainWindow, retrySession, cleanupStaleSessions } from './pipeline'
 import { createRecordingIndicatorWindow, destroyRecordingIndicator, sendHotkeyInfo } from './recordingIndicator'
@@ -346,6 +348,9 @@ function createWindow(): void {
 
   setPipelineMainWindow(mainWindow)
 
+  mainWindow.on('close', event => {
+    if (isMeetingRecording()) { event.preventDefault(); mainWindow?.hide() }
+  })
   mainWindow.on('closed', () => {
     mainWindow = null
     setPipelineMainWindow(null)
@@ -389,6 +394,15 @@ app.whenReady().then(async () => {
   }
 
   initDB()
+  if (app.isPackaged && getSetting('secure_speech_migrated') !== 'true') {
+    const previousProvider = getSetting('stt_provider')
+    if (!previousProvider || ['auto', 'groq', 'openai', 'openai-gpt-transcribe', 'elevenlabs'].includes(previousProvider)) setSetting('stt_provider', 'deepgram')
+    setSetting('secure_speech_migrated', 'true')
+  }
+  if (['nvidia', 'nvidia-nemotron'].includes(getSetting('stt_provider') ?? '')) {
+    void warmNvidiaProvider(getSetting('stt_provider') === 'nvidia-nemotron' ? 'nemotron' : 'parakeet')
+      .catch(error => console.warn('[nvidia] Startup failed:', error))
+  }
   loadCachedSubscription() // Load subscription cache early so IPC handlers return correct value
 
   // Notify renderer when subscription status changes (e.g. after silent auth refresh)
@@ -475,6 +489,7 @@ app.whenReady().then(async () => {
 
   // IPC handlers — registered BEFORE hotkey so renderer can call them immediately
   registerLocalModelIpc()
+  registerMeetingIpc()
   ipcMain.handle('sessions:get-all', () => getSessions())
 
   ipcMain.handle('session:retry', async (_event, sessionId: string, customPrompt?: string) => {
@@ -642,6 +657,9 @@ app.whenReady().then(async () => {
   let captureMonitorCleanup: (() => void) | null = null
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
   ipcMain.handle('settings:set', async (_e, key: string, value: string) => {
+    if (key === 'stt_provider' && ['nvidia', 'nvidia-nemotron'].includes(value)) {
+      await warmNvidiaProvider(value === 'nvidia-nemotron' ? 'nemotron' : 'parakeet')
+    }
     setSetting(key, value)
     syncSettingToCloud(key, value)
     if (key === 'hotkey') {
@@ -984,7 +1002,21 @@ app.whenReady().then(async () => {
   }, 5 * 60 * 1000)
 
   // Create tray icon
-  createTray(mainWindow!, handleHotkeyToggle)
+  const showAnna = (startMeeting = false): void => {
+    if (!mainWindow || mainWindow.isDestroyed()) createWindow()
+    mainWindow!.show()
+    mainWindow!.focus()
+    app.focus({ steal: true })
+    if (startMeeting) {
+      const window = mainWindow!
+      const navigate = (): void => { setTimeout(() => {
+        if (!window.isDestroyed()) window.webContents.send('app:navigate', { page: 'meetings', startMeeting: true })
+      }, 250) }
+      if (window.webContents.isLoading()) window.webContents.once('did-finish-load', navigate)
+      else navigate()
+    }
+  }
+  createTray(mainWindow!, handleHotkeyToggle, () => showAnna(), () => showAnna(true))
 
   // Auto-updater (skip in dev)
   if (!is.dev) {

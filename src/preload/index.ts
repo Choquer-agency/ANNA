@@ -1,6 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('annaAPI', {
+  onAppNavigate: (callback: (data: { page: string; startMeeting?: boolean }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { page: string; startMeeting?: boolean }): void => callback(data)
+    ipcRenderer.on('app:navigate', listener)
+    return () => ipcRenderer.removeListener('app:navigate', listener)
+  },
+  listMeetings: () => ipcRenderer.invoke('meetings:list'),
+  startMeeting: (title: string) => ipcRenderer.invoke('meetings:start', title),
+  appendMeetingAudio: (id: string, bytes: ArrayBuffer, duration: number) => ipcRenderer.invoke('meetings:chunk', id, bytes, duration),
+  finishMeeting: (id: string) => ipcRenderer.invoke('meetings:finish', id),
+  processMeeting: (id: string, provider: string) => ipcRenderer.invoke('meetings:process', id, provider),
+  editMeeting: (id: string, provider: string, result: unknown) => ipcRenderer.invoke('meetings:edit', id, provider, result),
   getSessions: (): Promise<unknown[]> => ipcRenderer.invoke('sessions:get-all'),
   retrySession: (id: string, customPrompt?: string): Promise<void> => ipcRenderer.invoke('session:retry', id, customPrompt),
   deleteSession: (id: string): Promise<void> => ipcRenderer.invoke('session:delete', id),

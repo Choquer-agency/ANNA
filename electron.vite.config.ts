@@ -20,18 +20,11 @@ export default defineConfig({
     },
     define: {
       'process.env.CONVEX_URL': JSON.stringify(process.env.CONVEX_URL),
-      'process.env.ANTHROPIC_API_KEY': JSON.stringify(process.env.ANTHROPIC_API_KEY),
-      'process.env.OPENAI_API_KEY': JSON.stringify(process.env.OPENAI_API_KEY),
       'process.env.LANGFUSE_PUBLIC_KEY': JSON.stringify(process.env.LANGFUSE_PUBLIC_KEY),
-      'process.env.LANGFUSE_SECRET_KEY': JSON.stringify(process.env.LANGFUSE_SECRET_KEY),
       'process.env.LANGFUSE_BASE_URL': JSON.stringify(process.env.LANGFUSE_BASE_URL),
       'process.env.WEBSITE_URL': JSON.stringify(process.env.WEBSITE_URL || 'https://annatype.io'),
       'process.env.POSTHOG_API_KEY': JSON.stringify(process.env.POSTHOG_API_KEY),
       'process.env.POSTHOG_HOST': JSON.stringify(process.env.POSTHOG_HOST),
-      'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY),
-      'process.env.GROQ_API_KEY': JSON.stringify(process.env.GROQ_API_KEY),
-      'process.env.DEEPGRAM_API_KEY': JSON.stringify(process.env.DEEPGRAM_API_KEY),
-      'process.env.ELEVENLABS_API_KEY': JSON.stringify(process.env.ELEVENLABS_API_KEY),
       'process.env.ELEVENLABS_MODEL': JSON.stringify(process.env.ELEVENLABS_MODEL),
       // AUTO_UPDATE_TOKEN intentionally NOT included — use public GitHub releases
       // to avoid embedding a GitHub token in the distributed binary

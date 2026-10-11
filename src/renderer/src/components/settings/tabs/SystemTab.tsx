@@ -11,6 +11,7 @@ export function SystemTab(): React.JSX.Element {
   const [dictationSounds, setDictationSounds] = useState(false)
   const [language, setLanguage] = useState('auto')
   const [sttProvider, setSttProvider] = useState('auto')
+  const [deepgramKeyterms, setDeepgramKeyterms] = useState(false)
   const [postLlmModel, setPostLlmModel] = useState('')
   const [skipShortProcessing, setSkipShortProcessing] = useState(true)
   const [accuracyMode, setAccuracyMode] = useState(false)
@@ -20,7 +21,7 @@ export function SystemTab(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   const loadSettings = useCallback(async () => {
-    const [ap, styles, sounds, lang, stt, llm, skip, lm, accuracy, models] = await Promise.all([
+    const [ap, styles, sounds, lang, stt, llm, skip, lm, accuracy, models, keyterms] = await Promise.all([
       window.annaAPI.getSetting('auto_paste'),
       window.annaAPI.getStyleProfiles(),
       window.annaAPI.getSetting('dictation_sounds'),
@@ -30,7 +31,8 @@ export function SystemTab(): React.JSX.Element {
       window.annaAPI.getSetting('skip_short_processing'),
       window.annaAPI.getSetting('local_model'),
       window.annaAPI.getSetting('accuracy_mode'),
-      window.annaAPI.listLocalModels().catch(() => [])
+      window.annaAPI.listLocalModels().catch(() => []),
+      window.annaAPI.getSetting('deepgram_keyterms_enabled')
     ])
     setAutoPaste(ap !== 'false')
     setStyleProfiles(styles)
@@ -39,6 +41,7 @@ export function SystemTab(): React.JSX.Element {
     setDictationSounds(sounds === 'true')
     setLanguage(lang ?? 'auto')
     setSttProvider(stt ?? 'auto')
+    setDeepgramKeyterms(keyterms === 'true')
     setPostLlmModel(llm ?? '')
     setSkipShortProcessing(skip !== 'false')
     setLocalModel(lm ?? 'small')
@@ -178,11 +181,26 @@ export function SystemTab(): React.JSX.Element {
             <option value="auto">Auto (recommended)</option>
             <option value="groq">Groq · Whisper Large v3 Turbo</option>
             <option value="openai">OpenAI · Whisper</option>
-            <option value="deepgram">Deepgram · Nova-3 (streaming + keyterms)</option>
+            <option value="deepgram">Deepgram · Nova-3 (streaming)</option>
             <option value="elevenlabs">ElevenLabs · Scribe (max accuracy, 99 langs)</option>
             <option value="local">Local (offline)</option>
           </select>
         </SettingsRow>
+
+        {sttProvider === 'deepgram' && (
+          <SettingsRow
+            label="Deepgram dictionary hints"
+            description="Help recognize names and specialist terms from your dictionary. Optional paid add-on; off by default."
+          >
+            <Toggle
+              value={deepgramKeyterms}
+              onChange={async (v) => {
+                await window.annaAPI.setSetting('deepgram_keyterms_enabled', String(v))
+                setDeepgramKeyterms(v)
+              }}
+            />
+          </SettingsRow>
+        )}
 
         <SettingsRow
           label="Accuracy mode"

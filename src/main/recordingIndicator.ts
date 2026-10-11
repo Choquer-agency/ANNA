@@ -4,6 +4,7 @@ import { is } from '@electron-toolkit/utils'
 
 let indicatorWindow: BrowserWindow | null = null
 let idleRepositionInterval: ReturnType<typeof setInterval> | null = null
+let indicatorState = 'idle'
 
 const WIN_WIDTH = 420
 const WIN_HEIGHT = 200
@@ -20,8 +21,7 @@ function getPosition(): { x: number; y: number } {
 }
 
 /**
- * Create the indicator window and show it immediately in idle state.
- * The window is always visible — it starts as a tiny pill and expands when recording.
+ * Prepare the floating indicator, keeping it hidden until dictation is active.
  */
 export function createRecordingIndicatorWindow(): void {
   if (indicatorWindow) return
@@ -68,7 +68,8 @@ export function createRecordingIndicatorWindow(): void {
       indicatorWindow.setSize(WIN_WIDTH, WIN_HEIGHT)
       const pos = getPosition()
       indicatorWindow.setPosition(pos.x, pos.y)
-      indicatorWindow.showInactive()
+      indicatorWindow.webContents.send('recording:state-change', indicatorState)
+      if (indicatorState !== 'idle') indicatorWindow.showInactive()
     }
   })
 
@@ -76,13 +77,11 @@ export function createRecordingIndicatorWindow(): void {
     indicatorWindow = null
   })
 
-  // Start idle repositioning (follow active screen every 2s)
-  startIdleReposition()
-
-  console.log('[recording-indicator] Window created (idle state)')
+  console.log('[recording-indicator] Window created (hidden while idle)')
 }
 
 export function showRecordingIndicator(): void {
+  indicatorState = 'recording'
   if (!indicatorWindow) {
     createRecordingIndicatorWindow()
   }
@@ -91,10 +90,11 @@ export function showRecordingIndicator(): void {
   const pos = getPosition()
   indicatorWindow.setPosition(pos.x, pos.y)
   indicatorWindow.showInactive()
+  startIdleReposition()
 }
 
 /**
- * Return indicator to idle state (tiny pill). Window stays visible.
+ * Hide the floating indicator completely when dictation finishes.
  */
 export function hideRecordingIndicator(): void {
   sendStateChange('idle')
@@ -115,8 +115,17 @@ export function sendAudioLevel(level: number): void {
 }
 
 export function sendStateChange(state: string): void {
+  indicatorState = state
   if (indicatorWindow) {
     indicatorWindow.webContents.send('recording:state-change', state)
+    if (state === 'idle') {
+      indicatorWindow.setIgnoreMouseEvents(true, { forward: true })
+      indicatorWindow.hide()
+      stopIdleReposition()
+    } else {
+      indicatorWindow.showInactive()
+      startIdleReposition()
+    }
   }
 }
 
