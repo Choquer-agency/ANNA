@@ -1,0 +1,569 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		23896959677D44E5055215E7 /* SharedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3421D23769AE9E3AB55FF5 /* SharedState.swift */; };
+		2C187733EB0DA46FB41C1137 /* AnnaKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 858865AD2BAEE4135A32C892 /* AnnaKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3215CCD746DC6E20BABF848B /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE89B03A7F83B929149CE07E /* KeyboardViewController.swift */; };
+		40E50A0BA28B97F9727F8F21 /* AnnaMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46799A057156FF5A6012F64 /* AnnaMark.swift */; };
+		4BB472BCC2C14EFF5B0F704F /* Recorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DF9F9D3037B633EFEB3336B /* Recorder.swift */; };
+		572702F2EB04DC06F74596E6 /* AnnaMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46799A057156FF5A6012F64 /* AnnaMark.swift */; };
+		8EC885E1A2D259F11ADCD3AB /* SharedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3421D23769AE9E3AB55FF5 /* SharedState.swift */; };
+		ACDA8808A0CF23FC1AE58722 /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE89B03A7F83B929149CE07E /* KeyboardViewController.swift */; };
+		C9FE55FCB726D6FB59CED6C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1BD00A34118B5D30AA2180B1 /* Assets.xcassets */; };
+		D209A8DCFBB115284565201A /* AnnaMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46799A057156FF5A6012F64 /* AnnaMark.swift */; };
+		E8A57265B9954CF66C594B2C /* AnnaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC25AC6E3601B748A9E8F409 /* AnnaTests.swift */; };
+		EB4D00275012C57C7130725F /* SharedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3421D23769AE9E3AB55FF5 /* SharedState.swift */; };
+		EDBAAB7F2464992B851380AC /* AnnaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B950AC53D75BFE9B207EF3 /* AnnaApp.swift */; };
+		FB5BFF32BDE18C451958C9F3 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2316222C211A08FA32BC39DF /* Keychain.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2C31982F62898BFAC9D85B19 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0CAE3566D6F0EFEB509DCD13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E13B66E67FFC43184B1BFF0D;
+			remoteInfo = AnnaKeyboard;
+		};
+		9C7675806A2242D0B5BAD016 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0CAE3566D6F0EFEB509DCD13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AB99B8A76E809DB54B5DD40D;
+			remoteInfo = Anna;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		71C1EAD522B8BDE4BD7DF9C7 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				2C187733EB0DA46FB41C1137 /* AnnaKeyboard.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0A536EA38254E670F339C7A4 /* AnnaTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AnnaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1BD00A34118B5D30AA2180B1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2316222C211A08FA32BC39DF /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
+		274D3ED7E386AA2E8EF81914 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		41A64A30A308F8E281DB2418 /* Anna.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Anna.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DF9F9D3037B633EFEB3336B /* Recorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recorder.swift; sourceTree = "<group>"; };
+		858865AD2BAEE4135A32C892 /* AnnaKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = AnnaKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA3421D23769AE9E3AB55FF5 /* SharedState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedState.swift; sourceTree = "<group>"; };
+		B3C66B763058A6FE79495344 /* Anna.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Anna.entitlements; sourceTree = "<group>"; };
+		BC25AC6E3601B748A9E8F409 /* AnnaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnaTests.swift; sourceTree = "<group>"; };
+		DC794EA6127077B8211F6543 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DF95633F802A46431FD64ECF /* AnnaKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AnnaKeyboard.entitlements; sourceTree = "<group>"; };
+		E46799A057156FF5A6012F64 /* AnnaMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnaMark.swift; sourceTree = "<group>"; };
+		EE89B03A7F83B929149CE07E /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		F0B950AC53D75BFE9B207EF3 /* AnnaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnaApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		61ADDC894944DE354EDAEED3 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				E46799A057156FF5A6012F64 /* AnnaMark.swift */,
+				AA3421D23769AE9E3AB55FF5 /* SharedState.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		6472E899A21ED58DE5C0892D = {
+			isa = PBXGroup;
+			children = (
+				D7506A7A820B93F2B4DC56F1 /* App */,
+				703F87329C87C53F079F97D2 /* Keyboard */,
+				61ADDC894944DE354EDAEED3 /* Shared */,
+				E2EA98A418A4CAAD846D3CD9 /* Tests */,
+				BD8E3A6616AC086C3FDCC8D6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		703F87329C87C53F079F97D2 /* Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				DF95633F802A46431FD64ECF /* AnnaKeyboard.entitlements */,
+				DC794EA6127077B8211F6543 /* Info.plist */,
+				EE89B03A7F83B929149CE07E /* KeyboardViewController.swift */,
+			);
+			path = Keyboard;
+			sourceTree = "<group>";
+		};
+		BD8E3A6616AC086C3FDCC8D6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				41A64A30A308F8E281DB2418 /* Anna.app */,
+				858865AD2BAEE4135A32C892 /* AnnaKeyboard.appex */,
+				0A536EA38254E670F339C7A4 /* AnnaTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D7506A7A820B93F2B4DC56F1 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B3C66B763058A6FE79495344 /* Anna.entitlements */,
+				F0B950AC53D75BFE9B207EF3 /* AnnaApp.swift */,
+				1BD00A34118B5D30AA2180B1 /* Assets.xcassets */,
+				274D3ED7E386AA2E8EF81914 /* Info.plist */,
+				2316222C211A08FA32BC39DF /* Keychain.swift */,
+				6DF9F9D3037B633EFEB3336B /* Recorder.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		E2EA98A418A4CAAD846D3CD9 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				BC25AC6E3601B748A9E8F409 /* AnnaTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AB99B8A76E809DB54B5DD40D /* Anna */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F689569E2EF17E4D3D960E9F /* Build configuration list for PBXNativeTarget "Anna" */;
+			buildPhases = (
+				A9B58E05CA5D6AD14BAA04F3 /* Sources */,
+				2B07A88403AA08E8E79C361E /* Resources */,
+				71C1EAD522B8BDE4BD7DF9C7 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E83F36CF8032DF02E5E468F1 /* PBXTargetDependency */,
+			);
+			name = Anna;
+			packageProductDependencies = (
+			);
+			productName = Anna;
+			productReference = 41A64A30A308F8E281DB2418 /* Anna.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D76491CAC1582A1D5B94BCD9 /* AnnaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8DD4081BB8206F2EC4B9AEA8 /* Build configuration list for PBXNativeTarget "AnnaTests" */;
+			buildPhases = (
+				57F59E43765A914B72CE4043 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				521CFE9F165D051AEB1120B0 /* PBXTargetDependency */,
+			);
+			name = AnnaTests;
+			packageProductDependencies = (
+			);
+			productName = AnnaTests;
+			productReference = 0A536EA38254E670F339C7A4 /* AnnaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E13B66E67FFC43184B1BFF0D /* AnnaKeyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 92CDB87C3C92D0EBD06819C4 /* Build configuration list for PBXNativeTarget "AnnaKeyboard" */;
+			buildPhases = (
+				CC8E7DF9283F5983556AE13B /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AnnaKeyboard;
+			packageProductDependencies = (
+			);
+			productName = AnnaKeyboard;
+			productReference = 858865AD2BAEE4135A32C892 /* AnnaKeyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0CAE3566D6F0EFEB509DCD13 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					AB99B8A76E809DB54B5DD40D = {
+						DevelopmentTeam = VAC2837QGB;
+						ProvisioningStyle = Automatic;
+					};
+					D76491CAC1582A1D5B94BCD9 = {
+						DevelopmentTeam = VAC2837QGB;
+						ProvisioningStyle = Automatic;
+					};
+					E13B66E67FFC43184B1BFF0D = {
+						DevelopmentTeam = VAC2837QGB;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 0F12B874BCEFC83E0ECD3F3A /* Build configuration list for PBXProject "Anna" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 6472E899A21ED58DE5C0892D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AB99B8A76E809DB54B5DD40D /* Anna */,
+				E13B66E67FFC43184B1BFF0D /* AnnaKeyboard */,
+				D76491CAC1582A1D5B94BCD9 /* AnnaTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2B07A88403AA08E8E79C361E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C9FE55FCB726D6FB59CED6C5 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		57F59E43765A914B72CE4043 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D209A8DCFBB115284565201A /* AnnaMark.swift in Sources */,
+				E8A57265B9954CF66C594B2C /* AnnaTests.swift in Sources */,
+				3215CCD746DC6E20BABF848B /* KeyboardViewController.swift in Sources */,
+				8EC885E1A2D259F11ADCD3AB /* SharedState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A9B58E05CA5D6AD14BAA04F3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EDBAAB7F2464992B851380AC /* AnnaApp.swift in Sources */,
+				40E50A0BA28B97F9727F8F21 /* AnnaMark.swift in Sources */,
+				FB5BFF32BDE18C451958C9F3 /* Keychain.swift in Sources */,
+				4BB472BCC2C14EFF5B0F704F /* Recorder.swift in Sources */,
+				EB4D00275012C57C7130725F /* SharedState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC8E7DF9283F5983556AE13B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				572702F2EB04DC06F74596E6 /* AnnaMark.swift in Sources */,
+				ACDA8808A0CF23FC1AE58722 /* KeyboardViewController.swift in Sources */,
+				23896959677D44E5055215E7 /* SharedState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		521CFE9F165D051AEB1120B0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AB99B8A76E809DB54B5DD40D /* Anna */;
+			targetProxy = 9C7675806A2242D0B5BAD016 /* PBXContainerItemProxy */;
+		};
+		E83F36CF8032DF02E5E468F1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E13B66E67FFC43184B1BFF0D /* AnnaKeyboard */;
+			targetProxy = 2C31982F62898BFAC9D85B19 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		10727DAC2DA5475658CC50CA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = VAC2837QGB;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		1DD971A3D25AC1A0BE7B5E9D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.annatype.AnnaTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Anna.app/Anna";
+			};
+			name = Debug;
+		};
+		6D7FAC8E1C574DBADD0F572B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Anna.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.annatype.anna;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7BEA30825D739780DBE09B2F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Anna.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.annatype.anna;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		81553AB39689825AADE10C08 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = VAC2837QGB;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		8387CB1F1677FB35DFF0E738 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.annatype.AnnaTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Anna.app/Anna";
+			};
+			name = Release;
+		};
+		C372D2E589549621FDC2A67B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Keyboard/AnnaKeyboard.entitlements;
+				INFOPLIST_FILE = Keyboard/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.annatype.anna.keyboard;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		DF4A276A965EB3298A7E552E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Keyboard/AnnaKeyboard.entitlements;
+				INFOPLIST_FILE = Keyboard/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = io.annatype.anna.keyboard;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0F12B874BCEFC83E0ECD3F3A /* Build configuration list for PBXProject "Anna" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				10727DAC2DA5475658CC50CA /* Debug */,
+				81553AB39689825AADE10C08 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8DD4081BB8206F2EC4B9AEA8 /* Build configuration list for PBXNativeTarget "AnnaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DD971A3D25AC1A0BE7B5E9D /* Debug */,
+				8387CB1F1677FB35DFF0E738 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		92CDB87C3C92D0EBD06819C4 /* Build configuration list for PBXNativeTarget "AnnaKeyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DF4A276A965EB3298A7E552E /* Debug */,
+				C372D2E589549621FDC2A67B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F689569E2EF17E4D3D960E9F /* Build configuration list for PBXNativeTarget "Anna" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6D7FAC8E1C574DBADD0F572B /* Debug */,
+				7BEA30825D739780DBE09B2F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0CAE3566D6F0EFEB509DCD13 /* Project object */;
+}

@@ -1,0 +1,52 @@
+name: Anna
+options:
+  bundleIdPrefix: io.annatype
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: VAC2837QGB
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1"
+targets:
+  Anna:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.annatype.anna
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/Anna.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: AnnaKeyboard
+        embed: true
+  AnnaKeyboard:
+    type: app-extension
+    platform: iOS
+    sources: [Keyboard, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.annatype.anna.keyboard
+        INFOPLIST_FILE: Keyboard/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Keyboard/AnnaKeyboard.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+  AnnaTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests, Shared, Keyboard/KeyboardViewController.swift]
+    dependencies:
+      - target: Anna
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Anna:
+    build:
+      targets:
+        Anna: all
+        AnnaTests: [test]
+    test:
+      targets: [AnnaTests]

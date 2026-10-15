@@ -23,3 +23,6 @@ resources/fn-key-helper
 /ios/build-device/
 /ios/**/*.xcuserstate
 /ios/**/xcuserdata/
+
+# Private agency usage reports
+/reports/anna-cost-comparison-*.csv

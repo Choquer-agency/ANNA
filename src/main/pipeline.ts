@@ -213,6 +213,8 @@ let streamingSession: StreamingCapture | null = null
 let streamingProviderId: string | null = null
 let recordingMaxDurationTimeout: ReturnType<typeof setTimeout> | null = null
 let recordingWarningTimeout: ReturnType<typeof setTimeout> | null = null
+let microphoneStarting = false
+let microphoneAttempt = 0
 
 // Warn 30 seconds before the 15-minute recording limit.
 const MAX_RECORDING_DURATION_MS = 900_000
@@ -379,7 +381,17 @@ function abortStreamingSession(): void {
  * Handle cancel: stop recording, discard, show cancelled state with undo option
  */
 async function handleCancel(): Promise<void> {
-  if (!getRecordingState()) return
+  microphoneAttempt++
+  microphoneStarting = false
+  if (!getRecordingState()) {
+    cleanupRecordingState()
+    abortStreamingSession()
+    sendStatus('idle')
+    sendStateChange('idle')
+    hideRecordingIndicator()
+    await stopRecording()
+    return
+  }
 
   playDictationStop()
   cleanupRecordingState()
@@ -805,6 +817,7 @@ async function runPipeline(
 
 export async function handleHotkeyToggle(): Promise<void> {
   if (isMeetingRecording()) return
+  if (microphoneStarting) { await handleCancel(); return }
   if (getRecordingState()) {
     const stoppedAt = performance.now()
     // Stop recording and run pipeline
@@ -941,8 +954,23 @@ export async function handleHotkeyToggle(): Promise<void> {
     }
 
     playDictationStart()
+    const attempt = ++microphoneAttempt
+    microphoneStarting = true
     const recordingStarted = startRecording()
-    void recordingStarted.catch((err) => console.warn('[pipeline] Microphone startup failed:', err))
+    void recordingStarted.then(() => {
+      if (attempt === microphoneAttempt) microphoneStarting = false
+    }, () => {})
+    void recordingStarted.catch(async (err) => {
+      if (attempt !== microphoneAttempt) return
+      microphoneStarting = false
+      console.warn('[pipeline] Microphone startup failed:', err)
+      cleanupRecordingState()
+      abortStreamingSession()
+      sendStatus('idle')
+      sendStateChange('idle')
+      hideRecordingIndicator()
+      await stopRecording()
+    })
     showRecordingIndicator()
 
     // Best-effort: open a streaming STT session in parallel with recording.

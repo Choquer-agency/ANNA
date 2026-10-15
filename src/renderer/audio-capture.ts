@@ -14,6 +14,7 @@ declare global {
 }
 
 let mediaStream: MediaStream | null = null
+let captureGeneration = 0
 let audioContext: AudioContext | null = null
 let sourceNode: MediaStreamAudioSourceNode | null = null
 let workletNode: AudioWorkletNode | null = null
@@ -173,6 +174,7 @@ async function ensureAudioContext(): Promise<AudioContext> {
 }
 
 window.audioAPI.onStartRecording(async (deviceId) => {
+  const generation = ++captureGeneration
   try {
     chunks = []
     chunkRms = []
@@ -190,9 +192,19 @@ window.audioAPI.onStartRecording(async (deviceId) => {
           noiseSuppression: false,
           autoGainControl: true
         }
+      }).catch(async (error) => {
+        if (deviceId && deviceId !== 'default' && ['NotFoundError', 'OverconstrainedError'].includes(error.name)) {
+          console.warn('[audio-capture] Saved microphone unavailable; using system default')
+          return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true } })
+        }
+        throw error
       }),
       ensureAudioContext(),
     ])
+    if (generation !== captureGeneration) {
+      stream.getTracks().forEach(track => track.stop())
+      return
+    }
     mediaStream = stream
     const track = stream.getAudioTracks()[0]
     console.log('[audio-capture] Microphone:', track?.label, 'muted:', track?.muted)
@@ -231,6 +243,7 @@ window.audioAPI.onStartRecording(async (deviceId) => {
 })
 
 window.audioAPI.onStopRecording(() => {
+  captureGeneration++
   if (workletNode) {
     workletNode.disconnect()
     workletNode = null

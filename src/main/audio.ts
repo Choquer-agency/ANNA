@@ -47,7 +47,7 @@ export function createAudioWindow(): void {
     }
   })
   hiddenWindow.webContents.on('console-message', (_event, _level, message) => {
-    if (message.startsWith('[audio-capture] Microphone:')) console.log(message)
+    if (message.startsWith('[audio-capture]')) console.log(message)
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
