@@ -1,14 +1,11 @@
-# Electron app files (not needed for website deploy)
-/node_modules
-/out
-/dist
-/src/main
-/src/preload
-/src/renderer
-/resources
-/scripts
-/build
-/.github
-*.dmg
-*.zip
-*.node
+# Only the website and its shared Convex imports belong in this deployment.
+**
+!website
+!website/**
+!convex
+!convex/**
+!package.json
+!package-lock.json
+website/node_modules/**
+website/.next/**
+website/.env*
